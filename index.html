@@ -111,6 +111,23 @@
   .head .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--magenta), transparent); align-self: center; }
   .head small { font-family: var(--hud); color: var(--orange); letter-spacing: 0.2em; font-size: 0.75rem; text-transform: uppercase; }
 
+  /* ---------- Latest video ---------- */
+  .screen { position: relative; padding: clamp(10px, 1.6vw, 16px); border: 1px solid var(--line); background: rgba(18, 11, 34, 0.8);
+    box-shadow: 0 0 0 1px rgba(255, 61, 154, 0.15), 0 0 40px rgba(255, 61, 154, 0.12); }
+  .screen::before, .screen::after { content: ""; position: absolute; width: 26px; height: 26px; border: 2px solid var(--magenta); }
+  .screen::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+  .screen::after { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+  .player { position: relative; aspect-ratio: 16 / 9; width: 100%; max-width: 100%; background: #05030B; overflow: hidden; }
+  .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .player .standby { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--hud); font-size: 0.8rem;
+    letter-spacing: 0.3em; text-transform: uppercase; color: var(--soft); }
+  .screen-foot { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 0.9rem;
+    font-family: var(--hud); font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--soft); }
+  .screen-foot .live { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--magenta); }
+  .screen-foot .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--magenta); box-shadow: 0 0 10px var(--magenta); }
+  .screen-foot a { color: var(--cyan); text-decoration: none; font-weight: 700; }
+  .screen-foot a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
   /* ---------- Mixtape: channel cassettes ---------- */
   .tapes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
   .tape { position: relative; background: var(--panel); border: 1px solid var(--line); padding: 1.1rem 1.1rem 1.4rem; display: flex; flex-direction: column; gap: 0.9rem;
@@ -176,6 +193,7 @@
   <header class="top">
     <a class="tag" href="/">POBA<span>JOBS</span></a>
     <nav aria-label="Main">
+      <a href="#latest">Latest</a>
       <a href="#mixtape">Channels</a>
       <a href="#socials">Socials</a>
     </nav>
@@ -196,6 +214,23 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="9"/></svg>Catch a stream</a>
     </div>
     <div class="shield-bar" aria-hidden="true"><span>Shield</span><span class="meter"><b></b></span></div>
+  </section>
+
+  <section class="block" id="latest">
+    <div class="head"><h2>Latest transmission</h2><span class="rule"></span><small>Newest upload</small></div>
+    <div class="screen">
+      <div class="player">
+        <span class="standby">Incoming signal&hellip;</span>
+        <!-- Your channel's uploads playlist (UU + channel ID): it always opens on the newest video, so this updates itself. -->
+        <iframe src="https://www.youtube-nocookie.com/embed/videoseries?list=UUirfgMJXAZkxliSP0-wAoHA&amp;rel=0"
+          title="Latest pobajobs video" loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      </div>
+      <div class="screen-foot">
+        <span class="live">Now showing: newest upload</span>
+        <a href="https://www.youtube.com/@pobajobs/videos" target="_blank" rel="noopener">All videos &rarr;</a>
+      </div>
+    </div>
   </section>
 
   <section class="block" id="mixtape">
