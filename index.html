@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>pobajobs</title>
+<meta name="description" content="pobajobs: gamer, streamer, general idiot. Me and my mates messing about in various games.">
+<meta name="theme-color" content="#0B0716">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Monoton&family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a starfield behind a HUD-framed hero (neon wordmark), then the "mixtape" of channels as cassette cards, then socials. One deliberate dark look. */
+  :root {
+    color-scheme: dark;
+    --space: #0B0716;      /* deep space */
+    --space-2: #160D2B;    /* nebula purple */
+    --panel: #120B22;
+    --ink: #F3ECFF;
+    --soft: #B7A9D6;
+    --magenta: #FF3D9A;
+    --orange: #FF9A3C;
+    --cyan: #38E1E6;
+    --line: rgba(183, 169, 214, 0.22);
+    --display: 'Monoton', 'Arial Black', sans-serif;
+    --hud: 'Chakra Petch', 'Segoe UI', sans-serif;
+    --body: 'Barlow', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100%; background: var(--space); color: var(--ink);
+    font-family: var(--body); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  a { color: inherit; }
+
+  /* ---------- Backdrop: nebula, stars, grunge ---------- */
+  .sky { position: fixed; inset: 0; z-index: -2;
+    background:
+      radial-gradient(60% 45% at 85% 10%, rgba(255, 61, 154, 0.28), transparent 70%),
+      radial-gradient(55% 40% at 5% 35%, rgba(56, 225, 230, 0.16), transparent 70%),
+      radial-gradient(70% 50% at 50% 105%, rgba(255, 154, 60, 0.22), transparent 70%),
+      linear-gradient(180deg, var(--space) 0%, var(--space-2) 55%, var(--space) 100%); }
+  #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; }
+  .grain { position: fixed; inset: -50%; z-index: 50; pointer-events: none; opacity: 0.09; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: grain 1.2s steps(4) infinite; }
+  @keyframes grain { 25% { transform: translate(-3%, 2%); } 50% { transform: translate(2%, -3%); } 75% { transform: translate(-1%, -2%); } }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding-inline: max(16px, 4vw); padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+  /* ---------- Top bar ---------- */
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: calc(1.1rem + env(safe-area-inset-top, 0px)) 1.1rem; }
+  .tag { font-family: var(--hud); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.08em; text-decoration: none; }
+  .tag span { color: var(--magenta); }
+  .top nav { display: flex; gap: 1.4rem; font-family: var(--hud); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+  .top nav a { text-decoration: none; color: var(--soft); }
+  .top nav a:hover, .top nav a:focus-visible { color: var(--cyan); }
+
+  /* ---------- Hero ---------- */
+  .hero { position: relative; margin-top: clamp(0.5rem, 3vw, 2rem); padding: clamp(2.5rem, 7vw, 5rem) clamp(1.1rem, 4vw, 3rem); text-align: center; }
+  .hud-frame { position: absolute; inset: 0; pointer-events: none; }
+  .hud-frame i { position: absolute; width: 30px; height: 30px; border: 2px solid var(--cyan); opacity: 0.85; }
+  .hud-frame i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+  .hud-frame i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+  .hud-frame i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+  .hud-frame i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+  .status { display: inline-flex; align-items: center; gap: 0.55rem; font-family: var(--hud); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--orange);
+    border: 1px solid rgba(255, 154, 60, 0.45); padding: 0.35rem 0.85rem; background: rgba(255, 154, 60, 0.07); }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 10px var(--orange); animation: blink 1.4s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.2; } }
+
+  .wordmark { position: relative; display: block; width: fit-content; margin: 1.6rem auto 0.4rem; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  .wordmark h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(2.6rem, 11.5vw, 7.6rem); line-height: 1.05; letter-spacing: 0.02em; color: #FFE3F2;
+    text-shadow: 0 0 4px #fff, 0 0 12px var(--magenta), 0 0 28px var(--magenta), 0 0 60px rgba(255, 61, 154, 0.55);
+    animation: buzz 7s linear infinite; }
+  @keyframes buzz { 0%, 92%, 100% { opacity: 1; } 93% { opacity: 0.55; } 94% { opacity: 1; } 95.5% { opacity: 0.7; } 96.5% { opacity: 1; } }
+  .sub { font-family: var(--hud); font-weight: 600; letter-spacing: 0.45em; text-transform: uppercase; color: var(--cyan); font-size: clamp(0.8rem, 2.6vw, 1.05rem);
+    text-shadow: 0 0 10px rgba(56, 225, 230, 0.6); margin-right: -0.45em; }
+  .lede { max-width: 34em; margin: 1.6rem auto 0; color: var(--soft); font-size: 1.08rem; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8rem; margin-top: 2rem; }
+  .btn { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--hud); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none;
+    padding: 0.85rem 1.4rem; border: 2px solid currentColor; color: var(--magenta); background: rgba(255, 61, 154, 0.08);
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); transition: background .2s, color .2s, transform .2s; }
+  .btn:hover, .btn:focus-visible { background: var(--magenta); color: var(--space); transform: translateY(-2px); outline: none; }
+  .btn.alt { color: var(--cyan); background: rgba(56, 225, 230, 0.07); }
+  .btn.alt:hover, .btn.alt:focus-visible { background: var(--cyan); color: var(--space); }
+  .btn svg { width: 18px; height: 18px; }
+
+  /* Shield meter under the hero (easter egg target) */
+  .shield-bar { display: flex; align-items: center; justify-content: center; gap: 0.7rem; margin-top: 2.4rem; font-family: var(--hud); font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--soft); }
+  .shield-bar .meter { width: min(240px, 50vw); height: 10px; border: 1.5px solid var(--cyan); padding: 1.5px; }
+  .shield-bar .meter b { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--cyan), #9FF6F8); transform-origin: left; box-shadow: 0 0 10px rgba(56, 225, 230, 0.7); }
+
+  /* Easter egg: tap the wordmark five times */
+  .hit-flash { position: fixed; inset: 0; z-index: 40; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(56, 225, 230, 0.35) 75%, rgba(255, 154, 60, 0.45) 100%); }
+  body.shield-hit .hit-flash { animation: hitflash 1s steps(1) 1; }
+  body.shield-hit .shield-bar .meter b { animation: recharge 2.8s ease-in 1; }
+  body.shield-hit .shield-bar .meter { animation: meterflash 1s steps(1) 1; }
+  @keyframes hitflash { 0% { opacity: 1; } 15% { opacity: 0; } 30% { opacity: 0.8; } 45%, 100% { opacity: 0; } }
+  @keyframes recharge { 0%, 35% { transform: scaleX(0); background: var(--orange); } 100% { transform: scaleX(1); } }
+  @keyframes meterflash { 0%, 30% { border-color: var(--orange); } 15%, 45%, 100% { border-color: var(--cyan); } }
+
+  /* ---------- Section heads ---------- */
+  section.block { margin-top: clamp(4rem, 10vw, 7rem); }
+  .head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.6rem; }
+  .head h2 { margin: 0; font-family: var(--hud); font-weight: 700; font-size: clamp(1.5rem, 4vw, 2.1rem); letter-spacing: 0.06em; text-transform: uppercase; }
+  .head .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--magenta), transparent); align-self: center; }
+  .head small { font-family: var(--hud); color: var(--orange); letter-spacing: 0.2em; font-size: 0.75rem; text-transform: uppercase; }
+
+  /* ---------- Mixtape: channel cassettes ---------- */
+  .tapes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+  .tape { position: relative; background: var(--panel); border: 1px solid var(--line); padding: 1.1rem 1.1rem 1.4rem; display: flex; flex-direction: column; gap: 0.9rem;
+    clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%); transition: transform .25s, border-color .25s; }
+  .tape:hover { transform: translateY(-4px) rotate(-0.4deg); border-color: var(--accent); }
+  .tape.a { --accent: var(--magenta); }
+  .tape.b { --accent: var(--orange); }
+  .tape.c { --accent: var(--cyan); }
+  .cassette { position: relative; aspect-ratio: 1.6 / 1; max-width: 100%; border-radius: 8px; padding: 9% 7% 0;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 85%, #fff 10%), color-mix(in srgb, var(--accent) 55%, #000 45%));
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,0.25), 0 10px 24px rgba(0,0,0,0.45); }
+  .cassette .label { background: #F5EEDC; color: #1C1430; border-radius: 4px; height: 58%; padding: 6% 6% 0; position: relative;
+    background-image: repeating-linear-gradient(180deg, transparent 0 13px, rgba(28, 20, 48, 0.12) 13px 14px); }
+  .cassette .label b { display: block; font-family: var(--hud); font-size: clamp(0.72rem, 1.9vw, 0.92rem); letter-spacing: 0.06em; transform: rotate(-2deg); font-weight: 700; }
+  .cassette .label em { font-style: normal; font-family: var(--hud); font-size: 0.62rem; letter-spacing: 0.2em; color: #6B5F86; }
+  .cassette .window { position: absolute; left: 22%; right: 22%; top: 49%; height: 22%; background: #1C1430; border-radius: 30px; display: flex; justify-content: space-between; align-items: center; padding: 0 6%; }
+  .cassette .reel { width: 22%; aspect-ratio: 1; border-radius: 50%; border: 3px dashed #F5EEDC; animation: spin 4s linear infinite; }
+  .tape.paused .reel { animation-play-state: paused; opacity: 0.6; }
+  .cassette .bottom { position: absolute; left: 18%; right: 18%; bottom: 0; height: 15%; background: rgba(0,0,0,0.28); clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .side { font-family: var(--hud); font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .tape h3 { margin: -0.4rem 0 0; font-family: var(--hud); font-size: 1.3rem; letter-spacing: 0.04em; }
+  .tape p { margin: 0; color: var(--soft); font-size: 0.98rem; }
+  .tape .go { margin-top: auto; font-family: var(--hud); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; color: var(--accent); }
+  .tape .go:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .soon { align-self: flex-start; margin-top: auto; font-family: var(--hud); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent);
+    border: 1.5px dashed var(--accent); padding: 0.3rem 0.7rem; }
+
+  /* ---------- Socials ---------- */
+  .socials { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.9rem; }
+  .social { display: flex; flex-direction: column; gap: 0.25rem; text-decoration: none; padding: 1rem 1rem 1.1rem; border: 1px solid var(--line); background: rgba(18, 11, 34, 0.75);
+    transition: border-color .2s, transform .2s, box-shadow .2s; }
+  .social:hover, .social:focus-visible { border-color: var(--c); transform: translateY(-3px); box-shadow: 0 0 22px color-mix(in srgb, var(--c) 35%, transparent); outline: none; }
+  .social .p { font-family: var(--hud); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.06em; color: var(--c); }
+  .social .h { color: var(--soft); font-size: 0.88rem; word-break: break-word; }
+
+  footer { margin-top: clamp(4rem, 10vw, 6rem); padding-block: 1.6rem 2.4rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    font-family: var(--hud); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+
+  @media (max-width: 860px) {
+    .tapes { grid-template-columns: 1fr; max-width: 460px; margin-inline: auto; }
+    .socials { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .socials .social:last-child { grid-column: 1 / -1; }
+  }
+  @media (max-width: 560px) {
+    .top nav { display: none; }
+    .hero { padding-inline: 0.9rem; }
+    .hud-frame i { width: 20px; height: 20px; }
+    .head small { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .grain, .wordmark h1, .status::before, .cassette .reel { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="sky"></div>
+<canvas id="stars" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="hit-flash" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header class="top">
+    <a class="tag" href="/">POBA<span>JOBS</span></a>
+    <nav aria-label="Main">
+      <a href="#mixtape">Channels</a>
+      <a href="#socials">Socials</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hud-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <span class="status">Site under construction</span>
+    <div class="wordmark" id="wordmark" role="button" tabindex="0" aria-label="pobajobs">
+      <h1>pobajobs</h1>
+    </div>
+    <div class="sub">Gaming</div>
+    <p class="lede"><strong>Gamer, streamer, general idiot.</strong> Me and my mates messing about in various games. The full site is on its way; until then, the good stuff is on YouTube and Twitch.</p>
+    <div class="ctas">
+      <a class="btn" href="https://www.youtube.com/@pobajobs" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch on YouTube</a>
+      <a class="btn alt" href="https://www.twitch.tv/pobajobs" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="9"/></svg>Catch a stream</a>
+    </div>
+    <div class="shield-bar" aria-hidden="true"><span>Shield</span><span class="meter"><b></b></span></div>
+  </section>
+
+  <section class="block" id="mixtape">
+    <div class="head"><h2>The mixtape</h2><span class="rule"></span><small>3 tracks</small></div>
+    <div class="tapes">
+      <article class="tape a">
+        <div class="cassette" aria-hidden="true">
+          <div class="label"><b>POBAJOBS GAMING</b><em>SIDE A &middot; NOW PLAYING</em></div>
+          <div class="window"><span class="reel"></span><span class="reel"></span></div>
+          <div class="bottom"></div>
+        </div>
+        <span class="side">Side A &middot; Now playing</span>
+        <h3>pobajobs Gaming</h3>
+        <p>Let's plays, streams and general chaos with the lads. Expect bad aim and good times.</p>
+        <a class="go" href="https://www.youtube.com/@pobajobs" target="_blank" rel="noopener">Watch the channel &rarr;</a>
+      </article>
+
+      <article class="tape b paused">
+        <div class="cassette" aria-hidden="true">
+          <div class="label"><b>POBAJOBS BUILDS</b><em>SIDE B &middot; RECORDING</em></div>
+          <div class="window"><span class="reel"></span><span class="reel"></span></div>
+          <div class="bottom"></div>
+        </div>
+        <span class="side">Side B &middot; Recording</span>
+        <h3>pobajobs Builds</h3>
+        <p>A second channel for builds and projects. Still being recorded.</p>
+        <span class="soon">Coming soon</span>
+      </article>
+
+      <article class="tape c paused">
+        <div class="cassette" aria-hidden="true">
+          <div class="label"><b>THE POBAJOBS PODCAST</b><em>BONUS TRACK &middot; UNRELEASED</em></div>
+          <div class="window"><span class="reel"></span><span class="reel"></span></div>
+          <div class="bottom"></div>
+        </div>
+        <span class="side">Bonus track &middot; Unreleased</span>
+        <h3>The Podcast</h3>
+        <p>Chat, games and whatever else comes up. Mic check pending.</p>
+        <span class="soon">Coming soon</span>
+      </article>
+    </div>
+  </section>
+
+  <section class="block" id="socials">
+    <div class="head"><h2>Comms channels</h2><span class="rule"></span><small>Open frequencies</small></div>
+    <div class="socials">
+      <a class="social" style="--c: #FF4D4D" href="https://www.youtube.com/@pobajobs" target="_blank" rel="noopener"><span class="p">YouTube</span><span class="h">@pobajobs</span></a>
+      <a class="social" style="--c: #A970FF" href="https://www.twitch.tv/pobajobs" target="_blank" rel="noopener"><span class="p">Twitch</span><span class="h">twitch.tv/pobajobs</span></a>
+      <a class="social" style="--c: #FF3D9A" href="https://www.instagram.com/pobajobs/" target="_blank" rel="noopener"><span class="p">Instagram</span><span class="h">@pobajobs</span></a>
+      <a class="social" style="--c: #38E1E6" href="https://www.tiktok.com/@pobajobs" target="_blank" rel="noopener"><span class="p">TikTok</span><span class="h">@pobajobs</span></a>
+      <a class="social" style="--c: #FF9A3C" href="https://bit.ly/pobamerch" target="_blank" rel="noopener"><span class="p">Merch</span><span class="h">Kit yourself out</span></a>
+    </div>
+  </section>
+
+  <footer>
+    <span>&copy; <span id="yr">2026</span> pobajobs</span>
+    <span>Transmission incomplete &middot; more soon</span>
+  </footer>
+</div>
+
+<script>
+  document.getElementById('yr').textContent = new Date().getFullYear();
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- Starfield: three layers drifting at different speeds ----
+  const cv = document.getElementById('stars'), ctx = cv.getContext('2d');
+  let stars = [], w = 0, h = 0;
+  const tints = ['#FFFFFF', '#FFFFFF', '#FFD6EC', '#C9FBFF', '#FFE2C2'];
+  function setup() {
+    const d = Math.min(devicePixelRatio || 1, 2);
+    w = innerWidth; h = innerHeight; cv.width = w * d; cv.height = h * d; ctx.setTransform(d, 0, 0, d, 0, 0);
+    const count = Math.round((w * h) / 2600);
+    stars = Array.from({ length: count }, () => {
+      const z = Math.random();
+      return { x: Math.random() * w, y: Math.random() * h, z, r: 0.3 + z * 1.4, c: tints[Math.random() * tints.length | 0], tw: Math.random() * Math.PI * 2 };
+    });
+  }
+  function frame(t) {
+    ctx.clearRect(0, 0, w, h);
+    for (const s of stars) {
+      if (!reduce) { s.x -= 0.04 + s.z * 0.22; if (s.x < -2) { s.x = w + 2; s.y = Math.random() * h; } }
+      ctx.globalAlpha = 0.45 + 0.55 * Math.abs(Math.sin(t / 1400 + s.tw)) * s.z;
+      ctx.fillStyle = s.c; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (!reduce) requestAnimationFrame(frame);
+  }
+  addEventListener('resize', () => { setup(); if (reduce) frame(0); });
+  setup(); requestAnimationFrame(frame);
+
+  // ---- Easter egg: tap the wordmark five times quickly ----
+  const mark = document.getElementById('wordmark');
+  let taps = 0, tapTimer, hitTimer;
+  function tap() {
+    taps++; clearTimeout(tapTimer); tapTimer = setTimeout(() => { taps = 0; }, 1200);
+    if (taps >= 5) {
+      taps = 0;
+      document.body.classList.remove('shield-hit'); void document.body.offsetWidth; document.body.classList.add('shield-hit');
+      clearTimeout(hitTimer); hitTimer = setTimeout(() => document.body.classList.remove('shield-hit'), 3000);
+    }
+  }
+  mark.addEventListener('click', tap);
+  mark.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap(); } });
+</script>
+</body>
+</html>
