@@ -192,6 +192,25 @@
   .ring .out { clip-path: inset(0 0 52% 0); z-index: 2; }
   .ring .out img { filter: drop-shadow(0 0 14px rgba(77, 168, 255, 0.35)); }
 
+  /* ---------- Ticker tape: charity stream lead-up (auto-hides after November) ---------- */
+  .ticker { --t1d: #4DA8FF; position: relative; z-index: 5; display: flex; align-items: stretch; height: 38px; text-decoration: none; overflow: hidden;
+    background: rgba(8, 5, 18, 0.92); border-bottom: 1px solid rgba(77, 168, 255, 0.55); box-shadow: 0 0 22px rgba(77, 168, 255, 0.25);
+    font-family: var(--hud); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase; }
+  .ticker[hidden] { display: none; }
+  .ticker .flag { flex-shrink: 0; display: flex; align-items: center; gap: 0.55rem; padding: 0 1rem 0 max(16px, 2vw); color: var(--space); background: var(--orange);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%); padding-right: 1.6rem; }
+  .ticker .flag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--space); animation: blink 1s steps(2) infinite; }
+  .ticker .lane { flex: 1; overflow: hidden; display: flex; align-items: center;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent); mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent); }
+  .ticker .track { display: flex; width: max-content; animation: tape 40s linear infinite; }
+  .ticker:hover .track, .ticker:focus-visible .track { animation-play-state: paused; }
+  .ticker .grp { display: flex; align-items: center; flex-shrink: 0; }
+  .ticker .grp span { padding: 0 1.1rem; color: var(--t1d); text-shadow: 0 0 8px rgba(77, 168, 255, 0.6); white-space: nowrap; }
+  .ticker .grp span.hot { color: #fff; text-shadow: 0 0 8px var(--magenta), 0 0 16px var(--magenta); }
+  .ticker .grp i { color: var(--magenta); font-style: normal; }
+  @keyframes tape { to { transform: translateX(-50%); } }
+  @media (max-width: 560px) { .ticker { height: 34px; font-size: 0.72rem; } .ticker .flag { padding-left: 12px; padding-right: 1.2rem; } }
+
   /* ---------- Socials ---------- */
   .socials { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.9rem; }
   .social { display: flex; flex-direction: column; gap: 0.25rem; text-decoration: none; padding: 1rem 1rem 1.1rem; border: 1px solid var(--line); background: rgba(18, 11, 34, 0.75);
@@ -220,7 +239,8 @@
     .mission .ctas .btn { flex: 1 1 100%; justify-content: center; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .grain, .wordmark h1, .status::before, .cassette .reel, .ring::before { animation: none !important; }
+    .grain, .wordmark h1, .status::before, .cassette .reel, .ring::before, .ticker .flag::before { animation: none !important; }
+    .ticker .track { animation-duration: 160s; }
   }
 </style>
 </head>
@@ -229,6 +249,13 @@
 <canvas id="stars" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
 <div class="hit-flash" aria-hidden="true"></div>
+
+<!-- Charity stream ticker. Set STREAM_START in the script at the bottom once the date is fixed;
+     it counts down, says LIVE NOW during the stream, and disappears on its own after November. -->
+<a class="ticker" id="ticker" href="#charity" aria-label="24-hour charity stream for Breakthrough T1D, coming November 2026" hidden>
+  <span class="flag"><b>Incoming</b></span>
+  <span class="lane" aria-hidden="true"><span class="track" id="tickerTrack"></span></span>
+</a>
 
 <div class="wrap">
   <header class="top">
@@ -405,6 +432,42 @@
   }
   mark.addEventListener('click', tap);
   mark.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap(); } });
+</script>
+<script>
+  // ---- Charity stream ticker ----
+  // When the date is set, put it here, e.g. '2026-11-14T10:00' (UK time). Leave '' while it's TBA.
+  const STREAM_START = '';
+  (function () {
+    const el = document.getElementById('ticker'), track = document.getElementById('tickerTrack');
+    const now = () => new Date();
+    const END = new Date('2026-12-01T00:00:00');               // ticker retires itself after November
+    if (now() >= END) return;
+    const start = STREAM_START ? new Date(STREAM_START) : null;
+    const pad = n => String(n).padStart(2, '0');
+    function countdown() {
+      const t = now();
+      if (start) {
+        const ms = start - t;
+        if (ms <= 0 && t - start < 24 * 3600e3) return '&#9673; Live now on Twitch';
+        if (ms <= 0) return 'Thank you for the support';
+        const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60;
+        return `T-minus ${d}d ${pad(h)}h ${pad(m)}m`;
+      }
+      const nov = new Date('2026-11-01T00:00:00');
+      if (t >= nov) return 'Date dropping soon';
+      const d = Math.ceil((nov - t) / 864e5);
+      return `T-minus ${d} day${d === 1 ? '' : 's'} to November`;
+    }
+    function build() {
+      const items = [`<span class="hot">${countdown()}</span>`, '24-hour charity stream', 'In support of Breakthrough T1D',
+        'Diabetes Awareness Month', start ? start.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Date TBA', 'For Kylo'];
+      const grp = '<span class="grp">' + items.map(x => (x.startsWith('<') ? x : `<span>${x}</span>`) + '<i>&#9670;</i>').join('') + '</span>';
+      const half = grp.repeat(3);                               // wide enough to cover big screens
+      track.innerHTML = half + half;                            // two identical halves = seamless loop
+    }
+    build(); el.hidden = false;
+    setInterval(build, 60000);
+  })();
 </script>
 </body>
 </html>
