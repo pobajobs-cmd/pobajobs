@@ -156,6 +156,41 @@
   .soon { align-self: flex-start; margin-top: auto; font-family: var(--hud); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent);
     border: 1.5px dashed var(--accent); padding: 0.3rem 0.7rem; }
 
+  /* ---------- Charity stream (Nov 2026, Breakthrough T1D) ----------
+     The blue circle is the worldwide diabetes awareness symbol, same as on kyloloki.com. */
+  .mission { --t1d: #4DA8FF; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 340px); gap: clamp(1.5rem, 4vw, 3rem); align-items: center;
+    padding: clamp(1.4rem, 4vw, 2.6rem); border: 1px solid rgba(77, 168, 255, 0.35); background: linear-gradient(135deg, rgba(77, 168, 255, 0.10), rgba(18, 11, 34, 0.85) 55%);
+    box-shadow: 0 0 0 1px rgba(77, 168, 255, 0.12), 0 0 50px rgba(77, 168, 255, 0.14);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px)); }
+  .mission .status { color: var(--t1d); border-color: rgba(77, 168, 255, 0.5); background: rgba(77, 168, 255, 0.08); }
+  .mission .status::before { background: var(--t1d); box-shadow: 0 0 10px var(--t1d); }
+  .mission h3 { margin: 1.1rem 0 0.2rem; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.2em 0.5em; line-height: 1; }
+  .mission h3 .big { font-family: var(--display); font-weight: 400; font-size: clamp(3.4rem, 10vw, 5.6rem); color: #E3F1FF;
+    text-shadow: 0 0 4px #fff, 0 0 12px var(--t1d), 0 0 30px var(--t1d), 0 0 60px rgba(77, 168, 255, 0.5); }
+  .mission h3 .small { font-family: var(--hud); font-weight: 700; font-size: clamp(1.3rem, 3.6vw, 2rem); letter-spacing: 0.08em; text-transform: uppercase; }
+  .mission .for { font-family: var(--hud); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; font-size: 0.82rem; color: var(--t1d); margin: 0.4rem 0 1.1rem; }
+  .mission p { margin: 0 0 0.9rem; color: var(--soft); max-width: 36em; }
+  .mission p strong { color: var(--ink); font-weight: 600; }
+  .readouts { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 0.6rem; margin: 1.4rem 0 1.6rem; max-width: 600px; }
+  .readouts div { border: 1px solid var(--line); background: rgba(11, 7, 22, 0.6); padding: 0.55rem 0.7rem; }
+  .readouts dt { font-family: var(--hud); font-size: 0.64rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--soft); }
+  .readouts dd { margin: 0.15rem 0 0; font-family: var(--hud); font-weight: 700; font-size: 1rem; letter-spacing: 0.06em; color: var(--ink); }
+  .mission .ctas { justify-content: flex-start; margin-top: 0; }
+  .btn.t1d { color: var(--t1d); background: rgba(77, 168, 255, 0.08); }
+  .btn.t1d:hover, .btn.t1d:focus-visible { background: var(--t1d); color: var(--space); }
+  .mission .note { margin: 1rem 0 0; font-family: var(--hud); font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+  /* Kylo in the blue circle: lower half sits inside the ring, head pops out of the top */
+  .ring { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1; justify-self: center; }
+  .ring::before { content: ""; position: absolute; inset: 9%; border-radius: 50%; border: clamp(14px, 3.4vw, 22px) solid var(--t1d); z-index: 1;
+    box-shadow: 0 0 18px rgba(77, 168, 255, 0.75), inset 0 0 18px rgba(77, 168, 255, 0.6); animation: pulse 4s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 34px rgba(77, 168, 255, 0.95), inset 0 0 28px rgba(77, 168, 255, 0.8); } }
+  .ring .in, .ring .out { position: absolute; inset: 0; }
+  .ring .in { inset: 9%; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 60%, rgba(77, 168, 255, 0.25), rgba(11, 7, 22, 0.9) 70%); }
+  .ring img { position: absolute; left: 50%; bottom: 9%; width: 86%; height: auto; transform: translateX(-50%); }
+  .ring .in img { bottom: 0; width: 104.9%; }  /* 86% / 82%: same size and spot as the outer copy, measured inside the 9% inset */
+  .ring .out { clip-path: inset(0 0 52% 0); z-index: 2; }
+  .ring .out img { filter: drop-shadow(0 0 14px rgba(77, 168, 255, 0.35)); }
+
   /* ---------- Socials ---------- */
   .socials { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.9rem; }
   .social { display: flex; flex-direction: column; gap: 0.25rem; text-decoration: none; padding: 1rem 1rem 1.1rem; border: 1px solid var(--line); background: rgba(18, 11, 34, 0.75);
@@ -168,6 +203,8 @@
     font-family: var(--hud); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
 
   @media (max-width: 860px) {
+    .mission { grid-template-columns: 1fr; }
+    .mission .ring { order: -1; max-width: 260px; margin-top: -0.5rem; }
     .tapes { grid-template-columns: 1fr; max-width: 460px; margin-inline: auto; }
     .socials { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .socials .social:last-child { grid-column: 1 / -1; }
@@ -177,9 +214,12 @@
     .hero { padding-inline: 0.9rem; }
     .hud-frame i { width: 20px; height: 20px; }
     .head small { display: none; }
+    .readouts { grid-template-columns: 1fr 1fr; }
+    .readouts div:last-child { grid-column: 1 / -1; }
+    .mission .ctas .btn { flex: 1 1 100%; justify-content: center; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .grain, .wordmark h1, .status::before, .cassette .reel { animation: none !important; }
+    .grain, .wordmark h1, .status::before, .cassette .reel, .ring::before { animation: none !important; }
   }
 </style>
 </head>
@@ -193,6 +233,7 @@
   <header class="top">
     <a class="tag" href="/">POBA<span>JOBS</span></a>
     <nav aria-label="Main">
+      <a href="#charity">Charity stream</a>
       <a href="#latest">Latest</a>
       <a href="#mixtape">Channels</a>
       <a href="#socials">Socials</a>
@@ -214,6 +255,35 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="9"/></svg>Catch a stream</a>
     </div>
     <div class="shield-bar" aria-hidden="true"><span>Shield</span><span class="meter"><b></b></span></div>
+  </section>
+
+  <!-- Charity stream announcement. When the date is set, change "Date TBA" in the readouts
+       (and the status chip), and swap the "Donations open soon" note for a donate button. -->
+  <section class="block" id="charity">
+    <div class="head"><h2>Incoming mission</h2><span class="rule"></span><small>Charity stream</small></div>
+    <div class="mission">
+      <div>
+        <span class="status">Coming November 2026</span>
+        <h3><span class="big">24H</span><span class="small">Charity stream</span></h3>
+        <div class="for">In support of Breakthrough T1D</div>
+        <p>For <strong>Diabetes Awareness Month</strong> I'm going live for <strong>24 hours straight</strong> to raise money for Breakthrough T1D, the charity funding research into type 1 diabetes.</p>
+        <p>This one's personal. My son <strong>Kylo</strong> was diagnosed with type 1 at just 15 months old, so every hour on stream is for him and every family living with it.</p>
+        <dl class="readouts">
+          <div><dt>Duration</dt><dd>24:00:00</dd></div>
+          <div><dt>Date</dt><dd>TBA</dd></div>
+          <div><dt>Charity</dt><dd>Breakthrough T1D</dd></div>
+        </dl>
+        <div class="ctas">
+          <a class="btn t1d" href="https://kyloloki.com" target="_blank" rel="noopener">Meet Kylo &rarr;</a>
+          <a class="btn alt" href="https://www.twitch.tv/pobajobs" target="_blank" rel="noopener">Follow on Twitch</a>
+        </div>
+        <p class="note">Donations open closer to the day. Follow to get the alert.</p>
+      </div>
+      <div class="ring" aria-hidden="true">
+        <div class="in"><picture><source srcset="images/kylo.webp" type="image/webp"><img src="images/kylo.png" alt="" width="480" height="498" loading="lazy"></picture></div>
+        <div class="out"><picture><source srcset="images/kylo.webp" type="image/webp"><img src="images/kylo.png" alt="" width="480" height="498" loading="lazy"></picture></div>
+      </div>
+    </div>
   </section>
 
   <section class="block" id="latest">
