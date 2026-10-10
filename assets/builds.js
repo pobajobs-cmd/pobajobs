@@ -78,7 +78,9 @@ async function fetchBuildFile(name) {
 
 async function fetchBuilds() {
   try {
-    const res = await fetch(`https://api.github.com/repos/${BUILDS_REPO}/contents/${BUILDS_FOLDER}?ref=${BUILDS_BRANCH}`);
+    // No "?ref=" on this address: some ad blockers block any address ending in "/log?..."
+    // (the repo's default branch is main anyway).
+    const res = await fetch(`https://api.github.com/repos/${BUILDS_REPO}/contents/${BUILDS_FOLDER}`);
     if (!res.ok) return [];
     const items = await res.json();
     const files = Array.isArray(items) ? items.filter(i => i.type === 'file' && i.name.endsWith('.md')) : [];
