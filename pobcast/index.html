@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Pobcast</title>
+<meta name="description" content="The Pobcast from pobajobs: an easy listen. Goofing around, having a laugh, with a bit of everything dropped in. Coming soon.">
+<meta name="theme-color" content="#FFF3E0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<script src="/assets/stream.js" data-flag="Charity stream" data-href="/gaming/#charity" data-sep="&#9679;" defer></script>
+<style>
+  /* Warm and daft: cream paper, tomato and mustard, a chunky wordmark, an unlit ON AIR sign
+     (tap it), and a waveform that's just idling until there's something to say. */
+  :root {
+    --cream: #FFF3E0; --cream-2: #FBE6C6; --ink: #2A1D17; --soft: #6E5A4E;
+    --tomato: #E5533B; --mustard: #F2B23A; --teal: #2D8C80; --plum: #7A3B5E;
+    --logo: 'Bagel Fat One', 'Arial Rounded MT Bold', sans-serif;
+    --body: 'DM Sans', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--cream); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; overflow-x: hidden; }
+  a { color: inherit; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding-inline: max(16px, 4vw); }
+
+  /* Ticker (from /assets/stream.js) */
+  .ticker { display: flex; height: 36px; overflow: hidden; text-decoration: none; background: var(--ink); color: var(--cream);
+    font-weight: 700; font-size: 0.8rem; letter-spacing: 0.04em; }
+  .ticker .flag { flex-shrink: 0; display: flex; align-items: center; padding: 0 1.1rem 0 max(16px, 2vw); background: var(--tomato); color: #fff; border-radius: 0 999px 999px 0; }
+  .ticker .lane { flex: 1; overflow: hidden; display: flex; align-items: center; }
+  .ticker .track { display: flex; width: max-content; animation: roll 50s linear infinite; }
+  .ticker:hover .track { animation-play-state: paused; }
+  .ticker .grp { display: flex; align-items: center; flex-shrink: 0; }
+  .ticker .grp span { padding: 0 1rem; white-space: nowrap; }
+  .ticker .grp span.hot { color: var(--mustard); }
+  .ticker .grp i { color: var(--tomato); font-style: normal; font-size: 0.55rem; }
+  @keyframes roll { to { transform: translateX(-50%); } }
+
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: 1.2rem; font-weight: 700; font-size: 0.92rem; }
+  .top a { text-decoration: none; }
+  .top .crumb span { color: var(--soft); font-weight: 500; }
+  .top nav { display: flex; gap: 1.2rem; }
+  .top nav a { color: var(--soft); font-weight: 500; }
+  .top nav a:hover { color: var(--tomato); }
+
+  /* Hero */
+  .hero { position: relative; display: grid; grid-template-columns: 1.3fr 1fr; gap: clamp(1.5rem, 5vw, 3.5rem); align-items: center; padding: clamp(1.5rem, 6vw, 4rem) 0 clamp(1rem, 4vw, 2rem); }
+  .hero h1 { margin: 0; font-family: var(--logo); font-weight: 400; font-size: clamp(4rem, 15vw, 8.5rem); line-height: 0.85; letter-spacing: -0.01em; color: var(--tomato);
+    text-shadow: 4px 4px 0 var(--mustard), 8px 8px 0 var(--ink); }
+  .hero h1 small { display: block; font-size: 0.32em; color: var(--ink); text-shadow: none; letter-spacing: 0.02em; margin-bottom: 0.25em; }
+  .sticker { display: inline-block; margin-top: 1.6rem; background: var(--mustard); color: var(--ink); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 0.45rem 0.95rem; border-radius: 999px; transform: rotate(-3deg); box-shadow: 3px 3px 0 var(--ink); }
+  .hero .lede { font-size: clamp(1.1rem, 1rem + 0.6vw, 1.35rem); line-height: 1.5; margin: 1.4rem 0 0; max-width: 26em; }
+  .hero .lede em { font-style: normal; background: linear-gradient(transparent 62%, rgba(242, 178, 58, 0.55) 62%); }
+
+  /* ON AIR sign + mic */
+  .studio { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1.4rem; }
+  .onair { all: unset; cursor: pointer; font-family: var(--logo); font-size: clamp(1.8rem, 5vw, 2.6rem); letter-spacing: 0.06em; color: #C9B8A6; background: #3A2A22;
+    padding: 0.5rem 1.4rem; border-radius: 14px; border: 4px solid #2A1D17; box-shadow: inset 0 0 0 3px #4A372C, 0 8px 0 #1E1410; transition: color .2s, text-shadow .2s, background .2s;
+    -webkit-tap-highlight-color: transparent; }
+  .onair:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
+  .onair.lit { color: #FFE9E3; background: #8E2416; text-shadow: 0 0 6px #fff, 0 0 18px var(--tomato), 0 0 36px var(--tomato); }
+  .onair.flick { animation: flick 0.9s steps(1) 1; }
+  @keyframes flick { 0%, 20%, 45% { color: #FFE9E3; text-shadow: 0 0 14px var(--tomato); } 10%, 30%, 60%, 100% { color: #C9B8A6; text-shadow: none; } }
+  .quip { min-height: 1.6em; margin: -0.6rem 0 0; font-weight: 700; color: var(--plum); text-align: center; }
+
+  .mic { width: min(230px, 60vw); height: auto; }
+  .wave { display: flex; align-items: center; justify-content: center; gap: 5px; height: 54px; }
+  .wave i { width: 7px; border-radius: 4px; background: var(--teal); height: 18%; animation: idle 1.6s ease-in-out infinite; }
+  .wave i:nth-child(3n) { background: var(--tomato); } .wave i:nth-child(4n) { background: var(--mustard); }
+  .wave.talk i { animation-duration: 0.45s; }
+  @keyframes idle { 50% { height: var(--h, 40%); } }
+
+  /* What to expect */
+  section.block { margin-top: clamp(3.5rem, 9vw, 5.5rem); }
+  .block h2 { font-family: var(--logo); font-weight: 400; font-size: clamp(1.8rem, 5vw, 2.6rem); margin: 0 0 1.2rem; line-height: 1.05; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.7rem; padding: 0; margin: 0; list-style: none; }
+  .chips li { padding: 0.6rem 1.1rem; border-radius: 999px; font-weight: 700; border: 2.5px solid var(--ink); background: #fff; box-shadow: 3px 3px 0 var(--ink); }
+  .chips li:nth-child(5n+1) { background: #FFD9CF; } .chips li:nth-child(5n+2) { background: #FCE3A8; } .chips li:nth-child(5n+3) { background: #CDEBE5; }
+  .chips li:nth-child(5n+4) { background: #EBD3E0; } .chips li:nth-child(5n+5) { background: #fff; }
+  .chips li:nth-child(odd) { transform: rotate(-1.5deg); } .chips li:nth-child(even) { transform: rotate(1.2deg); }
+
+  .listen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.9rem; }
+  .plat { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 1rem 1.1rem; border-radius: 16px; background: var(--cream-2);
+    border: 2px dashed rgba(42, 29, 23, 0.35); color: var(--soft); font-weight: 700; }
+  .plat small { font-weight: 500; font-size: 0.8rem; }
+  .meanwhile { margin-top: 1.4rem; color: var(--soft); }
+  .meanwhile a { color: var(--tomato); font-weight: 700; }
+
+  /* Suggest a topic */
+  .suggest { display: grid; grid-template-columns: 1fr 1.3fr; gap: clamp(1.25rem, 4vw, 2.5rem); align-items: start; padding: clamp(1.25rem, 4vw, 2rem);
+    background: #fff; border: 2.5px solid var(--ink); border-radius: 22px; box-shadow: 6px 6px 0 var(--ink); }
+  .suggest h2 { margin-bottom: 0.6rem; }
+  .suggest p { margin: 0; color: var(--soft); }
+  .suggest form { display: grid; gap: 0.8rem; min-width: 0; }
+  .suggest label { display: grid; gap: 0.3rem; font-weight: 700; font-size: 0.9rem; }
+  .suggest label small { font-weight: 500; color: var(--soft); }
+  .suggest textarea, .suggest input { font: inherit; font-size: 1rem; color: var(--ink); background: var(--cream); border: 2px solid var(--ink); border-radius: 12px; padding: 0.7rem 0.85rem; width: 100%; }
+  .suggest textarea { min-height: 110px; resize: vertical; }
+  .suggest textarea:focus, .suggest input:focus { outline: 3px solid var(--mustard); outline-offset: 1px; }
+  .suggest .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .suggest .row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .suggest button { font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; color: #fff; background: var(--tomato); border: 2.5px solid var(--ink); border-radius: 999px;
+    padding: 0.65rem 1.4rem; box-shadow: 3px 3px 0 var(--ink); transition: transform .1s, box-shadow .1s; }
+  .suggest button:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink); }
+  .suggest button:disabled { opacity: 0.6; cursor: default; }
+  .suggest .status { font-weight: 700; color: var(--teal); }
+  .suggest .status.err { color: var(--tomato); }
+  .count { font-size: 0.8rem; color: var(--soft); font-variant-numeric: tabular-nums; justify-self: end; margin-top: -0.4rem; }
+
+  .kylo { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .kylo::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 2.5px solid #2E7BC4; }
+
+  footer { margin-top: clamp(4rem, 10vw, 6rem); padding-block: 1.5rem 2.2rem; border-top: 2.5px solid var(--ink); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    font-size: 0.88rem; color: var(--soft); }
+  footer a { text-decoration: none; font-weight: 700; color: var(--ink); }
+  footer a:hover { color: var(--tomato); }
+
+  @media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; }
+    .studio { order: -1; flex-direction: row; justify-content: center; flex-wrap: wrap; }
+    .mic { width: 110px; }
+    .quip { width: 100%; }
+    .listen { grid-template-columns: 1fr; }
+    .suggest { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) { .top nav a:not(:first-child) { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .wave i, .onair.flick { animation: none; } .ticker .track { animation-duration: 180s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="crumb" href="/" title="Back to pobajobs home">pobajobs <span>/ Pobcast</span></a>
+    <nav aria-label="Main">
+      <a href="/">Home</a>
+      <a href="/gaming/">Gaming</a>
+      <a href="/builds/">Builds</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1><small>pobajobs presents</small>The Pobcast</h1>
+      <span class="sticker">Coming soon</span>
+      <p class="lede">An easy listen. <em>Goofing around, having a laugh,</em> with a bit of everything dropped in.</p>
+    </div>
+    <div class="studio">
+      <button class="onair" id="onAir" type="button" aria-label="On air sign. Tap it.">ON AIR</button>
+      <p class="quip" id="quip" aria-live="polite"></p>
+      <svg class="mic" viewBox="0 0 200 230" aria-hidden="true">
+        <rect x="62" y="10" width="76" height="120" rx="38" fill="#2A1D17"/>
+        <rect x="70" y="18" width="60" height="104" rx="30" fill="#E5533B"/>
+        <g stroke="#2A1D17" stroke-width="3" opacity="0.35"><path d="M74 46h52M72 62h56M72 78h56M72 94h56M74 110h52"/></g>
+        <path d="M40 104a60 60 0 0 0 120 0" fill="none" stroke="#2A1D17" stroke-width="10" stroke-linecap="round"/>
+        <path d="M100 164v40" stroke="#2A1D17" stroke-width="10"/>
+        <rect x="58" y="200" width="84" height="16" rx="8" fill="#F2B23A" stroke="#2A1D17" stroke-width="4"/>
+      </svg>
+      <div class="wave" id="wave" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="expectHead">
+    <h2 id="expectHead">On the menu</h2>
+    <ul class="chips">
+      <li>Daft chat</li>
+      <li>Gaming stories</li>
+      <li>Builds gone wrong</li>
+      <li>Hot takes, cold tea</li>
+      <li>Questionable opinions</li>
+      <li>Guests (if they'll have us)</li>
+      <li>Whatever comes up</li>
+    </ul>
+  </section>
+
+  <section class="block" aria-labelledby="suggestHead">
+    <div class="suggest">
+      <div>
+        <h2 id="suggestHead">Suggest a topic</h2>
+        <p>Got something we should talk about, argue about or get completely wrong? Chuck it in the pile. Every suggestion gets read.</p>
+      </div>
+      <form id="suggestForm" novalidate>
+        <label for="topic">Your topic <small>(up to 500 characters)</small>
+          <textarea id="topic" name="topic" maxlength="500" required placeholder="Is a hot dog a sandwich?"></textarea>
+        </label>
+        <span class="count" id="topicCount" aria-live="polite">0 / 500</span>
+        <label for="who">Your name <small>(optional, for a shout-out)</small>
+          <input id="who" name="name" maxlength="60" autocomplete="nickname">
+        </label>
+        <div class="hp" aria-hidden="true"><label for="website">Leave this empty<input id="website" name="website" tabindex="-1" autocomplete="off"></label></div>
+        <div class="row">
+          <button type="submit" id="suggestBtn">Send it in</button>
+          <span class="status" id="suggestStatus" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="listenHead">
+    <h2 id="listenHead">Where to listen</h2>
+    <div class="listen">
+      <div class="plat">Spotify <small>Soon</small></div>
+      <div class="plat">Apple Podcasts <small>Soon</small></div>
+      <div class="plat">YouTube <small>Soon</small></div>
+    </div>
+    <p class="meanwhile">Mic check still pending. In the meantime, <a href="/gaming/">come and watch some gaming</a>.</p>
+  </section>
+
+  <footer>
+    <span>&copy; 2026 pobajobs &middot; <a class="kylo" href="https://kyloloki.com" target="_blank" rel="noopener">For Kylo</a></span>
+    <span><a href="/">Home</a> &middot; <a href="/gaming/">Gaming</a> &middot; <a href="/builds/">Builds</a></span>
+  </footer>
+</div>
+
+<script>
+  // Idle waveform bars
+  (function () {
+    const wave = document.getElementById('wave');
+    for (let i = 0; i < 18; i++) {
+      const bar = document.createElement('i');
+      bar.style.setProperty('--h', (25 + Math.round(Math.abs(Math.sin(i * 1.7)) * 65)) + '%');
+      bar.style.animationDelay = (-i * 0.13) + 's';
+      wave.appendChild(bar);
+    }
+    // Tap the ON AIR sign: it tries its best.
+    const sign = document.getElementById('onAir'), quip = document.getElementById('quip');
+    const lines = ['Not yet, keen bean.', 'Mic check… 1, 2… nope.', 'Still warming up the tea.', 'Patience, young padawan.', 'Recording soon. Probably.', 'You found the button. Have a biscuit.'];
+    let n = 0, t;
+    sign.addEventListener('click', () => {
+      sign.classList.remove('flick'); void sign.offsetWidth; sign.classList.add('flick');
+      wave.classList.add('talk');
+      quip.textContent = lines[n++ % lines.length];
+      clearTimeout(t); t = setTimeout(() => { wave.classList.remove('talk'); }, 1400);
+    });
+  })();
+
+  // Suggest a topic: posts to the site's own /api/pobcast/suggest
+  (function () {
+    const form = document.getElementById('suggestForm'), topic = document.getElementById('topic');
+    const btn = document.getElementById('suggestBtn'), status = document.getElementById('suggestStatus'), count = document.getElementById('topicCount');
+    topic.addEventListener('input', () => { count.textContent = topic.value.length + ' / 500'; });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = topic.value.trim();
+      status.className = 'status';
+      if (text.length < 3) { status.className = 'status err'; status.textContent = 'Type a topic first.'; topic.focus(); return; }
+      btn.disabled = true; status.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/pobcast/suggest', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: text, name: document.getElementById('who').value.trim(), website: document.getElementById('website').value }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'That didn’t send. Try again in a minute.');
+        form.reset(); count.textContent = '0 / 500';
+        status.textContent = 'Added to the pile. Cheers!';
+      } catch (err) {
+        status.className = 'status err'; status.textContent = err.message;
+      } finally { btn.disabled = false; }
+    });
+  })();
+</script>
+</body>
+</html>
