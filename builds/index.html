@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="darkreader-lock">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>pobajobs Builds</title>
+<meta name="description" content="pobajobs Builds: DIY, smart home, electronic design, 3D printing and more. Coming soon.">
+<meta name="theme-color" content="#1B1E21">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/assets/stream.js" data-flag="Charity stream" data-href="/gaming/#charity" data-sep="&#9632;" defer></script>
+<style>
+  /* Workshop: graphite bench under a blueprint grid, a birch-ply sign screwed to it,
+     a "3D printed" BUILDS that prints itself layer by layer, and a parts-bin of topics. */
+  :root {
+    --bench: #1B1E21; --bench-2: #23272B; --steel: #2E3338; --line: rgba(160, 190, 210, 0.16);
+    --ink: #EDEAE4; --soft: #A9AFB4;
+    --ply: #E7D2A9; --ply-2: #D9BF8D; --ply-edge: #B8975F; --walnut: #5C3B22;
+    --safety: #FF6B1A; --copper: #D08A4E; --print: #FF6B1A;
+    --display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --body: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bench); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; overflow-x: hidden;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px),
+      linear-gradient(rgba(160,190,210,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(160,190,210,0.06) 1px, transparent 1px);
+    background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px; background-attachment: fixed; }
+  a { color: inherit; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding-inline: max(16px, 4vw); }
+
+  /* Ticker (from /assets/stream.js) */
+  .ticker { display: flex; height: 36px; overflow: hidden; text-decoration: none; background: #111315; border-bottom: 2px solid var(--safety);
+    font-family: var(--mono); font-weight: 600; font-size: 0.76rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .ticker .flag { flex-shrink: 0; display: flex; align-items: center; padding: 0 1rem 0 max(16px, 2vw); color: #111;
+    background: repeating-linear-gradient(-45deg, var(--safety) 0 12px, #FFB21A 12px 24px); font-weight: 700; }
+  .ticker .lane { flex: 1; overflow: hidden; display: flex; align-items: center; }
+  .ticker .track { display: flex; width: max-content; animation: roll 45s linear infinite; }
+  .ticker:hover .track { animation-play-state: paused; }
+  .ticker .grp { display: flex; align-items: center; flex-shrink: 0; }
+  .ticker .grp span { padding: 0 1rem; color: var(--soft); white-space: nowrap; }
+  .ticker .grp span.hot { color: var(--safety); }
+  .ticker .grp i { color: var(--copper); font-style: normal; font-size: 0.6rem; }
+  @keyframes roll { to { transform: translateX(-50%); } }
+
+  /* Header */
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: 1.1rem; font-family: var(--mono); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .top a { text-decoration: none; }
+  .crumb b { color: var(--safety); }
+  .crumb span { color: var(--soft); }
+  .top nav { display: flex; gap: 1.3rem; color: var(--soft); }
+  .top nav a:hover { color: var(--ink); }
+
+  /* Hero: plywood sign */
+  .sign { position: relative; margin-top: clamp(1rem, 4vw, 2.5rem); padding: clamp(2rem, 6vw, 4rem) clamp(1.25rem, 5vw, 4rem) clamp(1.75rem, 5vw, 3.25rem);
+    color: #2B1D10; border-radius: 6px;
+    background:
+      repeating-linear-gradient(92deg, rgba(120, 80, 30, 0.07) 0 3px, transparent 3px 11px),
+      repeating-linear-gradient(88deg, rgba(120, 80, 30, 0.05) 0 1px, transparent 1px 7px),
+      radial-gradient(120% 60% at 30% 40%, var(--ply), var(--ply-2));
+    /* ply edge: alternating veneer layers */
+    box-shadow: 0 0 0 3px var(--ply-edge), 0 0 0 5px #F1E2C3, 0 0 0 7px var(--ply-edge), 0 0 0 9px #F1E2C3, 0 0 0 11px #9C7A45, 0 24px 50px rgba(0,0,0,0.5); }
+  .screw { position: absolute; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #F4F4F2, #9EA3A6 60%, #6C7175);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+  .screw::after { content: ""; position: absolute; left: 3px; right: 3px; top: 7px; height: 2px; background: #555B60; transform: rotate(var(--r, 30deg)); }
+  .screw.tl { top: 14px; left: 14px; } .screw.tr { top: 14px; right: 14px; --r: -20deg; }
+  .screw.bl { bottom: 14px; left: 14px; --r: 70deg; } .screw.br { bottom: 14px; right: 14px; --r: 10deg; }
+
+  .stamp { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--mono); font-weight: 600; font-size: 0.74rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: #2B1D10; border: 2px solid #2B1D10; padding: 0.3rem 0.7rem; transform: rotate(-1.5deg); }
+  .stamp i { width: 22px; height: 12px; background: repeating-linear-gradient(-45deg, #2B1D10 0 4px, transparent 4px 8px); }
+
+  /* 3D-printed word: clipped from the bottom up in layer steps, nozzle line riding the top edge */
+  .printed { position: relative; display: inline-block; margin: 1rem 0 0.3rem; line-height: 0.86; }
+  .printed .word { display: block; font-family: var(--display); font-weight: 900; font-size: clamp(5rem, 22vw, 13rem); letter-spacing: 0.01em; text-transform: uppercase;
+    color: var(--walnut); text-shadow: 0 2px 0 rgba(255,255,255,0.35); }
+  .printed .ghost { position: absolute; inset: 0; color: transparent; -webkit-text-stroke: 1.5px rgba(92, 59, 34, 0.35); text-shadow: none; }
+  .printed .solid { position: relative; animation: layers 9s steps(36, end) infinite;
+    background: repeating-linear-gradient(0deg, var(--walnut) 0 5px, #6E4A2C 5px 6px); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .printed .nozzle { position: absolute; left: -2%; right: -2%; height: 3px; background: var(--print); box-shadow: 0 0 10px var(--print), 0 0 2px #fff;
+    animation: nozzle 9s steps(36, end) infinite; }
+  @keyframes layers { 0% { clip-path: inset(100% 0 0 0); } 70%, 100% { clip-path: inset(0 0 0 0); } }
+  @keyframes nozzle { 0% { top: 100%; opacity: 1; } 70% { top: 0%; opacity: 1; } 71%, 100% { top: 0%; opacity: 0; } }
+
+  .sign .lede { max-width: 34em; margin: 0.6rem 0 0; font-size: 1.1rem; color: #3E2B19; }
+  .sign .lede strong { color: #1F150B; }
+  .readout { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin-top: 1.4rem; font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: #5A4127; }
+  .readout b { color: #1F150B; }
+  .readout .pct { display: inline-block; width: 120px; height: 9px; border: 1.5px solid #2B1D10; vertical-align: middle; margin-left: 0.4rem; padding: 1px; }
+  .readout .pct i { display: block; height: 100%; width: 12%; background: var(--safety); animation: inch 6s ease-in-out infinite alternate; }
+  @keyframes inch { to { width: 19%; } }
+
+  /* Section heads */
+  section.block { margin-top: clamp(3.5rem, 9vw, 6rem); }
+  .head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.4rem; }
+  .head h2 { margin: 0; font-family: var(--display); font-weight: 900; font-size: clamp(1.9rem, 5vw, 2.8rem); letter-spacing: 0.02em; text-transform: uppercase; line-height: 1; }
+  .head .rule { flex: 1; height: 0; border-top: 2px dashed rgba(208, 138, 78, 0.5); align-self: center; }
+  .head small { font-family: var(--mono); color: var(--copper); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  /* Parts bin: small-parts drawer cabinet */
+  .cabinet { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 12px; background: linear-gradient(#3A4046, #2A2F34);
+    border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 18px 40px rgba(0,0,0,0.45); }
+  .drawer { position: relative; display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem 0.9rem 1.1rem; border-radius: 5px; min-height: 210px;
+    background: linear-gradient(180deg, rgba(170, 205, 225, 0.20), rgba(120, 160, 185, 0.10)); border: 1px solid rgba(190, 220, 240, 0.25);
+    box-shadow: inset 0 10px 18px rgba(255,255,255,0.05); transition: transform .2s, border-color .2s; }
+  .drawer:hover { transform: translateY(-3px); border-color: var(--safety); }
+  .drawer::after { content: ""; position: absolute; left: 50%; bottom: 10px; width: 34%; height: 7px; transform: translateX(-50%); border-radius: 0 0 6px 6px; background: rgba(0,0,0,0.35); }
+  .drawer .tag { align-self: flex-start; background: #F4F1EA; color: #1E2124; font-family: var(--mono); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 2px; box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
+  .drawer svg { width: 40px; height: 40px; color: var(--copper); }
+  .drawer h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.45rem; letter-spacing: 0.02em; line-height: 1.05; text-transform: uppercase; }
+  .drawer p { margin: 0; color: var(--soft); font-size: 0.9rem; line-height: 1.45; }
+
+  /* Datasheet */
+  .sheet { display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(1.25rem, 4vw, 2.5rem); align-items: start; }
+  .spec { margin: 0; border: 1px solid var(--line); background: rgba(17, 19, 21, 0.75); font-family: var(--mono); font-size: 0.86rem; }
+  .spec div { display: grid; grid-template-columns: 11em 1fr; border-bottom: 1px solid var(--line); }
+  .spec div:last-child { border-bottom: 0; }
+  .spec dt, .spec dd { margin: 0; padding: 0.65rem 0.9rem; }
+  .spec dt { color: var(--soft); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.74rem; border-right: 1px solid var(--line); }
+  .spec dd .on { color: var(--safety); }
+  .note p { margin: 0 0 1rem; color: var(--soft); }
+  .note p strong { color: var(--ink); }
+  .btn { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--mono); font-weight: 600; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase;
+    text-decoration: none; padding: 0.8rem 1.2rem; background: var(--safety); color: #111; border-radius: 3px; box-shadow: 0 3px 0 #A8410A; transition: transform .15s, box-shadow .15s; }
+  .btn:hover { transform: translateY(1px); box-shadow: 0 2px 0 #A8410A; }
+  .btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--soft); }
+  .btns { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+
+  /* PCB trace decoration */
+  .traces { position: absolute; right: -40px; bottom: -60px; width: 340px; opacity: 0.55; pointer-events: none; color: var(--copper); }
+
+  /* Build log list */
+  .logs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .log { display: flex; flex-direction: column; text-decoration: none; background: rgba(17, 19, 21, 0.8); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; transition: transform .2s, border-color .2s; }
+  .log:hover, .log:focus-visible { transform: translateY(-3px); border-color: var(--safety); outline: none; }
+  .log .pic { position: relative; aspect-ratio: 16 / 10; background: #14324A;
+    background-image: linear-gradient(rgba(180, 215, 240, 0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(180, 215, 240, 0.18) 1px, transparent 1px); background-size: 18px 18px; }
+  .log .pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .log .pic .ex { position: absolute; left: 10px; top: 10px; font-family: var(--mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    background: #FFB21A; color: #111; padding: 0.15rem 0.45rem; }
+  .log .txt { display: grid; gap: 0.35rem; padding: 0.9rem 1rem 1.1rem; }
+  .log .meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); }
+  .log .meta b { color: var(--safety); font-weight: 600; }
+  .log h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.45rem; line-height: 1.05; text-transform: uppercase; letter-spacing: 0.01em; }
+  .log p { margin: 0; color: var(--soft); font-size: 0.92rem; line-height: 1.45; }
+  .logs .empty { grid-column: 1 / -1; font-family: var(--mono); font-size: 0.85rem; color: var(--soft); padding: 1rem 0; }
+
+  .kylo { display: inline-flex; align-items: center; gap: 0.45rem; text-decoration: none; }
+  .kylo::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 2.5px solid #4DA8FF; }
+
+  footer { margin-top: clamp(4rem, 10vw, 6rem); padding-block: 1.5rem 2.2rem; border-top: 2px dashed rgba(208, 138, 78, 0.35); display: flex; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+  footer a { text-decoration: none; }
+  footer a:hover { color: var(--safety); }
+
+  @media (max-width: 900px) {
+    .cabinet { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cabinet .drawer:last-child { grid-column: 1 / -1; min-height: 0; }
+    .sheet { grid-template-columns: 1fr; }
+    .logs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    .top nav a:not(:first-child) { display: none; }
+    .drawer { min-height: 0; }
+    .logs { grid-template-columns: 1fr; }
+    .spec div { grid-template-columns: 8.5em 1fr; }
+    .screw { width: 12px; height: 12px; } .screw::after { top: 5px; }
+    .traces { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .printed .solid, .printed .nozzle, .readout .pct i { animation: none; }
+    .printed .nozzle { display: none; }
+    .ticker .track { animation-duration: 180s; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="crumb" href="/" title="Back to pobajobs home"><b>POBAJOBS</b> <span>/ Builds</span></a>
+    <nav aria-label="Main">
+      <a href="/">Home</a>
+      <a href="/gaming/">Gaming</a>
+      <a href="/pobcast/">Pobcast</a>
+    </nav>
+  </header>
+
+  <section class="sign" aria-labelledby="buildsTitle">
+    <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+    <span class="stamp"><i></i>Workshop under construction</span>
+    <h1 class="printed" id="buildsTitle">
+      <span class="word ghost" aria-hidden="true">Builds</span>
+      <span class="word solid">Builds</span>
+      <span class="nozzle" aria-hidden="true"></span>
+    </h1>
+    <p class="lede"><strong>A new pobajobs channel for the stuff I make.</strong> DIY, smart home, electronic design, 3D printing and more. Some of it will work first time. Most of it won't. You'll see both.</p>
+    <div class="readout">
+      <span>Status: <b>Coming soon</b></span>
+      <span>Workshop setup <span class="pct" aria-hidden="true"><i></i></span></span>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="binHead">
+    <div class="head"><h2 id="binHead">The parts bin</h2><span class="rule"></span><small>What to expect</small></div>
+    <div class="cabinet">
+      <article class="drawer">
+        <span class="tag">Bin 01</span>
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 33l15-15"/><path d="M17 12l5-5 4 1 6 6 1 4-5 5z"/><path d="M24 14l4 4"/></svg>
+        <h3>DIY</h3>
+        <p>Around-the-house projects, fixes and the odd thing made from scrap wood.</p>
+      </article>
+      <article class="drawer">
+        <span class="tag">Bin 02</span>
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 19L20 8l13 11"/><path d="M10 17v15h20V17"/><path d="M15 25a7 7 0 0 1 10 0"/><path d="M18 28.5a3 3 0 0 1 4 0"/></svg>
+        <h3>Smart home</h3>
+        <p>Automations, sensors and making the house slightly cleverer than me.</p>
+      </article>
+      <article class="drawer">
+        <span class="tag">Bin 03</span>
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="12" y="12" width="16" height="16" rx="2"/><path d="M16 12V6M24 12V6M16 34v-6M24 34v-6M12 16H6M12 24H6M34 16h-6M34 24h-6"/></svg>
+        <h3>Electronic design</h3>
+        <p>Circuits, custom PCBs and things that blink (on purpose).</p>
+      </article>
+      <article class="drawer">
+        <span class="tag">Bin 04</span>
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 6h12v8l-4 5h-4l-4-5z"/><path d="M20 19v4"/><path d="M8 33h24M11 29h18"/></svg>
+        <h3>3D printing</h3>
+        <p>Designs, prints, fails and the spaghetti in between.</p>
+      </article>
+      <article class="drawer">
+        <span class="tag">Bin 05</span>
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 10v20M10 20h20"/></svg>
+        <h3>And more</h3>
+        <p>Whatever ends up on the bench next.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="logHead">
+    <div class="head"><h2 id="logHead">Build log</h2><span class="rule"></span><small>Newest first</small></div>
+    <div class="logs" id="logs"><p class="empty">Loading the build log&hellip;</p></div>
+  </section>
+
+  <section class="block" aria-labelledby="sheetHead" style="position: relative;">
+    <div class="head"><h2 id="sheetHead">Datasheet</h2><span class="rule"></span><small>Rev 0.1</small></div>
+    <div class="sheet">
+      <dl class="spec">
+        <div><dt>Project</dt><dd>pobajobs Builds</dd></div>
+        <div><dt>Status</dt><dd><span class="on">&#9679;</span> Prototyping</dd></div>
+        <div><dt>First build</dt><dd>TBA</dd></div>
+        <div><dt>Format</dt><dd>Build videos and write-ups</dd></div>
+        <div><dt>Tolerance</dt><dd>&plusmn; a bit</dd></div>
+        <div><dt>Powered by</dt><dd>Coffee, solder and stubbornness</dd></div>
+      </dl>
+      <div class="note">
+        <p><strong>The bench is being set up.</strong> Build videos will land on their own channel. Until then, you'll find me gaming.</p>
+        <div class="btns">
+          <a class="btn" href="/gaming/">pobajobs Gaming &rarr;</a>
+          <a class="btn ghost" href="https://www.youtube.com/@pobajobs" target="_blank" rel="noopener">YouTube</a>
+        </div>
+      </div>
+    </div>
+    <svg class="traces" viewBox="0 0 340 220" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M0 40h90l30 30h120l40-40h60"/><path d="M0 80h70l30 30h90l30 30h120"/><path d="M60 220v-60l30-30h60"/><path d="M200 220v-40l20-20h120"/>
+      <circle cx="90" cy="40" r="5"/><circle cx="240" cy="70" r="5"/><circle cx="150" cy="130" r="5"/><circle cx="220" cy="160" r="5"/>
+    </svg>
+  </section>
+
+  <footer>
+    <span>&copy; 2026 pobajobs &middot; <a class="kylo" href="https://kyloloki.com" target="_blank" rel="noopener">For Kylo</a></span>
+    <span><a href="/">Home</a> &middot; <a href="/gaming/">Gaming</a> &middot; <a href="/pobcast/">Pobcast</a></span>
+  </footer>
+</div>
+
+<script src="/assets/builds.js"></script>
+<script>
+  fetchBuilds().then(builds => {
+    const root = document.getElementById('logs');
+    if (!builds.length) { root.innerHTML = '<p class="empty">First build log coming soon. The bench is still being cleared.</p>'; return; }
+    root.innerHTML = builds.map(b => `
+      <a class="log" href="/builds/build/?slug=${encodeURIComponent(b.slug)}">
+        <span class="pic">${b.cover ? `<img src="${escHtml(b.cover)}" alt="" loading="lazy">` : ''}${b.placeholder ? '<span class="ex">Example</span>' : ''}</span>
+        <span class="txt">
+          <span class="meta">${b.status ? `<b>${escHtml(b.status)}</b>` : ''}<span>${fmtBuildDate(b.date)}</span>${b.tags.length ? `<span>${b.tags.map(escHtml).join(' / ')}</span>` : ''}</span>
+          <h3>${escHtml(b.title)}</h3>
+          ${b.summary ? `<p>${escHtml(b.summary)}</p>` : ''}
+        </span>
+      </a>`).join('');
+  });
+</script>
+</body>
+</html>
