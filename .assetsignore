@@ -1,0 +1,14 @@
+# Files in the repo that should NOT be published on the website
+worker.js
+wrangler.jsonc
+.pages.yml
+_concepts
+brand
+archived
+.dev.vars
+.wrangler
+node_modules
+.git
+.github
+.gitignore
+README.md

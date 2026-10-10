@@ -1,0 +1,27 @@
+// Cloudflare settings for pobajobs.co.uk (the Worker is called "pobajobs").
+// Cloudflare reads this file every time you push to GitHub.
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "pobajobs",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-06",
+
+  // The website files. Everything in the repo is served as-is, apart from what's listed
+  // in .assetsignore. Only /api/... addresses go to worker.js first.
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // Where Pobcast topic suggestions are kept.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pobajobs",
+      "database_id": "85290ec6-195a-4070-b384-9eb0c1d8c0b5"
+    }
+  ],
+
+  "observability": { "enabled": true }
+}

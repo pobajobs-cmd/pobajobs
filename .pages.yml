@@ -1,0 +1,74 @@
+media:
+  input: images
+  output: /images
+
+content:
+  - name: builds
+    label: Build log
+    type: collection
+    path: builds/log
+    filename: "{year}-{month}-{day}-{primary}.md"
+    view:
+      fields: [title, date, status]
+      sort: date
+      sort_direction: desc
+    fields:
+      - name: title
+        label: Title
+        type: string
+        required: true
+      - name: date
+        label: Date
+        type: date
+        required: true
+      - name: summary
+        label: One-line summary (shown in the build list)
+        type: text
+      - name: status
+        label: Status
+        type: select
+        options:
+          values: [Planning, In progress, Finished, Abandoned (for now)]
+      - name: tags
+        label: Bins (comma separated, e.g. Smart home, Electronics)
+        type: string
+      - name: cover
+        label: Cover photo
+        type: image
+      - name: video
+        label: YouTube link (optional, paste the full URL)
+        type: string
+      - name: parts
+        label: Parts list (one per line - qty | part | notes | link)
+        type: text
+      - name: files
+        label: Files to download (one per line - label | link or /builds/files/name.stl)
+        type: text
+      - name: placeholder
+        label: Example build (shows an "Example" label on the site)
+        type: boolean
+      - name: body
+        label: Write-up
+        type: rich-text
+
+  - name: now
+    label: Right now (homepage)
+    type: file
+    path: data/now.json
+    format: json
+    fields:
+      - name: playing
+        label: Playing
+        type: string
+      - name: building
+        label: Building
+        type: string
+      - name: recording
+        label: Recording
+        type: string
+      - name: pobcast_latest_title
+        label: Latest Pobcast episode title (leave empty until there is one)
+        type: string
+      - name: pobcast_latest_url
+        label: Latest Pobcast episode link
+        type: string

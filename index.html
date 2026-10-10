@@ -5,469 +5,208 @@
 <meta name="darkreader-lock">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>pobajobs</title>
-<meta name="description" content="pobajobs: gamer, streamer, general idiot. Me and my mates messing about in various games.">
-<meta name="theme-color" content="#0B0716">
+<meta name="description" content="pobajobs: gaming, builds and the Pobcast. Three channels, one bloke, not enough sleep.">
+<meta name="theme-color" content="#1A1512">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Monoton&family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Monoton&family=Big+Shoulders+Display:wght@900&family=Bagel+Fat+One&display=swap" rel="stylesheet">
+<script src="/assets/stream.js" data-flag="Charity stream" data-href="/gaming/#charity" data-sep="&#8226;" defer></script>
 <style>
-  /* Layout: a starfield behind a HUD-framed hero (neon wordmark), then the "mixtape" of channels as cassette cards, then socials. One deliberate dark look. */
+  /* pobajobs home, "Pick a channel": warm dark evening, amber light, and three tall cards like
+     channels on a dial. Hover one and the others dim. The three dots after the name are the
+     brand mark: one per channel, in channel order (gaming, builds, pobcast). */
   :root {
-    color-scheme: dark;
-    --space: #0B0716;      /* deep space */
-    --space-2: #160D2B;    /* nebula purple */
-    --panel: #120B22;
-    --ink: #F3ECFF;
-    --soft: #B7A9D6;
-    --magenta: #FF3D9A;
-    --orange: #FF9A3C;
-    --cyan: #38E1E6;
-    --line: rgba(183, 169, 214, 0.22);
-    --display: 'Monoton', 'Arial Black', sans-serif;
-    --hud: 'Chakra Petch', 'Segoe UI', sans-serif;
-    --body: 'Barlow', -apple-system, 'Segoe UI', sans-serif;
+    --night: #1A1512; --night-2: #241D18; --ink: #F4EADD; --soft: #B3A495; --line: rgba(244, 234, 221, 0.12);
+    --amber: #F0A955; --gaming: #FF3D9A; --builds: #FF6B1A; --pobcast: #F2B23A; --t1d: #4DA8FF;
+    --display: 'Bricolage Grotesque', 'Helvetica Neue', sans-serif;
+    --body: 'DM Sans', -apple-system, 'Segoe UI', sans-serif;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0; min-height: 100%; background: var(--space); color: var(--ink);
-    font-family: var(--body); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; overflow-x: hidden;
-  }
+  body { margin: 0; background: radial-gradient(80% 50% at 50% 0%, #3A2A1E 0%, var(--night) 70%) no-repeat, var(--night); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; overflow-x: hidden; min-height: 100vh; }
   a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-inline: max(16px, 4vw); }
 
-  /* ---------- Backdrop: nebula, stars, grunge ---------- */
-  .sky { position: fixed; inset: 0; z-index: -2;
-    background:
-      radial-gradient(60% 45% at 85% 10%, rgba(255, 61, 154, 0.28), transparent 70%),
-      radial-gradient(55% 40% at 5% 35%, rgba(56, 225, 230, 0.16), transparent 70%),
-      radial-gradient(70% 50% at 50% 105%, rgba(255, 154, 60, 0.22), transparent 70%),
-      linear-gradient(180deg, var(--space) 0%, var(--space-2) 55%, var(--space) 100%); }
-  #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; }
-  .grain { position: fixed; inset: -50%; z-index: 50; pointer-events: none; opacity: 0.09; mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    animation: grain 1.2s steps(4) infinite; }
-  @keyframes grain { 25% { transform: translate(-3%, 2%); } 50% { transform: translate(2%, -3%); } 75% { transform: translate(-1%, -2%); } }
-
-  .wrap { max-width: 1080px; margin: 0 auto; padding-inline: max(16px, 4vw); padding-bottom: env(safe-area-inset-bottom, 0px); }
-
-  /* ---------- Top bar ---------- */
-  .top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: calc(1.1rem + env(safe-area-inset-top, 0px)) 1.1rem; }
-  .tag { font-family: var(--hud); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.08em; text-decoration: none; }
-  .tag span { color: var(--magenta); }
-  .top nav { display: flex; gap: 1.4rem; font-family: var(--hud); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
-  .top nav a { text-decoration: none; color: var(--soft); }
-  .top nav a:hover, .top nav a:focus-visible { color: var(--cyan); }
-
-  /* ---------- Hero ---------- */
-  .hero { position: relative; margin-top: clamp(0.5rem, 3vw, 2rem); padding: clamp(2.5rem, 7vw, 5rem) clamp(1.1rem, 4vw, 3rem); text-align: center; }
-  .hud-frame { position: absolute; inset: 0; pointer-events: none; }
-  .hud-frame i { position: absolute; width: 30px; height: 30px; border: 2px solid var(--cyan); opacity: 0.85; }
-  .hud-frame i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; }
-  .hud-frame i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; }
-  .hud-frame i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; }
-  .hud-frame i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; }
-  .status { display: inline-flex; align-items: center; gap: 0.55rem; font-family: var(--hud); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--orange);
-    border: 1px solid rgba(255, 154, 60, 0.45); padding: 0.35rem 0.85rem; background: rgba(255, 154, 60, 0.07); }
-  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 10px var(--orange); animation: blink 1.4s steps(2) infinite; }
-  @keyframes blink { 50% { opacity: 0.2; } }
-
-  .wordmark { position: relative; display: block; width: fit-content; margin: 1.6rem auto 0.4rem; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-  .wordmark h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(2.6rem, 11.5vw, 7.6rem); line-height: 1.05; letter-spacing: 0.02em; color: #FFE3F2;
-    text-shadow: 0 0 4px #fff, 0 0 12px var(--magenta), 0 0 28px var(--magenta), 0 0 60px rgba(255, 61, 154, 0.55);
-    animation: buzz 7s linear infinite; }
-  @keyframes buzz { 0%, 92%, 100% { opacity: 1; } 93% { opacity: 0.55; } 94% { opacity: 1; } 95.5% { opacity: 0.7; } 96.5% { opacity: 1; } }
-  .sub { font-family: var(--hud); font-weight: 600; letter-spacing: 0.45em; text-transform: uppercase; color: var(--cyan); font-size: clamp(0.8rem, 2.6vw, 1.05rem);
-    text-shadow: 0 0 10px rgba(56, 225, 230, 0.6); margin-right: -0.45em; }
-  .lede { max-width: 34em; margin: 1.6rem auto 0; color: var(--soft); font-size: 1.08rem; }
-  .lede strong { color: var(--ink); font-weight: 600; }
-  .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8rem; margin-top: 2rem; }
-  .btn { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--hud); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none;
-    padding: 0.85rem 1.4rem; border: 2px solid currentColor; color: var(--magenta); background: rgba(255, 61, 154, 0.08);
-    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); transition: background .2s, color .2s, transform .2s; }
-  .btn:hover, .btn:focus-visible { background: var(--magenta); color: var(--space); transform: translateY(-2px); outline: none; }
-  .btn.alt { color: var(--cyan); background: rgba(56, 225, 230, 0.07); }
-  .btn.alt:hover, .btn.alt:focus-visible { background: var(--cyan); color: var(--space); }
-  .btn svg { width: 18px; height: 18px; }
-
-  /* Shield meter under the hero (easter egg target) */
-  .shield-bar { display: flex; align-items: center; justify-content: center; gap: 0.7rem; margin-top: 2.4rem; font-family: var(--hud); font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--soft); }
-  .shield-bar .meter { width: min(240px, 50vw); height: 10px; border: 1.5px solid var(--cyan); padding: 1.5px; }
-  .shield-bar .meter b { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--cyan), #9FF6F8); transform-origin: left; box-shadow: 0 0 10px rgba(56, 225, 230, 0.7); }
-
-  /* Easter egg: tap the wordmark five times */
-  .hit-flash { position: fixed; inset: 0; z-index: 40; pointer-events: none; opacity: 0;
-    background: radial-gradient(ellipse at center, transparent 45%, rgba(56, 225, 230, 0.35) 75%, rgba(255, 154, 60, 0.45) 100%); }
-  body.shield-hit .hit-flash { animation: hitflash 1s steps(1) 1; }
-  body.shield-hit .shield-bar .meter b { animation: recharge 2.8s ease-in 1; }
-  body.shield-hit .shield-bar .meter { animation: meterflash 1s steps(1) 1; }
-  @keyframes hitflash { 0% { opacity: 1; } 15% { opacity: 0; } 30% { opacity: 0.8; } 45%, 100% { opacity: 0; } }
-  @keyframes recharge { 0%, 35% { transform: scaleX(0); background: var(--orange); } 100% { transform: scaleX(1); } }
-  @keyframes meterflash { 0%, 30% { border-color: var(--orange); } 15%, 45%, 100% { border-color: var(--cyan); } }
-
-  /* ---------- Section heads ---------- */
-  section.block { margin-top: clamp(4rem, 10vw, 7rem); }
-  .head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.6rem; }
-  .head h2 { margin: 0; font-family: var(--hud); font-weight: 700; font-size: clamp(1.5rem, 4vw, 2.1rem); letter-spacing: 0.06em; text-transform: uppercase; }
-  .head .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--magenta), transparent); align-self: center; }
-  .head small { font-family: var(--hud); color: var(--orange); letter-spacing: 0.2em; font-size: 0.75rem; text-transform: uppercase; }
-
-  /* ---------- Latest video ---------- */
-  .screen { position: relative; padding: clamp(10px, 1.6vw, 16px); border: 1px solid var(--line); background: rgba(18, 11, 34, 0.8);
-    box-shadow: 0 0 0 1px rgba(255, 61, 154, 0.15), 0 0 40px rgba(255, 61, 154, 0.12); }
-  .screen::before, .screen::after { content: ""; position: absolute; width: 26px; height: 26px; border: 2px solid var(--magenta); }
-  .screen::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
-  .screen::after { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
-  .player { position: relative; aspect-ratio: 16 / 9; width: 100%; max-width: 100%; background: #05030B; overflow: hidden; }
-  .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .player .standby { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--hud); font-size: 0.8rem;
-    letter-spacing: 0.3em; text-transform: uppercase; color: var(--soft); }
-  .screen-foot { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 0.9rem;
-    font-family: var(--hud); font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--soft); }
-  .screen-foot .live { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--magenta); }
-  .screen-foot .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--magenta); box-shadow: 0 0 10px var(--magenta); }
-  .screen-foot a { color: var(--cyan); text-decoration: none; font-weight: 700; }
-  .screen-foot a:hover { text-decoration: underline; text-underline-offset: 4px; }
-
-  /* ---------- Mixtape: channel cassettes ---------- */
-  .tapes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
-  .tape { position: relative; background: var(--panel); border: 1px solid var(--line); padding: 1.1rem 1.1rem 1.4rem; display: flex; flex-direction: column; gap: 0.9rem;
-    clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%); transition: transform .25s, border-color .25s; }
-  .tape:hover { transform: translateY(-4px) rotate(-0.4deg); border-color: var(--accent); }
-  .tape.a { --accent: var(--magenta); }
-  .tape.b { --accent: var(--orange); }
-  .tape.c { --accent: var(--cyan); }
-  .cassette { position: relative; aspect-ratio: 1.6 / 1; max-width: 100%; border-radius: 8px; padding: 9% 7% 0;
-    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 85%, #fff 10%), color-mix(in srgb, var(--accent) 55%, #000 45%));
-    box-shadow: inset 0 0 0 2px rgba(0,0,0,0.25), 0 10px 24px rgba(0,0,0,0.45); }
-  .cassette .label { background: #F5EEDC; color: #1C1430; border-radius: 4px; height: 58%; padding: 6% 6% 0; position: relative;
-    background-image: repeating-linear-gradient(180deg, transparent 0 13px, rgba(28, 20, 48, 0.12) 13px 14px); }
-  .cassette .label b { display: block; font-family: var(--hud); font-size: clamp(0.72rem, 1.9vw, 0.92rem); letter-spacing: 0.06em; transform: rotate(-2deg); font-weight: 700; }
-  .cassette .label em { font-style: normal; font-family: var(--hud); font-size: 0.62rem; letter-spacing: 0.2em; color: #6B5F86; }
-  .cassette .window { position: absolute; left: 22%; right: 22%; top: 49%; height: 22%; background: #1C1430; border-radius: 30px; display: flex; justify-content: space-between; align-items: center; padding: 0 6%; }
-  .cassette .reel { width: 22%; aspect-ratio: 1; border-radius: 50%; border: 3px dashed #F5EEDC; animation: spin 4s linear infinite; }
-  .tape.paused .reel { animation-play-state: paused; opacity: 0.6; }
-  .cassette .bottom { position: absolute; left: 18%; right: 18%; bottom: 0; height: 15%; background: rgba(0,0,0,0.28); clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%); }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .side { font-family: var(--hud); font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
-  .tape h3 { margin: -0.4rem 0 0; font-family: var(--hud); font-size: 1.3rem; letter-spacing: 0.04em; }
-  .tape p { margin: 0; color: var(--soft); font-size: 0.98rem; }
-  .tape .go { margin-top: auto; font-family: var(--hud); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; color: var(--accent); }
-  .tape .go:hover { text-decoration: underline; text-underline-offset: 4px; }
-  .soon { align-self: flex-start; margin-top: auto; font-family: var(--hud); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent);
-    border: 1.5px dashed var(--accent); padding: 0.3rem 0.7rem; }
-
-  /* ---------- Charity stream (Nov 2026, Breakthrough T1D) ----------
-     The blue circle is the worldwide diabetes awareness symbol, same as on kyloloki.com. */
-  .mission { --t1d: #4DA8FF; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 340px); gap: clamp(1.5rem, 4vw, 3rem); align-items: center;
-    padding: clamp(1.4rem, 4vw, 2.6rem); border: 1px solid rgba(77, 168, 255, 0.35); background: linear-gradient(135deg, rgba(77, 168, 255, 0.10), rgba(18, 11, 34, 0.85) 55%);
-    box-shadow: 0 0 0 1px rgba(77, 168, 255, 0.12), 0 0 50px rgba(77, 168, 255, 0.14);
-    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px)); }
-  .mission .status { color: var(--t1d); border-color: rgba(77, 168, 255, 0.5); background: rgba(77, 168, 255, 0.08); }
-  .mission .status::before { background: var(--t1d); box-shadow: 0 0 10px var(--t1d); }
-  .mission h3 { margin: 1.1rem 0 0.2rem; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.2em 0.5em; line-height: 1; }
-  .mission h3 .big { font-family: var(--display); font-weight: 400; font-size: clamp(3.4rem, 10vw, 5.6rem); color: #E3F1FF;
-    text-shadow: 0 0 4px #fff, 0 0 12px var(--t1d), 0 0 30px var(--t1d), 0 0 60px rgba(77, 168, 255, 0.5); }
-  .mission h3 .small { font-family: var(--hud); font-weight: 700; font-size: clamp(1.3rem, 3.6vw, 2rem); letter-spacing: 0.08em; text-transform: uppercase; }
-  .mission .for { font-family: var(--hud); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; font-size: 0.82rem; color: var(--t1d); margin: 0.4rem 0 1.1rem; }
-  .mission p { margin: 0 0 0.9rem; color: var(--soft); max-width: 36em; }
-  .mission p strong { color: var(--ink); font-weight: 600; }
-  .readouts { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 0.6rem; margin: 1.4rem 0 1.6rem; max-width: 600px; }
-  .readouts div { border: 1px solid var(--line); background: rgba(11, 7, 22, 0.6); padding: 0.55rem 0.7rem; }
-  .readouts dt { font-family: var(--hud); font-size: 0.64rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--soft); }
-  .readouts dd { margin: 0.15rem 0 0; font-family: var(--hud); font-weight: 700; font-size: 1rem; letter-spacing: 0.06em; color: var(--ink); }
-  .mission .ctas { justify-content: flex-start; margin-top: 0; }
-  .btn.t1d { color: var(--t1d); background: rgba(77, 168, 255, 0.08); }
-  .btn.t1d:hover, .btn.t1d:focus-visible { background: var(--t1d); color: var(--space); }
-  .mission .note { margin: 1rem 0 0; font-family: var(--hud); font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
-  /* Kylo in the blue circle: lower half sits inside the ring, head pops out of the top */
-  .ring { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1; justify-self: center; }
-  .ring::before { content: ""; position: absolute; inset: 9%; border-radius: 50%; border: clamp(14px, 3.4vw, 22px) solid var(--t1d); z-index: 1;
-    box-shadow: 0 0 18px rgba(77, 168, 255, 0.75), inset 0 0 18px rgba(77, 168, 255, 0.6); animation: pulse 4s ease-in-out infinite; }
-  @keyframes pulse { 50% { box-shadow: 0 0 34px rgba(77, 168, 255, 0.95), inset 0 0 28px rgba(77, 168, 255, 0.8); } }
-  .ring .in, .ring .out { position: absolute; inset: 0; }
-  .ring .in { inset: 9%; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 60%, rgba(77, 168, 255, 0.25), rgba(11, 7, 22, 0.9) 70%); }
-  .ring img { position: absolute; left: 50%; bottom: 9%; width: 86%; height: auto; transform: translateX(-50%); }
-  .ring .in img { bottom: 0; width: 104.9%; }  /* 86% / 82%: same size and spot as the outer copy, measured inside the 9% inset */
-  .ring .out { clip-path: inset(0 0 52% 0); z-index: 2; }
-  .ring .out img { filter: drop-shadow(0 0 14px rgba(77, 168, 255, 0.35)); }
-
-  /* ---------- Ticker tape: charity stream lead-up (auto-hides after November) ---------- */
-  .ticker { --t1d: #4DA8FF; position: relative; z-index: 5; display: flex; align-items: stretch; height: 38px; text-decoration: none; overflow: hidden;
-    background: rgba(8, 5, 18, 0.92); border-bottom: 1px solid rgba(77, 168, 255, 0.55); box-shadow: 0 0 22px rgba(77, 168, 255, 0.25);
-    font-family: var(--hud); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase; }
-  .ticker[hidden] { display: none; }
-  .ticker .flag { flex-shrink: 0; display: flex; align-items: center; gap: 0.55rem; padding: 0 1rem 0 max(16px, 2vw); color: var(--space); background: var(--orange);
-    clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%); padding-right: 1.6rem; }
-  .ticker .flag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--space); animation: blink 1s steps(2) infinite; }
-  .ticker .lane { flex: 1; overflow: hidden; display: flex; align-items: center;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent); mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent); }
-  .ticker .track { display: flex; width: max-content; animation: tape 40s linear infinite; }
-  .ticker:hover .track, .ticker:focus-visible .track { animation-play-state: paused; }
+  .ticker { display: flex; height: 34px; overflow: hidden; text-decoration: none; background: rgba(0,0,0,0.35); border-bottom: 1px solid var(--line); color: var(--soft); font-size: 0.8rem; font-weight: 500; }
+  .ticker .flag { flex-shrink: 0; display: flex; align-items: center; padding: 0 1rem 0 max(16px, 4vw); color: var(--amber); font-weight: 700; }
+  .ticker .lane { flex: 1; overflow: hidden; display: flex; align-items: center; }
+  .ticker .track { display: flex; width: max-content; animation: roll 55s linear infinite; }
+  .ticker:hover .track { animation-play-state: paused; }
   .ticker .grp { display: flex; align-items: center; flex-shrink: 0; }
-  .ticker .grp span { padding: 0 1.1rem; color: var(--t1d); text-shadow: 0 0 8px rgba(77, 168, 255, 0.6); white-space: nowrap; }
-  .ticker .grp span.hot { color: #fff; text-shadow: 0 0 8px var(--magenta), 0 0 16px var(--magenta); }
-  .ticker .grp i { color: var(--magenta); font-style: normal; }
-  @keyframes tape { to { transform: translateX(-50%); } }
-  @media (max-width: 560px) { .ticker { height: 34px; font-size: 0.72rem; } .ticker .flag { padding-left: 12px; padding-right: 1.2rem; } }
+  .ticker .grp span { padding: 0 0.9rem; white-space: nowrap; }
+  .ticker .grp span.hot { color: var(--ink); }
+  .ticker .grp i { font-style: normal; color: var(--amber); }
+  @keyframes roll { to { transform: translateX(-50%); } }
 
-  /* ---------- Socials ---------- */
-  .socials { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.9rem; }
-  .social { display: flex; flex-direction: column; gap: 0.25rem; text-decoration: none; padding: 1rem 1rem 1.1rem; border: 1px solid var(--line); background: rgba(18, 11, 34, 0.75);
-    transition: border-color .2s, transform .2s, box-shadow .2s; }
-  .social:hover, .social:focus-visible { border-color: var(--c); transform: translateY(-3px); box-shadow: 0 0 22px color-mix(in srgb, var(--c) 35%, transparent); outline: none; }
-  .social .p { font-family: var(--hud); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.06em; color: var(--c); }
-  .social .h { color: var(--soft); font-size: 0.88rem; word-break: break-word; }
+  .hero { text-align: center; padding: clamp(3rem, 9vw, 6rem) 0 clamp(2rem, 5vw, 3.5rem); }
+  .mark { font-family: var(--display); font-weight: 800; font-size: clamp(1.1rem, 2.5vw, 1.35rem); letter-spacing: -0.02em; text-decoration: none; }
+  .hero h1 { margin: 1.2rem auto 0; font-family: var(--display); font-weight: 800; font-size: clamp(3rem, 10vw, 7rem); line-height: 0.9; letter-spacing: -0.05em; max-width: 9em; }
+  .hero h1 em { font-style: normal; color: var(--amber); }
+  .hero p { margin: 1.2rem auto 0; max-width: 30em; color: var(--soft); font-size: clamp(1.02rem, 1rem + 0.4vw, 1.2rem); }
 
-  footer { margin-top: clamp(4rem, 10vw, 6rem); padding-block: 1.6rem 2.4rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-    font-family: var(--hud); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+  /* Channels */
+  .channels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 2vw, 22px); }
+  .ch { position: relative; aspect-ratio: 3 / 4.1; border-radius: 22px; overflow: hidden; text-decoration: none; display: flex; flex-direction: column; justify-content: space-between;
+    padding: 1.3rem; transition: transform .35s cubic-bezier(.2,.7,.2,1), opacity .3s, filter .3s; box-shadow: 0 20px 40px rgba(0,0,0,0.35); }
+  .channels:hover .ch:not(:hover) { opacity: 0.5; filter: saturate(0.6); }
+  .ch:hover, .ch:focus-visible { transform: translateY(-8px) rotate(-0.6deg); outline: none; }
+  .ch .top { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .ch .state { padding: 0.2rem 0.6rem; border-radius: 999px; }
+  .ch .foot { display: flex; justify-content: space-between; align-items: end; gap: 1rem; }
+  .ch .foot p { margin: 0; font-size: 0.92rem; line-height: 1.4; max-width: 15em; }
+  .ch .go { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 1.15rem; transition: transform .3s; }
+  .ch:hover .go { transform: rotate(-45deg); }
 
-  @media (max-width: 860px) {
-    .mission { grid-template-columns: 1fr; }
-    .mission .ring { order: -1; max-width: 260px; margin-top: -0.5rem; }
-    .tapes { grid-template-columns: 1fr; max-width: 460px; margin-inline: auto; }
-    .socials { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .socials .social:last-child { grid-column: 1 / -1; }
+  .ch.gaming { color: #F3ECFF; background: radial-gradient(70% 50% at 80% 15%, rgba(255, 61, 154, 0.5), transparent 70%), radial-gradient(60% 50% at 0% 100%, rgba(56, 225, 230, 0.3), transparent 70%), #120B22; }
+  .ch.gaming::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(1px 1px at 15% 20%, #fff, transparent), radial-gradient(1px 1px at 70% 40%, #fff, transparent), radial-gradient(1.5px 1.5px at 40% 60%, #fff, transparent),
+      radial-gradient(1px 1px at 85% 70%, #fff, transparent), radial-gradient(1px 1px at 25% 85%, #fff, transparent), radial-gradient(1.5px 1.5px at 60% 15%, #fff, transparent); }
+  .ch.gaming .state { background: var(--gaming); color: #120B22; }
+  .ch.gaming .name { font-family: 'Monoton', sans-serif; font-size: clamp(2.2rem, 4.6vw, 3.4rem); line-height: 1; color: #FFE3F2; text-shadow: 0 0 4px #fff, 0 0 14px var(--gaming), 0 0 34px var(--gaming); }
+  .ch.gaming .go { background: var(--gaming); color: #120B22; }
+
+  .ch.builds { color: #2B1D10; background: repeating-linear-gradient(92deg, rgba(120, 80, 30, 0.08) 0 3px, transparent 3px 11px), radial-gradient(120% 70% at 30% 30%, #EBD8B2, #D6BB86);
+    box-shadow: inset 0 -8px 0 #B8975F, 0 20px 40px rgba(0,0,0,0.35); }
+  .ch.builds .state { border: 1.5px solid #2B1D10; }
+  .ch.builds .name { font-family: 'Big Shoulders Display', sans-serif; font-weight: 900; font-size: clamp(3rem, 6.4vw, 4.8rem); line-height: 0.85; text-transform: uppercase; color: #5C3B22; }
+  .ch.builds .go { background: #FF6B1A; color: #111; }
+  .ch.builds .grid { position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
+    background-image: linear-gradient(rgba(46, 90, 140, 0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(46, 90, 140, 0.35) 1px, transparent 1px); background-size: 22px 22px;
+    -webkit-mask-image: linear-gradient(160deg, transparent 40%, #000 100%); mask-image: linear-gradient(160deg, transparent 40%, #000 100%); }
+
+  .ch.pobcast { color: #2A1D17; background: var(--pobcast); }
+  .ch.pobcast .state { background: #2A1D17; color: var(--pobcast); }
+  .ch.pobcast .name { font-family: 'Bagel Fat One', sans-serif; font-size: clamp(2.3rem, 4.8vw, 3.5rem); line-height: 0.92; color: #E5533B; text-shadow: 3px 3px 0 #2A1D17; }
+  .ch.pobcast .go { background: #2A1D17; color: var(--pobcast); }
+  .ch.pobcast .bars { display: flex; gap: 4px; align-items: center; height: 40px; margin-top: 0.6rem; }
+  .ch.pobcast .bars i { width: 6px; border-radius: 3px; background: #2A1D17; height: 25%; animation: idle 1.5s ease-in-out infinite; }
+  .ch.pobcast .bars i:nth-child(2n) { --h: 95%; animation-delay: -0.4s; } .ch.pobcast .bars i:nth-child(3n) { --h: 60%; animation-delay: -0.8s; background: #E5533B; } .ch.pobcast .bars i:nth-child(5n) { --h: 80%; animation-delay: -1.1s; }
+  @keyframes idle { 50% { height: var(--h, 70%); } }
+
+  /* Charity strip */
+  .cause { display: flex; align-items: center; gap: 1.2rem; margin-top: clamp(2.5rem, 7vw, 4rem); padding: 1.1rem 1.3rem; border-radius: 18px; border: 1px solid var(--line);
+    background: rgba(77, 168, 255, 0.07); text-decoration: none; transition: background .2s, border-color .2s; }
+  .cause:hover { background: rgba(77, 168, 255, 0.13); border-color: rgba(77, 168, 255, 0.45); }
+  .cause .ring { flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%; border: 8px solid var(--t1d); box-shadow: 0 0 18px rgba(77, 168, 255, 0.5); }
+  .cause span:nth-child(2) { flex: 1; }
+  .cause small { display: block; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t1d); }
+  .cause strong { font-family: var(--display); font-weight: 800; font-size: clamp(1.1rem, 1rem + 0.7vw, 1.4rem); letter-spacing: -0.02em; }
+  .cause .go { color: var(--soft); font-weight: 700; white-space: nowrap; }
+
+  .elsewhere { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.6rem; margin-top: clamp(2.5rem, 7vw, 4rem); list-style: none; padding: 0; }
+  .elsewhere a { display: inline-block; text-decoration: none; padding: 0.55rem 1.05rem; border-radius: 999px; border: 1px solid var(--line); color: var(--soft); font-weight: 500; font-size: 0.92rem; }
+  .elsewhere a:hover { color: var(--ink); border-color: var(--amber); }
+
+  /* Latest line inside a channel card (filled in by the script when there's something new) */
+  .ch .latest { display: block; margin-top: 0.5rem; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.02em; opacity: 0.9; }
+  .ch .latest[hidden] { display: none; }
+
+  /* Right now: edit data/now.json (or "Right now" in Pages CMS) */
+  .now { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 2vw, 22px); margin-top: clamp(14px, 2vw, 22px); }
+  .now div { min-width: 0; padding: 0.9rem 1.1rem; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); }
+  .now dt { display: flex; align-items: center; gap: 0.5rem; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); }
+  .now dt::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+  .now dd { margin: 0.25rem 0 0; font-family: var(--display); font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; }
+  .now .g { --c: var(--gaming); } .now .b { --c: var(--builds); } .now .p { --c: var(--pobcast); }
+
+  footer { text-align: center; color: var(--soft); font-size: 0.82rem; padding: 2.5rem 0 2.5rem; opacity: 0.8; }
+
+  /* Quiet link to Kylo's site, always there */
+  .kylo { display: inline-flex; align-items: center; gap: 0.45rem; text-decoration: none; color: var(--soft); }
+  .kylo::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2.5px solid var(--t1d); }
+  .kylo:hover { color: var(--ink); }
+
+  @media (max-width: 760px) {
+    .now { grid-template-columns: 1fr; gap: 8px; }
+    .channels { grid-template-columns: 1fr; }
+    .ch { aspect-ratio: auto; min-height: 190px; }
+    .channels:hover .ch:not(:hover) { opacity: 1; filter: none; }
+    .cause { flex-wrap: wrap; }
+    .cause .go { width: 100%; padding-left: calc(46px + 1.2rem); }
   }
-  @media (max-width: 560px) {
-    .top nav { display: none; }
-    .hero { padding-inline: 0.9rem; }
-    .hud-frame i { width: 20px; height: 20px; }
-    .head small { display: none; }
-    .readouts { grid-template-columns: 1fr 1fr; }
-    .readouts div:last-child { grid-column: 1 / -1; }
-    .mission .ctas .btn { flex: 1 1 100%; justify-content: center; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .grain, .wordmark h1, .status::before, .cassette .reel, .ring::before, .ticker .flag::before { animation: none !important; }
-    .ticker .track { animation-duration: 160s; }
-  }
+  @media (prefers-reduced-motion: reduce) { .ch.pobcast .bars i { animation: none; } .ticker .track { animation-duration: 200s; } }
+  /* Brand mark: three dots, one per channel (gaming, builds, pobcast) */
+  .dots { display: inline-flex; white-space: nowrap; }
+  .dots i { display: inline-block; align-self: flex-end; width: 0.15em; height: 0.15em; border-radius: 50%; margin-left: 0.05em; background: #FF3D9A; }
+  .dots i:nth-child(2) { background: #FF6B1A; } .dots i:nth-child(3) { background: #F2B23A; }
 </style>
 </head>
 <body>
-<div class="sky"></div>
-<canvas id="stars" aria-hidden="true"></canvas>
-<div class="grain" aria-hidden="true"></div>
-<div class="hit-flash" aria-hidden="true"></div>
-
-<!-- Charity stream ticker. Set STREAM_START in the script at the bottom once the date is fixed;
-     it counts down, says LIVE NOW during the stream, and disappears on its own after November. -->
-<a class="ticker" id="ticker" href="#charity" aria-label="24-hour charity stream for Breakthrough T1D, coming November 2026" hidden>
-  <span class="flag"><b>Incoming</b></span>
-  <span class="lane" aria-hidden="true"><span class="track" id="tickerTrack"></span></span>
-</a>
-
 <div class="wrap">
-  <header class="top">
-    <a class="tag" href="/">POBA<span>JOBS</span></a>
-    <nav aria-label="Main">
-      <a href="#charity">Charity stream</a>
-      <a href="#latest">Latest</a>
-      <a href="#mixtape">Channels</a>
-      <a href="#socials">Socials</a>
-    </nav>
-  </header>
-
   <section class="hero">
-    <div class="hud-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-    <span class="status">Site under construction</span>
-    <div class="wordmark" id="wordmark" role="button" tabindex="0" aria-label="pobajobs">
-      <h1>pobajobs</h1>
-    </div>
-    <div class="sub">Gaming</div>
-    <p class="lede"><strong>Gamer, streamer, general idiot.</strong> Me and my mates messing about in various games. The full site is on its way; until then, the good stuff is on YouTube and Twitch.</p>
-    <div class="ctas">
-      <a class="btn" href="https://www.youtube.com/@pobajobs" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch on YouTube</a>
-      <a class="btn alt" href="https://www.twitch.tv/pobajobs" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="9"/></svg>Catch a stream</a>
-    </div>
-    <div class="shield-bar" aria-hidden="true"><span>Shield</span><span class="meter"><b></b></span></div>
+    <a class="mark" href="/">pobajobs<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></a>
+    <h1>Pick a <em>channel.</em></h1>
+    <p>Games, builds and a bit of nonsense. Three channels, one bloke, not enough sleep.</p>
   </section>
 
-  <!-- Charity stream announcement. When the date is set, change "Date TBA" in the readouts
-       (and the status chip), and swap the "Donations open soon" note for a donate button. -->
-  <section class="block" id="charity">
-    <div class="head"><h2>Incoming mission</h2><span class="rule"></span><small>Charity stream</small></div>
-    <div class="mission">
-      <div>
-        <span class="status">Coming November 2026</span>
-        <h3><span class="big">24H</span><span class="small">Charity stream</span></h3>
-        <div class="for">In support of Breakthrough T1D</div>
-        <p>For <strong>Diabetes Awareness Month</strong> I'm going live for <strong>24 hours straight</strong> to raise money for Breakthrough T1D, the charity funding research into type 1 diabetes.</p>
-        <p>This one's personal. My son <strong>Kylo</strong> was diagnosed with type 1 at just 15 months old, so every hour on stream is for him and every family living with it.</p>
-        <dl class="readouts">
-          <div><dt>Duration</dt><dd>24:00:00</dd></div>
-          <div><dt>Date</dt><dd>TBA</dd></div>
-          <div><dt>Charity</dt><dd>Breakthrough T1D</dd></div>
-        </dl>
-        <div class="ctas">
-          <a class="btn t1d" href="https://kyloloki.com" target="_blank" rel="noopener">Meet Kylo &rarr;</a>
-          <a class="btn alt" href="https://www.twitch.tv/pobajobs" target="_blank" rel="noopener">Follow on Twitch</a>
-        </div>
-        <p class="note">Donations open closer to the day. Follow to get the alert.</p>
-      </div>
-      <div class="ring" aria-hidden="true">
-        <div class="in"><picture><source srcset="images/kylo.webp" type="image/webp"><img src="images/kylo.png" alt="" width="480" height="498" loading="lazy"></picture></div>
-        <div class="out"><picture><source srcset="images/kylo.webp" type="image/webp"><img src="images/kylo.png" alt="" width="480" height="498" loading="lazy"></picture></div>
-      </div>
-    </div>
-  </section>
+  <nav class="channels" aria-label="Channels">
+    <a class="ch gaming" href="/gaming/">
+      <span class="top"><span>Ch 01</span><span class="state">Live</span></span>
+      <span class="name">Gaming</span>
+      <span class="foot"><p>Let's plays, streams and general chaos with the lads.</p><span class="go" aria-hidden="true">&rarr;</span></span>
+    </a>
+    <a class="ch builds" href="/builds/">
+      <span class="grid" aria-hidden="true"></span>
+      <span class="top"><span>Ch 02</span><span class="state">Coming soon</span></span>
+      <span><span class="name">Builds</span><span class="latest" id="latestBuild" hidden></span></span>
+      <span class="foot"><p>DIY, smart home, electronic design, 3D printing and more.</p><span class="go" aria-hidden="true">&rarr;</span></span>
+    </a>
+    <a class="ch pobcast" href="/pobcast/">
+      <span class="top"><span>Ch 03</span><span class="state">Coming soon</span></span>
+      <span><span class="name">The Pobcast</span><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="latest" id="latestEpisode" hidden></span></span>
+      <span class="foot"><p>An easy listen. Goofing around with a bit of everything.</p><span class="go" aria-hidden="true">&rarr;</span></span>
+    </a>
+  </nav>
 
-  <section class="block" id="latest">
-    <div class="head"><h2>Latest transmission</h2><span class="rule"></span><small>Newest upload</small></div>
-    <div class="screen">
-      <div class="player">
-        <span class="standby">Incoming signal&hellip;</span>
-        <!-- Your channel's uploads playlist (UU + channel ID): it always opens on the newest video, so this updates itself. -->
-        <iframe src="https://www.youtube-nocookie.com/embed/videoseries?list=UUirfgMJXAZkxliSP0-wAoHA&amp;rel=0"
-          title="Latest pobajobs video" loading="lazy"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-      </div>
-      <div class="screen-foot">
-        <span class="live">Now showing: newest upload</span>
-        <a href="https://www.youtube.com/@pobajobs/videos" target="_blank" rel="noopener">All videos &rarr;</a>
-      </div>
-    </div>
-  </section>
+  <!-- Right now: the words come from data/now.json; these are the fallback -->
+  <dl class="now" aria-label="Right now">
+    <div class="g"><dt>Playing</dt><dd id="nowPlaying">Whatever the lads pick</dd></div>
+    <div class="b"><dt>Building</dt><dd id="nowBuilding">The workshop</dd></div>
+    <div class="p"><dt>Recording</dt><dd id="nowRecording">Not yet. Soon.</dd></div>
+  </dl>
 
-  <section class="block" id="mixtape">
-    <div class="head"><h2>The mixtape</h2><span class="rule"></span><small>3 tracks</small></div>
-    <div class="tapes">
-      <article class="tape a">
-        <div class="cassette" aria-hidden="true">
-          <div class="label"><b>POBAJOBS GAMING</b><em>SIDE A &middot; NOW PLAYING</em></div>
-          <div class="window"><span class="reel"></span><span class="reel"></span></div>
-          <div class="bottom"></div>
-        </div>
-        <span class="side">Side A &middot; Now playing</span>
-        <h3>pobajobs Gaming</h3>
-        <p>Let's plays, streams and general chaos with the lads. Expect bad aim and good times.</p>
-        <a class="go" href="https://www.youtube.com/@pobajobs" target="_blank" rel="noopener">Watch the channel &rarr;</a>
-      </article>
+  <a class="cause" href="/gaming/#charity">
+    <span class="ring" aria-hidden="true"></span>
+    <span><small>This November</small><strong>24-hour charity stream for Breakthrough T1D</strong></span>
+    <span class="go">Find out more &rarr;</span>
+  </a>
 
-      <article class="tape b paused">
-        <div class="cassette" aria-hidden="true">
-          <div class="label"><b>POBAJOBS BUILDS</b><em>SIDE B &middot; RECORDING</em></div>
-          <div class="window"><span class="reel"></span><span class="reel"></span></div>
-          <div class="bottom"></div>
-        </div>
-        <span class="side">Side B &middot; Recording</span>
-        <h3>pobajobs Builds</h3>
-        <p>A second channel for builds and projects. Still being recorded.</p>
-        <span class="soon">Coming soon</span>
-      </article>
+  <ul class="elsewhere">
+    <li><a href="https://www.youtube.com/@pobajobs" target="_blank" rel="noopener">YouTube</a></li>
+    <li><a href="https://www.twitch.tv/pobajobs" target="_blank" rel="noopener">Twitch</a></li>
+    <li><a href="https://www.instagram.com/pobajobs/" target="_blank" rel="noopener">Instagram</a></li>
+    <li><a href="https://www.tiktok.com/@pobajobs" target="_blank" rel="noopener">TikTok</a></li>
+    <li><a href="https://bit.ly/pobamerch" target="_blank" rel="noopener">Merch</a></li>
+  </ul>
 
-      <article class="tape c paused">
-        <div class="cassette" aria-hidden="true">
-          <div class="label"><b>THE POBAJOBS PODCAST</b><em>BONUS TRACK &middot; UNRELEASED</em></div>
-          <div class="window"><span class="reel"></span><span class="reel"></span></div>
-          <div class="bottom"></div>
-        </div>
-        <span class="side">Bonus track &middot; Unreleased</span>
-        <h3>The Podcast</h3>
-        <p>Chat, games and whatever else comes up. Mic check pending.</p>
-        <span class="soon">Coming soon</span>
-      </article>
-    </div>
-  </section>
-
-  <section class="block" id="socials">
-    <div class="head"><h2>Comms channels</h2><span class="rule"></span><small>Open frequencies</small></div>
-    <div class="socials">
-      <a class="social" style="--c: #FF4D4D" href="https://www.youtube.com/@pobajobs" target="_blank" rel="noopener"><span class="p">YouTube</span><span class="h">@pobajobs</span></a>
-      <a class="social" style="--c: #A970FF" href="https://www.twitch.tv/pobajobs" target="_blank" rel="noopener"><span class="p">Twitch</span><span class="h">twitch.tv/pobajobs</span></a>
-      <a class="social" style="--c: #FF3D9A" href="https://www.instagram.com/pobajobs/" target="_blank" rel="noopener"><span class="p">Instagram</span><span class="h">@pobajobs</span></a>
-      <a class="social" style="--c: #38E1E6" href="https://www.tiktok.com/@pobajobs" target="_blank" rel="noopener"><span class="p">TikTok</span><span class="h">@pobajobs</span></a>
-      <a class="social" style="--c: #FF9A3C" href="https://bit.ly/pobamerch" target="_blank" rel="noopener"><span class="p">Merch</span><span class="h">Kit yourself out</span></a>
-    </div>
-  </section>
-
-  <footer>
-    <span>&copy; <span id="yr">2026</span> pobajobs</span>
-    <span>Transmission incomplete &middot; more soon</span>
-  </footer>
+  <footer>&copy; 2026 pobajobs &middot; made with too much coffee &middot; <a class="kylo" href="https://kyloloki.com" target="_blank" rel="noopener">For Kylo</a></footer>
 </div>
 
+<script src="/assets/builds.js"></script>
 <script>
-  document.getElementById('yr').textContent = new Date().getFullYear();
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Right now (data/now.json) and the Pobcast's latest episode, once there is one
+  fetch('/data/now.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(now => {
+    if (!now) return;
+    const set = (id, v) => { if (v) document.getElementById(id).textContent = v; };
+    set('nowPlaying', now.playing); set('nowBuilding', now.building); set('nowRecording', now.recording);
+    if (now.pobcast_latest_title) {
+      const el = document.getElementById('latestEpisode');
+      el.textContent = 'Latest: ' + now.pobcast_latest_title; el.hidden = false;
+      const card = el.closest('.ch');
+      card.querySelector('.state').textContent = 'New episode';
+      if (now.pobcast_latest_url) card.href = now.pobcast_latest_url;
+    }
+  }).catch(() => {});
 
-  // ---- Starfield: three layers drifting at different speeds ----
-  const cv = document.getElementById('stars'), ctx = cv.getContext('2d');
-  let stars = [], w = 0, h = 0;
-  const tints = ['#FFFFFF', '#FFFFFF', '#FFD6EC', '#C9FBFF', '#FFE2C2'];
-  function setup() {
-    const d = Math.min(devicePixelRatio || 1, 2);
-    w = innerWidth; h = innerHeight; cv.width = w * d; cv.height = h * d; ctx.setTransform(d, 0, 0, d, 0, 0);
-    const count = Math.round((w * h) / 2600);
-    stars = Array.from({ length: count }, () => {
-      const z = Math.random();
-      return { x: Math.random() * w, y: Math.random() * h, z, r: 0.3 + z * 1.4, c: tints[Math.random() * tints.length | 0], tw: Math.random() * Math.PI * 2 };
-    });
-  }
-  function frame(t) {
-    ctx.clearRect(0, 0, w, h);
-    for (const s of stars) {
-      if (!reduce) { s.x -= 0.04 + s.z * 0.22; if (s.x < -2) { s.x = w + 2; s.y = Math.random() * h; } }
-      ctx.globalAlpha = 0.45 + 0.55 * Math.abs(Math.sin(t / 1400 + s.tw)) * s.z;
-      ctx.fillStyle = s.c; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-    if (!reduce) requestAnimationFrame(frame);
-  }
-  addEventListener('resize', () => { setup(); if (reduce) frame(0); });
-  setup(); requestAnimationFrame(frame);
-
-  // ---- Easter egg: tap the wordmark five times quickly ----
-  const mark = document.getElementById('wordmark');
-  let taps = 0, tapTimer, hitTimer;
-  function tap() {
-    taps++; clearTimeout(tapTimer); tapTimer = setTimeout(() => { taps = 0; }, 1200);
-    if (taps >= 5) {
-      taps = 0;
-      document.body.classList.remove('shield-hit'); void document.body.offsetWidth; document.body.classList.add('shield-hit');
-      clearTimeout(hitTimer); hitTimer = setTimeout(() => document.body.classList.remove('shield-hit'), 3000);
-    }
-  }
-  mark.addEventListener('click', tap);
-  mark.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap(); } });
-</script>
-<script>
-  // ---- Charity stream ticker ----
-  // When the date is set, put it here, e.g. '2026-11-14T10:00' (UK time). Leave '' while it's TBA.
-  const STREAM_START = '';
-  (function () {
-    const el = document.getElementById('ticker'), track = document.getElementById('tickerTrack');
-    const now = () => new Date();
-    const END = new Date('2026-12-01T00:00:00');               // ticker retires itself after November
-    if (now() >= END) return;
-    const start = STREAM_START ? new Date(STREAM_START) : null;
-    const pad = n => String(n).padStart(2, '0');
-    function countdown() {
-      const t = now();
-      if (start) {
-        const ms = start - t;
-        if (ms <= 0 && t - start < 24 * 3600e3) return '&#9673; Live now on Twitch';
-        if (ms <= 0) return 'Thank you for the support';
-        const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60;
-        return `T-minus ${d}d ${pad(h)}h ${pad(m)}m`;
-      }
-      const nov = new Date('2026-11-01T00:00:00');
-      if (t >= nov) return 'Date dropping soon';
-      const d = Math.ceil((nov - t) / 864e5);
-      return `T-minus ${d} day${d === 1 ? '' : 's'} to November`;
-    }
-    function build() {
-      const items = [`<span class="hot">${countdown()}</span>`, '24-hour charity stream', 'In support of Breakthrough T1D',
-        'Diabetes Awareness Month', start ? start.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Date TBA', 'For Kylo'];
-      const grp = '<span class="grp">' + items.map(x => (x.startsWith('<') ? x : `<span>${x}</span>`) + '<i>&#9670;</i>').join('') + '</span>';
-      const half = grp.repeat(3);                               // wide enough to cover big screens
-      track.innerHTML = half + half;                            // two identical halves = seamless loop
-    }
-    build(); el.hidden = false;
-    setInterval(build, 60000);
-  })();
+  // Newest real build log (examples don't count)
+  fetchBuilds().then(builds => {
+    const real = builds.filter(b => !b.placeholder);
+    if (!real.length) return;
+    const el = document.getElementById('latestBuild');
+    el.textContent = 'Latest: ' + real[0].title; el.hidden = false;
+    el.closest('.ch').querySelector('.state').textContent = 'Building';
+  });
 </script>
 </body>
 </html>
