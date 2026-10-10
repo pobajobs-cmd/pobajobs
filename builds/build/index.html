@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="darkreader-lock">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Build log · pobajobs Builds</title>
+<meta name="theme-color" content="#1B1E21">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/assets/stream.js" data-flag="Charity stream" data-href="/gaming/#charity" data-sep="&#9632;" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<style>
+  /* One build write-up: the same workshop as /builds/, with a datasheet header, the write-up,
+     then the parts list and files like a bill of materials. */
+  :root {
+    --bench: #1B1E21; --line: rgba(160, 190, 210, 0.16); --ink: #EDEAE4; --soft: #A9AFB4;
+    --safety: #FF6B1A; --copper: #D08A4E; --ply: #E7D2A9;
+    --display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --body: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bench); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.65; overflow-x: hidden;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 96px 96px; background-attachment: fixed; }
+  a { color: inherit; }
+  .wrap { max-width: 860px; margin: 0 auto; padding-inline: max(16px, 4vw); }
+
+  .ticker { display: flex; height: 36px; overflow: hidden; text-decoration: none; background: #111315; border-bottom: 2px solid var(--safety);
+    font-family: var(--mono); font-weight: 600; font-size: 0.76rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .ticker .flag { flex-shrink: 0; display: flex; align-items: center; padding: 0 1rem 0 max(16px, 2vw); color: #111; background: repeating-linear-gradient(-45deg, var(--safety) 0 12px, #FFB21A 12px 24px); font-weight: 700; }
+  .ticker .lane { flex: 1; overflow: hidden; display: flex; align-items: center; }
+  .ticker .track { display: flex; width: max-content; animation: roll 45s linear infinite; }
+  .ticker:hover .track { animation-play-state: paused; }
+  .ticker .grp { display: flex; align-items: center; flex-shrink: 0; }
+  .ticker .grp span { padding: 0 1rem; color: var(--soft); white-space: nowrap; }
+  .ticker .grp span.hot { color: var(--safety); }
+  .ticker .grp i { color: var(--copper); font-style: normal; font-size: 0.6rem; }
+  @keyframes roll { to { transform: translateX(-50%); } }
+
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: 1.1rem; font-family: var(--mono); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .top a { text-decoration: none; }
+  .crumb b { color: var(--safety); }
+  .crumb span { color: var(--soft); }
+
+  .ex { display: inline-block; font-family: var(--mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; background: #FFB21A; color: #111; padding: 0.15rem 0.5rem; margin-bottom: 0.8rem; }
+  h1 { margin: 1.5rem 0 0.8rem; font-family: var(--display); font-weight: 900; font-size: clamp(2.6rem, 8vw, 4.6rem); line-height: 0.92; text-transform: uppercase; text-wrap: balance; }
+  .spec { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 1.6rem; border: 1px solid var(--line); background: rgba(17, 19, 21, 0.8); font-family: var(--mono); font-size: 0.8rem; }
+  .spec div { padding: 0.5rem 0.9rem; border-right: 1px solid var(--line); }
+  .spec dt { color: var(--soft); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.68rem; }
+  .spec dd { margin: 0; }
+  .spec dd.on { color: var(--safety); }
+  .cover { width: 100%; border-radius: 6px; margin-bottom: 1.5rem; display: block; }
+  .video { position: relative; aspect-ratio: 16 / 9; max-width: 100%; margin-bottom: 1.5rem; background: #000; border-radius: 6px; overflow: hidden; }
+  .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+  .prose { max-width: 65ch; }
+  .prose h2 { font-family: var(--display); font-weight: 700; font-size: 1.9rem; text-transform: uppercase; letter-spacing: 0.02em; margin: 2rem 0 0.4rem; line-height: 1; }
+  .prose a { color: var(--safety); }
+  .prose img { max-width: 100%; border-radius: 6px; }
+  .prose code { font-family: var(--mono); font-size: 0.9em; background: rgba(255,255,255,0.06); padding: 0.1em 0.35em; border-radius: 3px; }
+
+  section.bom { margin-top: 2.5rem; }
+  .bom h2 { font-family: var(--display); font-weight: 900; font-size: 1.9rem; text-transform: uppercase; margin: 0 0 0.8rem; display: flex; align-items: baseline; gap: 1rem; }
+  .bom h2::after { content: ""; flex: 1; border-top: 2px dashed rgba(208, 138, 78, 0.5); }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.85rem; background: rgba(17, 19, 21, 0.8); border: 1px solid var(--line); }
+  th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--soft); font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  td.qty { white-space: nowrap; color: var(--safety); font-variant-numeric: tabular-nums; }
+  td a { color: var(--safety); }
+  .files { display: grid; gap: 0.6rem; }
+  .file { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.8rem 1rem; text-decoration: none; background: var(--ply); color: #2B1D10; border-radius: 4px;
+    font-family: var(--mono); font-weight: 600; font-size: 0.86rem; box-shadow: 0 3px 0 #B8975F; }
+  .file:hover { transform: translateY(1px); box-shadow: 0 2px 0 #B8975F; }
+  .file span:last-child { color: #A8410A; white-space: nowrap; }
+
+  .msg { font-family: var(--mono); color: var(--soft); padding: 3rem 0; }
+  .back { display: inline-block; margin-top: 2.5rem; font-family: var(--mono); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; color: var(--safety); }
+  .kylo { display: inline-flex; align-items: center; gap: 0.45rem; text-decoration: none; }
+  .kylo::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 2.5px solid #4DA8FF; }
+  footer { margin-top: 4rem; padding-block: 1.5rem 2.2rem; border-top: 2px dashed rgba(208, 138, 78, 0.35); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+  footer a { text-decoration: none; }
+  @media (prefers-reduced-motion: reduce) { .ticker .track { animation-duration: 180s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="crumb" href="/builds/"><b>POBAJOBS</b> <span>/ Builds / Log</span></a>
+  </header>
+  <main id="root"><p class="msg">Loading the build&hellip;</p></main>
+  <a class="back" href="/builds/">&larr; All builds</a>
+  <footer>
+    <span>&copy; 2026 pobajobs &middot; <a class="kylo" href="https://kyloloki.com" target="_blank" rel="noopener">For Kylo</a></span>
+    <span><a href="/">Home</a> &middot; <a href="/gaming/">Gaming</a> &middot; <a href="/pobcast/">Pobcast</a></span>
+  </footer>
+</div>
+
+<script src="/assets/builds.js"></script>
+<script>
+  const slug = new URLSearchParams(location.search).get('slug') || '';
+  const root = document.getElementById('root');
+  if (!/^[\w.-]+$/.test(slug)) {
+    root.innerHTML = '<p class="msg">That build log doesn\'t exist. Head back to the build list.</p>';
+  } else {
+    fetchBuild(slug).then(b => {
+      document.title = b.title + ' · pobajobs Builds';
+      const vid = youTubeId(b.video);
+      const isLink = h => /^(https?:\/\/|\/)/.test(h);
+      root.innerHTML = `
+        ${b.placeholder ? '<span class="ex">Example build</span>' : ''}
+        <h1>${escHtml(b.title)}</h1>
+        <dl class="spec">
+          ${b.status ? `<div><dt>Status</dt><dd class="on">${escHtml(b.status)}</dd></div>` : ''}
+          <div><dt>Logged</dt><dd>${fmtBuildDate(b.date)}</dd></div>
+          ${b.tags.length ? `<div><dt>Bins</dt><dd>${b.tags.map(escHtml).join(' / ')}</dd></div>` : ''}
+          ${b.parts.length ? `<div><dt>Parts</dt><dd>${b.parts.length}</dd></div>` : ''}
+        </dl>
+        ${b.cover ? `<img class="cover" src="${escHtml(b.cover)}" alt="">` : ''}
+        ${vid ? `<div class="video"><iframe src="https://www.youtube-nocookie.com/embed/${vid}?rel=0" title="${escHtml(b.title)}" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>` : ''}
+        <div class="prose">${marked.parse(b.body)}</div>
+        ${b.parts.length ? `<section class="bom"><h2>Parts list</h2><div class="tablewrap"><table>
+          <thead><tr><th>Qty</th><th>Part</th><th>Notes</th></tr></thead>
+          <tbody>${b.parts.map(p => `<tr><td class="qty">${escHtml(p.qty)}</td><td>${p.link && isLink(p.link) ? `<a href="${escHtml(p.link)}" target="_blank" rel="noopener">${escHtml(p.part)}</a>` : escHtml(p.part)}</td><td>${escHtml(p.notes)}</td></tr>`).join('')}</tbody>
+        </table></div></section>` : ''}
+        ${b.files.length ? `<section class="bom"><h2>Files</h2><div class="files">${b.files.filter(f => isLink(f.href)).map(f => `<a class="file" href="${escHtml(f.href)}" ${f.href.startsWith('/') ? 'download' : 'target="_blank" rel="noopener"'}><span>${escHtml(f.label || f.href)}</span><span>Download &darr;</span></a>`).join('')}</div></section>` : ''}
+      `;
+    }).catch(() => {
+      root.innerHTML = '<p class="msg">Couldn\'t load that build. It may have been moved, or the link is incomplete.</p>';
+    });
+  }
+</script>
+</body>
+</html>
