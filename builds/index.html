@@ -178,6 +178,13 @@
     .printed .nozzle { display: none; }
     .ticker .track { animation-duration: 180s; }
   }
+  /* Footer: the Kylo ring sits on the text baseline; on phones everything stacks, centred */
+  footer .kylo { display: inline; white-space: nowrap; }
+  footer .kylo::before { display: inline-block; vertical-align: -0.1em; margin-right: 0.45em; }
+  footer { align-items: center; }
+  @media (max-width: 560px) {
+    footer { flex-direction: column; justify-content: center; text-align: center; gap: 0.6rem; }
+  }
 </style>
 </head>
 <body>
@@ -256,7 +263,7 @@
         <div><dt>First build</dt><dd>TBA</dd></div>
         <div><dt>Format</dt><dd>Build videos and write-ups</dd></div>
         <div><dt>Tolerance</dt><dd>&plusmn; a bit</dd></div>
-        <div><dt>Powered by</dt><dd>Coffee, solder and stubbornness</dd></div>
+        <div><dt>Powered by</dt><dd>Cider, solder and stubbornness</dd></div>
       </dl>
       <div class="note">
         <p><strong>The bench is being set up.</strong> Build videos will land on their own channel. Until then, you'll find me gaming.</p>
