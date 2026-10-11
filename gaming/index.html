@@ -247,6 +247,13 @@
     .grain, .wordmark h1, .status::before, .cassette .reel, .ring::before, .ticker .flag::before { animation: none !important; }
     .ticker .track { animation-duration: 160s; }
   }
+  /* Footer: the Kylo ring sits on the text baseline; on phones everything stacks, centred */
+  footer .kylo { display: inline; white-space: nowrap; }
+  footer .kylo::before { display: inline-block; vertical-align: -0.1em; margin-right: 0.45em; }
+  footer { align-items: center; }
+  @media (max-width: 560px) {
+    footer { flex-direction: column; justify-content: center; text-align: center; gap: 0.6rem; }
+  }
 </style>
 <script src="/assets/stream.js" data-flag="Incoming" data-href="#charity" data-sep="&#9670;" defer></script>
 </head>
