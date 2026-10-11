@@ -110,7 +110,7 @@
   .now dd { margin: 0.25rem 0 0; font-family: var(--display); font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; }
   .now .g { --c: var(--gaming); } .now .b { --c: var(--builds); } .now .p { --c: var(--pobcast); }
 
-  footer { text-align: center; color: var(--soft); font-size: 0.82rem; padding: 2.5rem 0 2.5rem; opacity: 0.8; }
+  footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem 1.2rem; text-align: center; color: var(--soft); font-size: 0.82rem; padding: 2.5rem 0 2.5rem; opacity: 0.8; }
 
   /* Quiet link to Kylo's site, always there */
   .kylo { display: inline-flex; align-items: center; gap: 0.45rem; text-decoration: none; color: var(--soft); }
@@ -130,6 +130,13 @@
   .dots { display: inline-flex; white-space: nowrap; }
   .dots i { display: inline-block; align-self: flex-end; width: 0.15em; height: 0.15em; border-radius: 50%; margin-left: 0.05em; background: #FF3D9A; }
   .dots i:nth-child(2) { background: #FF6B1A; } .dots i:nth-child(3) { background: #F2B23A; }
+  /* Footer: the Kylo ring sits on the text baseline; on phones everything stacks, centred */
+  footer .kylo { display: inline; white-space: nowrap; }
+  footer .kylo::before { display: inline-block; vertical-align: -0.1em; margin-right: 0.45em; }
+  footer { align-items: center; }
+  @media (max-width: 560px) {
+    footer { flex-direction: column; justify-content: center; text-align: center; gap: 0.6rem; }
+  }
 </style>
 </head>
 <body>
@@ -180,7 +187,7 @@
     <li><a href="https://bit.ly/pobamerch" target="_blank" rel="noopener">Merch</a></li>
   </ul>
 
-  <footer>&copy; 2026 pobajobs &middot; made with too much coffee &middot; <a class="kylo" href="https://kyloloki.com" target="_blank" rel="noopener">For Kylo</a></footer>
+  <footer><span>&copy; 2026 pobajobs &middot; made with too much cider</span><a class="kylo" href="https://kyloloki.com" target="_blank" rel="noopener">For Kylo</a></footer>
 </div>
 
 <script src="/assets/builds.js"></script>
