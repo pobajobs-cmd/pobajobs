@@ -87,7 +87,12 @@
   .stats small { display: block; font-family: var(--mono); font-size: 0.64rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5A4127; }
   .stats strong { font-family: var(--mono); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
   .msg { margin: 0.8rem 0 0; font-size: 0.9rem; color: #7A2E10; font-weight: 600; }
-  .msg:empty { display: none; }
+  .msg:empty, .note:empty { display: none; }
+  .note { margin: 0.7rem 0 0; font-size: 0.88rem; color: #3E2B19; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .chips button { font: inherit; font-family: var(--mono); font-size: 0.74rem; font-weight: 600; cursor: pointer; padding: 0.35rem 0.6rem; border-radius: 4px;
+    border: 1px solid #3A4046; background: var(--field); color: var(--soft); }
+  .chips button.on { border-color: var(--safety); color: var(--safety); }
 
   .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.2rem; }
   .btn { font: inherit; font-family: var(--mono); font-weight: 600; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
@@ -178,7 +183,7 @@
         <div class="field">
           <label for="toBase"><i style="background:var(--sky)"></i>Laser to the base of the house</label>
           <div class="unit"><input id="toBase" type="text" autocomplete="off" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span>m</span></div>
-          <span class="hint">The bottom of the wall, straight below the chimney.</span>
+          <span class="hint">The bottom of the wall below the chimney, or the front wall if that's all you can see.</span>
         </div>
         <div class="field" data-for="slope angle">
           <span class="flabel">The base of the house was</span>
@@ -195,7 +200,17 @@
         <div class="field" data-for="slope">
           <label for="toLevel"><i style="background:var(--hazard)"></i>Level shot to the wall</label>
           <div class="unit"><input id="toLevel" type="text" autocomplete="off" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span>m</span></div>
-          <span class="hint">Hold the laser dead level and shoot the wall under the chimney.</span>
+          <span class="hint">Hold the laser dead level and shoot the same wall.</span>
+        </div>
+        <div class="field" data-for="flat slope">
+          <label for="setback"><i style="background:var(--copper)"></i>Stack set back from that wall</label>
+          <div class="unit"><input id="setback" type="text" autocomplete="off" inputmode="decimal" value="0"><span>m</span></div>
+          <div class="chips" id="setChips">
+            <button type="button" data-v="0">On the wall</button>
+            <button type="button" data-v="3.5">Terrace ridge ~3.5</button>
+            <button type="button" data-v="4.5">Bigger house ridge ~4.5</button>
+          </div>
+          <span class="hint">When you can only hit the front wall but the stack is further back, like on a terrace ridge. Usually about half the depth of the house. A guess here; the Angles method measures it for you.</span>
         </div>
         <div class="field" data-for="flat">
           <label for="laserH">Laser height off the ground</label>
@@ -268,6 +283,7 @@
           <div><small>Flue to sweep</small><strong id="flueL">&ndash;</strong></div>
           <div><small>Rods reach</small><strong id="reach">&ndash;</strong></div>
         </div>
+        <p class="note" id="note"></p>
         <p class="msg" id="msg"></p>
       </section>
       <div class="actions">
@@ -288,6 +304,7 @@
           <li><b>Shoot the pot</b>, then <b>the base</b> of the wall straight below it, without moving.</li>
           <li><b>Same level as the house?</b> That's it: use Flat ground.</li>
           <li><b>Up or down steps?</b> Add a third shot held dead level at the wall (Steps or slope). Or note both angles (Angles), from the laser or your phone.</li>
+          <li><b>Stack in the middle of the roof?</b> Shoot the base of the front wall anyway. Angles works out how far back the stack is; the other methods need a set-back guess (about half the depth of the house).</li>
           <li><b>Phone tilt:</b> lay the phone flat on top of the laser, screen up, top of the phone pointing where the laser points. Aim, fire the laser, hold still, tap Lock.</li>
         </ol>
       </div>
@@ -361,28 +378,31 @@
     if (method === 'angle' && !(num('baseAngle') >= 0)) need.push('the base angle');
     if (method === 'slope' && !(num('toLevel') > 0)) need.push('the level shot');
     if (need.length) return { error: '', need };
-    let x, b, up;
+    // x = how far back you are from the wall you shot; d = how much further back the stack is than that wall
+    let x, b, up, d = method === 'angle' ? 0 : Math.max(0, num('setback') || 0), warn = '';
     if (method === 'flat') {
       b = Math.max(0, num('laserH') || 0);
       if (pb <= b) return { error: 'The base shot is shorter than the laser height. Check the laser height, or use Steps or slope.' };
       x = Math.sqrt(pb * pb - b * b);
-      if (pt <= x) return { error: 'The pot shot needs to be longer than the base shot. Did they get swapped?' };
-      up = Math.sqrt(pt * pt - x * x);
+      if (pt <= x + d) return { error: d ? 'The pot shot is too short for a stack that far back. Check the set-back.' : 'The pot shot needs to be longer than the base shot. Did they get swapped?' };
+      up = Math.sqrt(pt * pt - (x + d) ** 2);
     } else if (method === 'slope') {
       x = num('toLevel');
       if (!(x > 0)) return { error: '' };
-      if (x > pb + 1e-9) return { error: 'The level shot should be shorter than the base shot. Check you held it level and hit the wall under the chimney.' };
-      if (pt <= x) return { error: 'The pot shot needs to be longer than the level shot.' };
+      if (x > pb + 1e-9) return { error: 'The level shot should be shorter than the base shot. Check you held it level and hit the same wall.' };
+      if (pt <= x + d) return { error: d ? 'The pot shot is too short for a stack that far back. Check the set-back.' : 'The pot shot needs to be longer than the level shot.' };
       b = sign * Math.sqrt(Math.max(0, pb * pb - x * x));
-      up = Math.sqrt(pt * pt - x * x);
+      up = Math.sqrt(pt * pt - (x + d) ** 2);
     } else {
       const a = num('angle'), c = num('baseAngle');
       if (!(a > 0 && a < 90) || !(c >= 0 && c < 90)) return { error: 'Angles need to be between 0 and 90 degrees.' };
-      up = pt * Math.sin(rad(a)); x = pt * Math.cos(rad(a));
-      b = sign * pb * Math.sin(rad(c));
-      const x2 = pb * Math.cos(rad(c));
-      if (Math.abs(x - x2) > Math.max(1, 0.15 * x)) return { error: `The two shots put you ${x.toFixed(1)} m and ${x2.toFixed(1)} m from the wall. Check the angles and that both shots hit the same spot on the wall.` };
-      x = (x + x2) / 2;
+      // Each shot gives its own height, so the stack can be anywhere behind the wall.
+      up = pt * Math.sin(rad(a)); b = sign * pb * Math.sin(rad(c));
+      const xPot = pt * Math.cos(rad(a));
+      x = pb * Math.cos(rad(c)); d = xPot - x;
+      if (Math.abs(d) < 0.5) { x = (x + xPot) / 2; d = 0; }
+      else if (d < 0) warn = `That puts the pot ${(-d).toFixed(1)} m in front of the wall you shot. Fine for a front stack; otherwise check the angles.`;
+      else if (d > 12) warn = `That puts the stack ${d.toFixed(1)} m behind the wall. Worth checking the angles.`;
     }
     const potH = b + up;
     if (!(potH > 0)) return { error: 'That puts the pot below the base of the house. Check above/below.' };
@@ -395,7 +415,7 @@
     const rodM = rodCm / 100;
     const clearM = (num('clear') || 0) / 100;
     const rods = Math.max(1, Math.ceil((flue + clearM - 1e-9) / rodM));
-    return { x, h: b, up, potH, start, flue, rods, rodM, rodCm, reach: rods * rodM, method, bends };
+    return { x, d, h: b, up, potH, start, flue, rods, rodM, rodCm, reach: rods * rodM, method, bends, warn };
   }
 
   function render() {
@@ -408,7 +428,7 @@
     if (!r.potH) {
       $('rodCount').textContent = '–'; $('rodWord').textContent = 'rods';
       $('rodSub').textContent = r.error ? 'Check the measurements.' : r.need ? 'Still need ' + r.need.join(', ').replace(/, ([^,]*)$/, ' and $1') + '.' : 'Enter the laser measurements.';
-      ['potH', 'flueL', 'reach'].forEach(id => $(id).textContent = '–');
+      ['potH', 'flueL', 'reach'].forEach(id => $(id).textContent = '–'); $('note').textContent = '';
       draw(null); bar(r); return;
     }
     const kind = val('flue') === 'liner' ? 'liner' : 'large';
@@ -418,7 +438,9 @@
     $('potH').textContent = m(r.potH);
     $('flueL').textContent = m(r.flue);
     $('reach').textContent = m(r.reach);
+    if (r.warn) $('msg').textContent = r.warn;
     if (r.potH > 25) $('msg').textContent = 'That is a very tall chimney. Worth double-checking the shots.';
+    $('note').textContent = r.d > 0.05 ? (r.method === 'angle' ? `Stack is about ${r.d.toFixed(1)} m back from the wall you shot.` : `Allowing ${r.d.toFixed(1)} m from the wall back to the stack.`) : '';
     draw(r);
     bar(r);
   }
@@ -451,14 +473,19 @@
     const feet = r.method === 'flat' ? 0 : r.h - 1.5;            // drawn 1.5 m under the laser
     const low = Math.min(0, feet), high = Math.max(r.potH + r.rodM * 0.6, r.h + 0.5) + 0.5;
     const houseM = 6, px = 22, dimRoom = 58;                      // house depth (m), left margin, room for the label
-    const s = Math.min((W - px - dimRoom - 6) / (r.x + houseM), (G - 22) / (high - low));
+    const dd = Math.max(0, r.d || 0), depthM = Math.max(houseM, dd * 2 + 1);
+    const s = Math.min((W - px - dimRoom - 6) / (r.x + depthM), (G - 22) / (high - low));
     const wallX = px + r.x * s;
-    const houseW = houseM * s;
+    const houseW = depthM * s;
     const y = (mm) => G - (mm - low) * s;
     const baseY = y(0), feetY = y(feet), laserY = y(r.h), potY = y(r.potH);
     // Gable end: eaves about 2 m under the pot, ridge in between
-    const eaveY = y(Math.max(r.potH * 0.6, r.potH - 3)), ridgeY = y(Math.max(r.potH * 0.8, r.potH - 1.6));
-    const stackW = Math.max(12, Math.min(20, 0.7 * s)), stackX = wallX, flueX = stackX + stackW / 2;
+    // Keep the roof under the pot shot (you could see the pot, after all)
+    const shotAt = (xm) => r.h + (r.potH - r.h) * xm / (r.x + (r.d > 0 ? r.d : 0));
+    const eaveM = Math.max(0.5, Math.min(Math.max(r.potH * 0.6, r.potH - 3), shotAt(r.x) - 0.6));
+    const ridgeM = Math.max(eaveM + 0.3, Math.min(Math.max(r.potH * 0.8, r.potH - 1.6), r.d > 0.05 ? r.potH - 1.2 : 99));
+    const eaveY = y(eaveM), ridgeY = y(ridgeM);
+    const stackW = Math.max(12, Math.min(20, 0.7 * s)), stackX = wallX + dd * s - (dd ? stackW / 2 : 0), flueX = stackX + stackW / 2;
     const potTop = potY, potH = Math.max(5, 0.4 * s);
     // Rods, stacked up the flue from the fireplace
     const startY = y(r.start), rodPx = r.rodM * s / (1 + r.bends);
@@ -476,9 +503,10 @@
       <polyline points="0,${feetY} ${stepX},${feetY} ${stepX},${baseY} ${W},${baseY}" fill="none" stroke="#5A6168" stroke-width="2"/>
       <!-- house, behind the wall you shot -->
       <rect x="${wallX}" y="${eaveY}" width="${houseW}" height="${baseY - eaveY}" fill="#2E3338" stroke="#4A5057"/>
-      <polygon points="${wallX - 3},${eaveY} ${wallX + houseW / 2},${ridgeY} ${wallX + houseW + 3},${eaveY}" fill="#3A3F45" stroke="#4A5057"/>
+      <polygon points="${wallX - 3},${eaveY} ${dd ? flueX : wallX + houseW / 2},${ridgeY} ${wallX + houseW + 3},${eaveY}" fill="#3A3F45" stroke="#4A5057"/>
+      ${dd ? `<line x1="${wallX}" y1="${baseY + 8}" x2="${flueX}" y2="${baseY + 8}" stroke="#D08A4E" stroke-width="1"/><line x1="${wallX}" y1="${baseY + 4}" x2="${wallX}" y2="${baseY + 12}" stroke="#D08A4E"/><line x1="${flueX}" y1="${baseY + 4}" x2="${flueX}" y2="${baseY + 12}" stroke="#D08A4E"/>` : ''}
       <!-- chimney stack on that wall, flue inside, pot on top -->
-      <rect x="${stackX}" y="${potTop + potH}" width="${stackW}" height="${baseY - potTop - potH}" fill="url(#brick)" opacity="0.9"/>
+      <rect x="${stackX}" y="${potTop + potH}" width="${stackW}" height="${(dd ? ridgeY + 8 : baseY) - potTop - potH}" fill="url(#brick)" opacity="0.9"/>
       <rect x="${flueX - 3.5}" y="${potTop}" width="7" height="${baseY - potTop}" fill="#16181A" opacity="0.7"/>
       <rect x="${flueX - 4}" y="${potTop}" width="8" height="${potH}" rx="1" fill="#B8623A"/>
       ${rods}
@@ -514,6 +542,7 @@
   });
   $('resetBtn').addEventListener('click', () => {
     ['toPot', 'toBase', 'toLevel', 'angle', 'baseAngle'].forEach(id => $(id).value = '');
+    $('setback').value = 0; chips();
     $('stoveH').value = 0; $('floor').value = '0'; $('bends').value = '0';
     $('copied').textContent = ''; render(); $('toPot').focus();
   });
@@ -589,6 +618,11 @@
     samples = []; zeroNote();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('tilt').hidden) closeTilt(); });
+
+  // Set-back quick picks
+  function chips() { const v = num('setback') || 0; document.querySelectorAll('#setChips button').forEach(b => b.classList.toggle('on', Math.abs(+b.dataset.v - v) < 0.01)); }
+  document.querySelectorAll('#setChips button').forEach(b => b.addEventListener('click', () => { $('setback').value = b.dataset.v; render(); }));
+  document.addEventListener('input', chips); chips();
 
   document.addEventListener('input', render);
   document.addEventListener('change', render);
