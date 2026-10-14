@@ -106,7 +106,24 @@
   .how li { margin-bottom: 0.35rem; }
   .how b { color: var(--ink); }
 
-  footer { margin-top: 2.5rem; padding-top: 1.2rem; border-top: 2px dashed rgba(208, 138, 78, 0.35); font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft);
+  /* Phone tilt */
+  .withbtn { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; }
+  .tiltbtn { font-family: var(--mono); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.2; cursor: pointer;
+    padding: 0 0.8rem; border-radius: 6px; border: 1.5px solid var(--safety); background: transparent; color: var(--safety); }
+  .tiltbtn:active { background: rgba(255, 107, 26, 0.15); }
+  .tilt { position: fixed; inset: 0; z-index: 10; background: #0E1012; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1rem; padding: calc(1.2rem + env(safe-area-inset-top, 0px)) 16px calc(1.2rem + env(safe-area-inset-bottom, 0px)); text-align: center; }
+  .tilt h3 { margin: 0; font-family: var(--display); font-weight: 900; font-size: 1.8rem; text-transform: uppercase; line-height: 1; }
+  .tilt .read { font-family: var(--display); font-weight: 900; font-size: clamp(5rem, 28vw, 8rem); line-height: 0.9; font-variant-numeric: tabular-nums; color: var(--hazard); }
+  .tilt .dir { font-family: var(--mono); font-weight: 600; font-size: 0.9rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); min-height: 1.3em; }
+  .tilt .steady { font-family: var(--mono); font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.7rem; border-radius: 3px; background: #3A2020; color: var(--warn); }
+  .tilt .steady.ok { background: #1F3324; color: #8FE0A0; }
+  .tilt p { margin: 0; max-width: 26em; color: var(--soft); font-size: 0.92rem; }
+  .tilt .lock { font-size: 1.1rem; padding: 1rem 2.4rem; }
+  .tilt .row { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+  .tilt svg { width: min(220px, 60vw); height: auto; }
+  .tilt .zero { font-family: var(--mono); font-size: 0.72rem; color: var(--soft); }
+ padding-top: 1.2rem; border-top: 2px dashed rgba(208, 138, 78, 0.35); font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft);
     display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   footer a { text-decoration: none; }
 
@@ -133,7 +150,7 @@
         <div class="seg" role="radiogroup" aria-label="How you measured">
           <input type="radio" name="method" id="mFlat" value="flat" checked><label for="mFlat">Flat ground<small>2 shots</small></label>
           <input type="radio" name="method" id="mSlope" value="slope"><label for="mSlope">Steps or slope<small>3 shots</small></label>
-          <input type="radio" name="method" id="mAngle" value="angle"><label for="mAngle">Angles<small>2 shots</small></label>
+          <input type="radio" name="method" id="mAngle" value="angle"><label for="mAngle">Angles<small>laser or phone</small></label>
         </div>
         <p class="mode-note" id="modeNote"></p>
 
@@ -143,7 +160,7 @@
         </div>
         <div class="field" data-for="angle">
           <label for="angle"><i style="background:var(--safety)"></i>Angle up to the pot</label>
-          <div class="unit"><input id="angle" type="number" inputmode="decimal" step="0.1" min="0" max="89.9" placeholder="0.0"><span>&deg;</span></div>
+          <div class="withbtn"><div class="unit"><input id="angle" type="number" inputmode="decimal" step="0.1" min="0" max="89.9" placeholder="0.0"><span>&deg;</span></div><button type="button" class="tiltbtn" data-tilt="angle">Phone<br>tilt</button></div>
         </div>
         <div class="field">
           <label for="toBase"><i style="background:var(--sky)"></i>Laser to the base of the house</label>
@@ -159,8 +176,8 @@
         </div>
         <div class="field" data-for="angle">
           <label for="baseAngle"><i style="background:var(--sky)"></i>Angle to the base</label>
-          <div class="unit"><input id="baseAngle" type="number" inputmode="decimal" step="0.1" min="0" max="89.9" placeholder="0.0"><span>&deg;</span></div>
-          <span class="hint">Ignore any minus sign: just say above or below.</span>
+          <div class="withbtn"><div class="unit"><input id="baseAngle" type="number" inputmode="decimal" step="0.1" min="0" max="89.9" placeholder="0.0"><span>&deg;</span></div><button type="button" class="tiltbtn" data-tilt="baseAngle">Phone<br>tilt</button></div>
+          <span class="hint">Ignore any minus sign: just say above or below. Phone tilt sets this for you.</span>
         </div>
         <div class="field" data-for="slope">
           <label for="toLevel"><i style="background:var(--hazard)"></i>Level shot to the wall</label>
@@ -257,10 +274,27 @@
           <li><b>Stand back</b> far enough to see the top of the pot and the bottom of the wall below it. Further back is more accurate.</li>
           <li><b>Shoot the pot</b>, then <b>the base</b> of the wall straight below it, without moving.</li>
           <li><b>Same level as the house?</b> That's it: use Flat ground.</li>
-          <li><b>Up or down steps?</b> Add a third shot held dead level at the wall (Steps or slope). Or, if your laser shows a tilt angle, note both angles (Angles).</li>
+          <li><b>Up or down steps?</b> Add a third shot held dead level at the wall (Steps or slope). Or note both angles (Angles), from the laser or your phone.</li>
+          <li><b>Phone tilt:</b> lay the phone flat on top of the laser, screen up, top of the phone pointing where the laser points. Aim, fire the laser, hold still, tap Lock.</li>
         </ol>
       </div>
     </div>
+  </div>
+
+  <div class="tilt" id="tilt" hidden role="dialog" aria-modal="true" aria-labelledby="tiltHead">
+    <h3 id="tiltHead">Angle to the pot</h3>
+    <svg viewBox="0 0 220 120" aria-hidden="true"><line x1="10" y1="100" x2="210" y2="100" stroke="#3A4046" stroke-width="2" stroke-dasharray="4 4"/>
+      <g id="tiltG"><line x1="30" y1="100" x2="200" y2="100" stroke="#FF6B1A" stroke-width="4" stroke-linecap="round"/><rect x="18" y="92" width="26" height="16" rx="3" fill="#FF6B1A"/></g></svg>
+    <div class="read" id="tiltRead">&ndash;</div>
+    <div class="dir" id="tiltDir"></div>
+    <div class="steady" id="tiltSteady">Hold still</div>
+    <p id="tiltHelp">Phone flat on top of the laser, screen up, top edge pointing where the laser points. Aim, fire the laser, hold still, then tap Lock.</p>
+    <button type="button" class="btn lock" id="tiltLock">Lock angle</button>
+    <div class="row">
+      <button type="button" class="btn ghost" id="tiltCancel">Cancel</button>
+      <button type="button" class="btn ghost" id="tiltZero">Set flat here</button>
+    </div>
+    <div class="zero" id="tiltZeroNote"></div>
   </div>
 
   <footer>
@@ -348,7 +382,7 @@
     remember();
     const mode = val('method');
     document.querySelectorAll('[data-for]').forEach(el => { el.hidden = !el.dataset.for.split(' ').includes(mode); });
-    $('modeNote').textContent = { flat: 'You and the house are on the same level.', slope: 'You\u2019re up or down steps from the house. No laser height needed.', angle: 'Your laser shows tilt angles. Works on any ground.' }[mode];
+    $('modeNote').textContent = { flat: 'You and the house are on the same level.', slope: 'You\u2019re up or down steps from the house. No laser height needed.', angle: 'Angles from your laser or your phone\u2019s tilt sensor. Works on any ground.' }[mode];
     $('msg').textContent = r.error || '';
     if (!r.potH) {
       $('rodCount').textContent = '–'; $('rodWord').textContent = 'rods';
@@ -444,6 +478,79 @@
     $('stoveH').value = 0; $('floor').value = '0'; $('bends').value = '0';
     $('copied').textContent = ''; render(); $('toPot').focus();
   });
+  // ---- Phone tilt ----
+  // beta is the tilt of the phone's long edge above level (top edge up = positive), whatever the sideways roll,
+  // so with the phone lying on the laser pointing the same way, beta is the laser's angle.
+  const ZKEY = 'pobajobs-chimney-tilt-zero';
+  let zero = 0; try { zero = parseFloat(localStorage.getItem(ZKEY)) || 0; } catch (e) {}
+  let samples = [], target = null, listening = false;
+  const now = () => performance.now();
+  function onTilt(e) {
+    if (e.beta == null) return;
+    const t = now();
+    samples.push([t, e.beta - zero]);
+    while (samples.length && samples[0][0] < t - 2000) samples.shift();
+    const recent = samples.filter(s => s[0] > t - 600).map(s => s[1]);
+    const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const spread = Math.max(...recent) - Math.min(...recent);
+    $('tiltRead').textContent = Math.abs(avg).toFixed(1) + '°';
+    $('tiltDir').textContent = Math.abs(avg) < 0.3 ? 'Level' : avg > 0 ? 'Aiming up' : 'Aiming down';
+    const ok = recent.length > 5 && spread < 0.6;
+    $('tiltSteady').textContent = ok ? 'Steady' : 'Hold still';
+    $('tiltSteady').classList.toggle('ok', ok);
+    $('tiltG').setAttribute('transform', `rotate(${(-Math.max(-80, Math.min(80, avg))).toFixed(2)} 31 100)`);
+  }
+  function zeroNote() { $('tiltZeroNote').textContent = zero ? `Flat set at ${zero.toFixed(1)}° · tap Set flat on a level surface to redo` : ''; }
+  async function openTilt(id) {
+    target = id; samples = [];
+    $('tiltHead').textContent = id === 'angle' ? 'Angle to the pot' : 'Angle to the base';
+    $('tiltRead').textContent = '–'; $('tiltDir').textContent = ''; zeroNote();
+    $('tiltHelp').textContent = 'Phone flat on top of the laser, screen up, top edge pointing where the laser points. Aim, fire the laser, hold still, then tap Lock.';
+    $('tilt').hidden = false; document.body.style.overflow = 'hidden';
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const p = await DeviceOrientationEvent.requestPermission();
+        if (p !== 'granted') { $('tiltHelp').textContent = 'The phone said no to motion access. Close Safari fully, reopen this page and tap Allow when it asks.'; return; }
+      }
+    } catch (e) { $('tiltHelp').textContent = 'Couldn’t get motion access on this phone.'; return; }
+    if (!listening) { window.addEventListener('deviceorientation', onTilt); listening = true; }
+    setTimeout(() => { if (!samples.length && !$('tilt').hidden) $('tiltHelp').textContent = 'No tilt sensor readings. This needs a phone, not a computer.'; }, 1500);
+  }
+  function closeTilt() {
+    $('tilt').hidden = true; document.body.style.overflow = '';
+    if (listening) { window.removeEventListener('deviceorientation', onTilt); listening = false; }
+  }
+  // Average the half second before the tap, so the tap itself doesn't jolt the reading
+  function heldAngle() {
+    const t = now(), win = samples.filter(s => s[0] > t - 700 && s[0] < t - 120).map(s => s[1]);
+    const use = win.length >= 3 ? win : samples.slice(-5).map(s => s[1]);
+    return use.length ? use.reduce((a, b) => a + b, 0) / use.length : NaN;
+  }
+  document.querySelectorAll('[data-tilt]').forEach(b => b.addEventListener('click', () => openTilt(b.dataset.tilt)));
+  $('tiltCancel').addEventListener('click', closeTilt);
+  $('tiltLock').addEventListener('click', () => {
+    const a = heldAngle();
+    if (!isFinite(a)) return;
+    if (target === 'angle') {
+      if (a <= 0) { $('tiltHelp').textContent = 'That’s aiming down. The pot shot should be aiming up.'; return; }
+      $('angle').value = a.toFixed(1);
+    } else {
+      $('baseAngle').value = Math.abs(a).toFixed(1);
+      document.querySelector(`input[name="dir"][value="${a > 0 ? 'up' : 'down'}"]`).checked = true;
+    }
+    closeTilt(); render();
+  });
+  $('tiltZero').addEventListener('click', () => {
+    const raw = heldAngle() + zero;
+    if (!isFinite(raw)) return;
+    // more than 5 degrees off isn't a level surface: keep the old setting
+    if (Math.abs(raw) > 5) { $('tiltZeroNote').textContent = 'That surface is over 5° off level, so I ignored it.'; return; }
+    zero = raw;
+    try { localStorage.setItem(ZKEY, String(zero)); } catch (e) {}
+    samples = []; zeroNote();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('tilt').hidden) closeTilt(); });
+
   document.addEventListener('input', render);
   document.addEventListener('change', render);
   render();
