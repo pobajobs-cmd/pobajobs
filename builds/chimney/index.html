@@ -49,6 +49,9 @@
   .seg input { position: absolute; opacity: 0; pointer-events: none; }
   .seg label { display: block; text-align: center; padding: 0.55rem 0.4rem; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.74rem; font-weight: 600;
     letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft); line-height: 1.25; }
+  .seg-sm { margin-bottom: 0; }
+  .flabel { font-weight: 600; font-size: 0.95rem; }
+  .mode-note { margin: -0.3rem 0 1rem; font-size: 0.85rem; color: var(--soft); }
   .seg label small { display: block; font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.72rem; opacity: 0.85; }
   .seg input:checked + label { background: var(--safety); color: #111; }
   .seg input:focus-visible + label { outline: 2px solid var(--hazard); outline-offset: 2px; }
@@ -128,29 +131,46 @@
       <section class="panel" aria-labelledby="mHead">
         <h2 id="mHead">Measure</h2>
         <div class="seg" role="radiogroup" aria-label="How you measured">
-          <input type="radio" name="method" id="mBase" value="base" checked><label for="mBase">Base of wall<small>2 shots</small></label>
-          <input type="radio" name="method" id="mLevel" value="level"><label for="mLevel">Level to wall<small>2 shots</small></label>
-          <input type="radio" name="method" id="mAngle" value="angle"><label for="mAngle">Angle<small>1 shot</small></label>
+          <input type="radio" name="method" id="mFlat" value="flat" checked><label for="mFlat">Flat ground<small>2 shots</small></label>
+          <input type="radio" name="method" id="mSlope" value="slope"><label for="mSlope">Steps or slope<small>3 shots</small></label>
+          <input type="radio" name="method" id="mAngle" value="angle"><label for="mAngle">Angles<small>2 shots</small></label>
         </div>
+        <p class="mode-note" id="modeNote"></p>
 
         <div class="field">
           <label for="toPot"><i style="background:var(--safety)"></i>Laser to the top of the pot</label>
           <div class="unit"><input id="toPot" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span>m</span></div>
         </div>
-        <div class="field" id="baseField">
-          <label for="toBase"><i style="background:var(--sky)"></i><span id="baseLabel">Laser to the base of the house</span></label>
-          <div class="unit"><input id="toBase" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span>m</span></div>
-          <span class="hint" id="baseHint">Aim at the bottom of the wall, straight below the chimney.</span>
-        </div>
-        <div class="field" id="angleField" hidden>
-          <label for="angle"><i style="background:var(--hazard)"></i>Angle up to the pot</label>
+        <div class="field" data-for="angle">
+          <label for="angle"><i style="background:var(--safety)"></i>Angle up to the pot</label>
           <div class="unit"><input id="angle" type="number" inputmode="decimal" step="0.1" min="0" max="89.9" placeholder="0.0"><span>&deg;</span></div>
-          <span class="hint">The tilt angle your laser shows for the pot shot.</span>
         </div>
         <div class="field">
+          <label for="toBase"><i style="background:var(--sky)"></i>Laser to the base of the house</label>
+          <div class="unit"><input id="toBase" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span>m</span></div>
+          <span class="hint">The bottom of the wall, straight below the chimney.</span>
+        </div>
+        <div class="field" data-for="slope angle">
+          <span class="flabel">The base of the house was</span>
+          <div class="seg seg-sm" role="radiogroup" aria-label="Base of the house below or above the laser">
+            <input type="radio" name="dir" id="dDown" value="down" checked><label for="dDown">Below the laser<small>aimed down</small></label>
+            <input type="radio" name="dir" id="dUp" value="up"><label for="dUp">Above the laser<small>aimed up</small></label>
+          </div>
+        </div>
+        <div class="field" data-for="angle">
+          <label for="baseAngle"><i style="background:var(--sky)"></i>Angle to the base</label>
+          <div class="unit"><input id="baseAngle" type="number" inputmode="decimal" step="0.1" min="0" max="89.9" placeholder="0.0"><span>&deg;</span></div>
+          <span class="hint">Ignore any minus sign: just say above or below.</span>
+        </div>
+        <div class="field" data-for="slope">
+          <label for="toLevel"><i style="background:var(--hazard)"></i>Level shot to the wall</label>
+          <div class="unit"><input id="toLevel" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span>m</span></div>
+          <span class="hint">Hold the laser dead level and shoot the wall under the chimney.</span>
+        </div>
+        <div class="field" data-for="flat">
           <label for="laserH">Laser height off the ground</label>
           <div class="unit"><input id="laserH" type="number" inputmode="decimal" step="0.05" min="0" value="1.5"><span>m</span></div>
-          <span class="hint">Where the laser was when you took the shots. 0 if it sat on the ground.</span>
+          <span class="hint">Only right when you're on the same level as the house. 0 if the laser sat on the ground.</span>
         </div>
       </section>
 
@@ -228,16 +248,16 @@
 
       <section class="panel diagram" style="margin-top:1rem" aria-label="Diagram">
         <svg id="dg" viewBox="0 0 360 300" role="img" aria-label="Diagram of the laser shots, the chimney and the rods"></svg>
-        <p class="cap">Drawn to scale from your numbers. Orange: shot to the pot. Blue: shot to the base. Rods stacked up the flue.</p>
+        <p class="cap">Drawn to scale from your numbers. Orange: shot to the pot. Blue: shot to the base. Yellow: level shot. Rods stacked up the flue.</p>
       </section>
 
       <div class="how">
         <strong>How to measure</strong>
         <ol>
           <li><b>Stand back</b> far enough to see the top of the pot and the bottom of the wall below it. Further back is more accurate.</li>
-          <li><b>Shoot the pot.</b> Hit the top of the pot, or the stack just under it.</li>
-          <li><b>Shoot the base</b> of the wall straight below the chimney, without moving. Or use <b>Level to wall</b> and shoot straight ahead, level.</li>
-          <li>If your laser shows a tilt angle, <b>Angle</b> needs just the pot shot.</li>
+          <li><b>Shoot the pot</b>, then <b>the base</b> of the wall straight below it, without moving.</li>
+          <li><b>Same level as the house?</b> That's it: use Flat ground.</li>
+          <li><b>Up or down steps?</b> Add a third shot held dead level at the wall (Steps or slope). Or, if your laser shows a tilt angle, note both angles (Angles).</li>
         </ol>
       </div>
     </div>
@@ -263,6 +283,7 @@
     const saved = JSON.parse(localStorage.getItem(STORE) || '{}');
     KEEP.forEach(k => { if (saved[k] != null) $(k).value = saved[k]; });
     if (saved.flue) document.querySelector(`input[name="flue"][value="${saved.flue}"]`).checked = true;
+    if (saved.method === 'base' || saved.method === 'level') saved.method = 'flat';
     if (saved.method) document.querySelector(`input[name="method"][value="${saved.method}"]`).checked = true;
   } catch (e) {}
   function remember() {
@@ -274,30 +295,42 @@
   }
 
   // ---- The maths ----
-  // P = laser, B = bottom of the wall, T = top of the pot (assumed straight above B), h = laser height.
-  //   Base of wall:  horizontal distance x = sqrt(PB² - h²); pot above laser = sqrt(PT² - x²)
-  //   Level to wall: x = level shot; pot above laser = sqrt(PT² - x²)
-  //   Angle:         pot above laser = PT · sin(angle); x = PT · cos(angle)
-  // Pot height = h + pot above laser.
+  // Laser L, base of the wall B, top of the pot T (straight above B). x = how far back you are (level).
+  // b = how far the base of the wall is below the laser (negative if it's above). up = pot above the laser.
+  // Pot height (from the base of the wall) = b + up.
+  //   Flat ground:    b = laser height; x = sqrt(LB² - b²); up = sqrt(LT² - x²)
+  //   Steps or slope: x = level shot; b = ±sqrt(LB² - x²); up = sqrt(LT² - x²)
+  //   Angles:         up = LT·sin(pot angle); b = ±LB·sin(base angle); x = LT·cos(pot angle)
+  const rad = (d) => d * Math.PI / 180;
   function solve() {
-    const method = val('method'), pt = num('toPot'), h = Math.max(0, num('laserH') || 0);
-    if (!(pt > 0)) return { error: '' };
-    let x, up;
-    if (method === 'angle') {
-      const a = num('angle');
-      if (!(a > 0 && a < 90)) return { error: '' };
-      up = pt * Math.sin(a * Math.PI / 180); x = pt * Math.cos(a * Math.PI / 180);
-    } else {
-      const pb = num('toBase');
-      if (!(pb > 0)) return { error: '' };
-      if (method === 'base') {
-        if (pb <= h) return { error: 'The base shot is shorter than the laser height. Check the laser height.' };
-        x = Math.sqrt(pb * pb - h * h);
-      } else x = pb;
-      if (pt <= x) return { error: 'The pot shot needs to be longer than the shot to the wall. Did they get swapped?' };
+    const method = val('method'), pt = num('toPot'), pb = num('toBase');
+    const sign = val('dir') === 'up' ? -1 : 1;
+    if (!(pt > 0) || !(pb > 0)) return { error: '' };
+    let x, b, up;
+    if (method === 'flat') {
+      b = Math.max(0, num('laserH') || 0);
+      if (pb <= b) return { error: 'The base shot is shorter than the laser height. Check the laser height, or use Steps or slope.' };
+      x = Math.sqrt(pb * pb - b * b);
+      if (pt <= x) return { error: 'The pot shot needs to be longer than the base shot. Did they get swapped?' };
       up = Math.sqrt(pt * pt - x * x);
+    } else if (method === 'slope') {
+      x = num('toLevel');
+      if (!(x > 0)) return { error: '' };
+      if (x > pb + 1e-9) return { error: 'The level shot should be shorter than the base shot. Check you held it level and hit the wall under the chimney.' };
+      if (pt <= x) return { error: 'The pot shot needs to be longer than the level shot.' };
+      b = sign * Math.sqrt(Math.max(0, pb * pb - x * x));
+      up = Math.sqrt(pt * pt - x * x);
+    } else {
+      const a = num('angle'), c = num('baseAngle');
+      if (!(a > 0 && a < 90) || !(c >= 0 && c < 90)) return { error: '' };
+      up = pt * Math.sin(rad(a)); x = pt * Math.cos(rad(a));
+      b = sign * pb * Math.sin(rad(c));
+      const x2 = pb * Math.cos(rad(c));
+      if (Math.abs(x - x2) > Math.max(1, 0.15 * x)) return { error: `The two shots put you ${x.toFixed(1)} m and ${x2.toFixed(1)} m from the wall. Check the angles and that both shots hit the same spot on the wall.` };
+      x = (x + x2) / 2;
     }
-    const potH = h + up;
+    const potH = b + up;
+    if (!(potH > 0)) return { error: 'That puts the pot below the base of the house. Check above/below.' };
     const floorH = (parseInt($('floor').value, 10) || 0) * (num('storey') || 0);
     const stoveM = (num('stoveH') || 0) / 100;
     const start = floorH + stoveM;
@@ -307,16 +340,15 @@
     const rodM = rodCm / 100;
     const clearM = (num('clear') || 0) / 100;
     const rods = Math.max(1, Math.ceil((flue + clearM - 1e-9) / rodM));
-    return { x, h, up, potH, start, flue, rods, rodM, rodCm, reach: rods * rodM, method, bends };
+    return { x, h: b, up, potH, start, flue, rods, rodM, rodCm, reach: rods * rodM, method, bends };
   }
 
   function render() {
     const r = solve();
     remember();
-    $('baseField').hidden = val('method') === 'angle';
-    $('angleField').hidden = val('method') !== 'angle';
-    $('baseLabel').textContent = val('method') === 'level' ? 'Level shot to the wall' : 'Laser to the base of the house';
-    $('baseHint').textContent = val('method') === 'level' ? 'Hold the laser level and shoot straight at the wall below the chimney.' : 'Aim at the bottom of the wall, straight below the chimney.';
+    const mode = val('method');
+    document.querySelectorAll('[data-for]').forEach(el => { el.hidden = !el.dataset.for.split(' ').includes(mode); });
+    $('modeNote').textContent = { flat: 'You and the house are on the same level.', slope: 'You\u2019re up or down steps from the house. No laser height needed.', angle: 'Your laser shows tilt angles. Works on any ground.' }[mode];
     $('msg').textContent = r.error || '';
     if (!r.potH) {
       $('rodCount').textContent = '–'; $('rodWord').textContent = 'rods';
@@ -344,10 +376,14 @@
         <text x="180" y="140" text-anchor="middle" fill="#A9AFB4">Waiting for measurements</text>`;
       return;
     }
-    const totalW = r.x + 4, totalH = r.potH + 0.6;            // metres to fit
-    const s = Math.min((W - 60) / totalW, (G - 24) / totalH);   // px per metre
+    // Heights are measured from the base of the house (0). The laser may be above or below it.
+    const feet = r.method === 'flat' ? 0 : r.h - 1.5;           // where you're standing (drawn 1.5 m under the laser)
+    const low = Math.min(0, feet), high = Math.max(r.potH, r.h) + 0.6;
+    const totalW = r.x + 4;
+    const s = Math.min((W - 60) / totalW, (G - 24) / (high - low)); // px per metre
     const px = 30, wallX = px + r.x * s;                        // laser and wall positions
-    const y = (metres) => G - metres * s;
+    const y = (metres) => G - (metres - low) * s;
+    const baseY = y(0), feetY = y(feet);
     const laserY = y(r.h), potY = y(r.potH);
     const houseW = Math.min(110, Math.max(60, 5 * s)), ridgeY = y(Math.max(r.potH - 1.4, r.potH * 0.75));
     const eaveY = y(Math.max(r.potH - 3.2, r.potH * 0.55));
@@ -362,10 +398,11 @@
     const brushY = startY - r.rods * rodPx;
     svg.innerHTML = `
       <defs><pattern id="brick" width="12" height="8" patternUnits="userSpaceOnUse"><rect width="12" height="8" fill="#4A3A30"/><path d="M0 4h12M6 0v4M0 4v4M12 4v4" stroke="#3A2C24" stroke-width="1"/></pattern></defs>
-      <line x1="0" y1="${G}" x2="${W}" y2="${G}" stroke="#5A6168" stroke-width="2"/>
+      <!-- ground: where you stand, a step, and the house's ground -->
+      <polyline points="0,${feetY} ${(px + wallX - houseW) / 2},${feetY} ${(px + wallX - houseW) / 2},${baseY} ${W},${baseY}" fill="none" stroke="#5A6168" stroke-width="2"/>
       <!-- house -->
       <polygon points="${wallX - houseW},${eaveY} ${wallX - houseW / 2},${ridgeY} ${wallX},${eaveY}" fill="#3A3F45"/>
-      <rect x="${wallX - houseW}" y="${eaveY}" width="${houseW}" height="${G - eaveY}" fill="#2E3338" stroke="#4A5057"/>
+      <rect x="${wallX - houseW}" y="${eaveY}" width="${houseW}" height="${baseY - eaveY}" fill="#2E3338" stroke="#4A5057"/>
       <!-- stack and pot, on the wall line -->
       <rect x="${stackX - 4}" y="${potY + 9}" width="22" height="${eaveY - potY - 9}" fill="url(#brick)"/>
       <rect x="${stackX + 1}" y="${potY}" width="12" height="10" rx="1" fill="#B8623A"/>
@@ -375,21 +412,20 @@
       <!-- fireplace -->
       <rect x="${stackX - 6}" y="${startY - 2}" width="26" height="4" fill="#FF6B1A"/>
       <!-- person + laser -->
-      <line x1="${px}" y1="${G}" x2="${px}" y2="${laserY}" stroke="#A9AFB4" stroke-width="2"/>
+      <line x1="${px}" y1="${feetY}" x2="${px}" y2="${laserY}" stroke="#A9AFB4" stroke-width="2"/>
       <circle cx="${px}" cy="${Math.max(laserY - 10, 12)}" r="5" fill="#A9AFB4"/>
       <rect x="${px - 3}" y="${laserY - 3}" width="9" height="6" rx="1" fill="#FF6B1A"/>
       <!-- shots -->
       <line x1="${px + 4}" y1="${laserY}" x2="${stackX + 7}" y2="${potY + 2}" stroke="#FF6B1A" stroke-width="2"/>
-      ${r.method === 'angle' ? '' : r.method === 'level'
-        ? `<line x1="${px + 4}" y1="${laserY}" x2="${wallX}" y2="${laserY}" stroke="#7FB8E0" stroke-width="2" stroke-dasharray="5 4"/>`
-        : `<line x1="${px + 4}" y1="${laserY}" x2="${wallX}" y2="${G}" stroke="#7FB8E0" stroke-width="2" stroke-dasharray="5 4"/>`}
+      <line x1="${px + 4}" y1="${laserY}" x2="${wallX}" y2="${baseY}" stroke="#7FB8E0" stroke-width="2" stroke-dasharray="5 4"/>
+      ${r.method === 'slope' ? `<line x1="${px + 4}" y1="${laserY}" x2="${wallX}" y2="${laserY}" stroke="#FFB21A" stroke-width="2" stroke-dasharray="2 4"/>` : ''}
       <!-- height dimension -->
-      <line x1="${wallX + 14}" y1="${potY}" x2="${wallX + 14}" y2="${G}" stroke="#EDEAE4" stroke-width="1"/>
+      <line x1="${wallX + 14}" y1="${potY}" x2="${wallX + 14}" y2="${baseY}" stroke="#EDEAE4" stroke-width="1"/>
       <line x1="${wallX + 9}" y1="${potY}" x2="${wallX + 19}" y2="${potY}" stroke="#EDEAE4"/>
-      <line x1="${wallX + 9}" y1="${G}" x2="${wallX + 19}" y2="${G}" stroke="#EDEAE4"/>
-      <text x="${Math.min(wallX + 22, W - 4)}" y="${(potY + G) / 2}" fill="#EDEAE4" text-anchor="${wallX + 70 > W ? 'end' : 'start'}" dominant-baseline="middle">${r.potH.toFixed(1)} m</text>
+      <line x1="${wallX + 9}" y1="${baseY}" x2="${wallX + 19}" y2="${baseY}" stroke="#EDEAE4"/>
+      <text x="${Math.min(wallX + 22, W - 4)}" y="${(potY + baseY) / 2}" fill="#EDEAE4" text-anchor="${wallX + 70 > W ? 'end' : 'start'}" dominant-baseline="middle">${r.potH.toFixed(1)} m</text>
       <!-- distance -->
-      <text x="${(px + wallX) / 2}" y="${G + 16}" fill="#A9AFB4" text-anchor="middle">${r.x.toFixed(1)} m away</text>
+      <text x="${(px + wallX) / 2}" y="${Math.min(Math.max(feetY, baseY) + 16, H - 4)}" fill="#A9AFB4" text-anchor="middle">${r.x.toFixed(1)} m away</text>
       <text x="${px + 8}" y="${laserY - 6}" fill="#FF6B1A">laser</text>`;
   }
 
@@ -404,7 +440,7 @@
     setTimeout(() => { if ($('copied').textContent === 'Copied') $('copied').textContent = ''; }, 2500);
   });
   $('resetBtn').addEventListener('click', () => {
-    ['toPot', 'toBase', 'angle'].forEach(id => $(id).value = '');
+    ['toPot', 'toBase', 'toLevel', 'angle', 'baseAngle'].forEach(id => $(id).value = '');
     $('stoveH').value = 0; $('floor').value = '0'; $('bends').value = '0';
     $('copied').textContent = ''; render(); $('toPot').focus();
   });
