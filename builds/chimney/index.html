@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="darkreader-lock">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Chimney height &amp; rods · pobajobs Builds</title>
+<meta name="theme-color" content="#1B1E21">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* On-site tool: measure two distances with a laser, get the chimney height and how many rods to take.
+     Workshop look from /builds/: graphite bench, plywood result plate, safety-orange accents. Phone first. */
+  :root {
+    --bench: #1B1E21; --bench-2: #23272B; --line: rgba(160, 190, 210, 0.16); --field: #111315;
+    --ink: #EDEAE4; --soft: #A9AFB4;
+    --ply: #E7D2A9; --ply-edge: #B8975F; --walnut: #5C3B22;
+    --safety: #FF6B1A; --hazard: #FFB21A; --copper: #D08A4E; --sky: #7FB8E0; --warn: #FF8A65;
+    --display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --body: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bench); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.5; overflow-x: hidden;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 96px 96px; background-attachment: fixed; }
+  a { color: inherit; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding-inline: max(16px, 4vw); padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px)); }
+
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: calc(1rem + env(safe-area-inset-top, 0px)) 1rem;
+    font-family: var(--mono); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .top a { text-decoration: none; }
+  .crumb b { color: var(--safety); }
+  .crumb span { color: var(--soft); }
+
+  h1 { margin: 0.5rem 0 0.2rem; font-family: var(--display); font-weight: 900; font-size: clamp(2.4rem, 9vw, 4rem); line-height: 0.9; text-transform: uppercase; }
+  .lede { margin: 0 0 1.5rem; color: var(--soft); max-width: 40em; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(1rem, 3vw, 2rem); align-items: start; }
+  .panel { background: rgba(17, 19, 21, 0.85); border: 1px solid var(--line); border-radius: 6px; padding: clamp(1rem, 3vw, 1.4rem); }
+  .panel + .panel { margin-top: 1rem; }
+  .panel h2 { margin: 0 0 0.9rem; font-family: var(--display); font-weight: 700; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1; }
+
+  /* Segmented choices */
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 1rem; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg label { display: block; text-align: center; padding: 0.55rem 0.4rem; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.74rem; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft); line-height: 1.25; }
+  .seg label small { display: block; font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.72rem; opacity: 0.85; }
+  .seg input:checked + label { background: var(--safety); color: #111; }
+  .seg input:focus-visible + label { outline: 2px solid var(--hazard); outline-offset: 2px; }
+
+  .field { display: grid; gap: 0.3rem; margin-bottom: 0.9rem; }
+  .field label { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }
+  .field label i { width: 12px; height: 4px; border-radius: 2px; flex-shrink: 0; }
+  .field .hint { font-size: 0.8rem; color: var(--soft); }
+  .unit { position: relative; }
+  .unit input, .field select { width: 100%; font: inherit; font-size: 1.25rem; font-family: var(--mono); font-weight: 600; color: var(--ink); background: var(--field);
+    border: 1.5px solid #3A4046; border-radius: 6px; padding: 0.65rem 3.2rem 0.65rem 0.8rem; }
+  .field select { padding-right: 0.5rem; padding-left: 0.6rem; font-size: 0.95rem; font-family: var(--body); }
+  .unit span { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); font-family: var(--mono); color: var(--soft); pointer-events: none; }
+  .unit input:focus, .field select:focus { outline: none; border-color: var(--safety); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+  .row2 .field { margin-bottom: 0.9rem; }
+  [hidden] { display: none !important; }
+
+  details.more summary { cursor: pointer; font-family: var(--mono); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--copper); margin-bottom: 0.2rem; }
+  details.more[open] summary { margin-bottom: 0.9rem; }
+
+  /* Result plate (plywood, like the Builds sign) */
+  .plate { position: relative; color: #2B1D10; border-radius: 6px; padding: 1.2rem 1.3rem 1.1rem;
+    background: repeating-linear-gradient(92deg, rgba(120, 80, 30, 0.07) 0 3px, transparent 3px 11px), radial-gradient(120% 60% at 30% 40%, var(--ply), #D9BF8D);
+    box-shadow: 0 0 0 3px var(--ply-edge), 0 0 0 5px #F1E2C3, 0 0 0 7px var(--ply-edge), 0 14px 30px rgba(0,0,0,0.4); margin: 7px 7px 1.2rem; }
+  .plate .k { font-family: var(--mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #5A4127; }
+  .rods { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin: 0.1rem 0 0.4rem; }
+  .rods b { font-family: var(--display); font-weight: 900; font-size: clamp(4rem, 18vw, 5.6rem); line-height: 0.85; color: var(--walnut); font-variant-numeric: tabular-nums; }
+  .rods span { font-family: var(--display); font-weight: 700; font-size: 1.6rem; text-transform: uppercase; line-height: 1; }
+  .plate .sub { font-size: 0.95rem; color: #3E2B19; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin-top: 0.9rem; }
+  .stats div { background: rgba(255, 255, 255, 0.35); border-radius: 4px; padding: 0.45rem 0.55rem; }
+  .stats small { display: block; font-family: var(--mono); font-size: 0.64rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5A4127; }
+  .stats strong { font-family: var(--mono); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .msg { margin: 0.8rem 0 0; font-size: 0.9rem; color: #7A2E10; font-weight: 600; }
+  .msg:empty { display: none; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.2rem; }
+  .btn { font: inherit; font-family: var(--mono); font-weight: 600; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+    padding: 0.7rem 1rem; border-radius: 3px; border: 0; background: var(--safety); color: #111; box-shadow: 0 3px 0 #A8410A; }
+  .btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--soft); }
+  .btn:active { transform: translateY(1px); }
+  .copied { font-family: var(--mono); font-size: 0.8rem; color: var(--hazard); align-self: center; }
+
+  /* Diagram */
+  .diagram svg { display: block; width: 100%; height: auto; }
+  .diagram .cap { font-family: var(--mono); font-size: 0.72rem; color: var(--soft); margin: 0.5rem 0 0; }
+  svg text { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; }
+
+  .how { margin-top: 1rem; font-size: 0.9rem; color: var(--soft); }
+  .how ol { padding-left: 1.2rem; margin: 0.4rem 0 0; }
+  .how li { margin-bottom: 0.35rem; }
+  .how b { color: var(--ink); }
+
+  footer { margin-top: 2.5rem; padding-top: 1.2rem; border-top: 2px dashed rgba(208, 138, 78, 0.35); font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft);
+    display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  footer a { text-decoration: none; }
+
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .diagram { order: -1; }
+  }
+  @media (max-width: 420px) { .stats { grid-template-columns: 1fr 1fr; } .stats div:last-child { grid-column: 1 / -1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="crumb" href="/builds/"><b>POBAJOBS</b> <span>/ Builds / Chimney</span></a>
+  </header>
+
+  <h1>Chimney height &amp; rods</h1>
+  <p class="lede">Two laser shots, one bit of trig, and how many rods to get the brush out of the pot.</p>
+
+  <div class="layout">
+    <div>
+      <section class="panel" aria-labelledby="mHead">
+        <h2 id="mHead">Measure</h2>
+        <div class="seg" role="radiogroup" aria-label="How you measured">
+          <input type="radio" name="method" id="mBase" value="base" checked><label for="mBase">Base of wall<small>2 shots</small></label>
+          <input type="radio" name="method" id="mLevel" value="level"><label for="mLevel">Level to wall<small>2 shots</small></label>
+          <input type="radio" name="method" id="mAngle" value="angle"><label for="mAngle">Angle<small>1 shot</small></label>
+        </div>
+
+        <div class="field">
+          <label for="toPot"><i style="background:var(--safety)"></i>Laser to the top of the pot</label>
+          <div class="unit"><input id="toPot" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span>m</span></div>
+        </div>
+        <div class="field" id="baseField">
+          <label for="toBase"><i style="background:var(--sky)"></i><span id="baseLabel">Laser to the base of the house</span></label>
+          <div class="unit"><input id="toBase" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span>m</span></div>
+          <span class="hint" id="baseHint">Aim at the bottom of the wall, straight below the chimney.</span>
+        </div>
+        <div class="field" id="angleField" hidden>
+          <label for="angle"><i style="background:var(--hazard)"></i>Angle up to the pot</label>
+          <div class="unit"><input id="angle" type="number" inputmode="decimal" step="0.1" min="0" max="89.9" placeholder="0.0"><span>&deg;</span></div>
+          <span class="hint">The tilt angle your laser shows for the pot shot.</span>
+        </div>
+        <div class="field">
+          <label for="laserH">Laser height off the ground</label>
+          <div class="unit"><input id="laserH" type="number" inputmode="decimal" step="0.05" min="0" value="1.5"><span>m</span></div>
+          <span class="hint">Where the laser was when you took the shots. 0 if it sat on the ground.</span>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="jHead">
+        <h2 id="jHead">The job</h2>
+        <div class="seg" role="radiogroup" aria-label="Flue type">
+          <input type="radio" name="flue" id="fLiner" value="liner" checked><label for="fLiner">Liner<small>90 cm rods</small></label>
+          <input type="radio" name="flue" id="fOpen" value="open"><label for="fOpen">Open fire<small>100 cm rods</small></label>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="stoveH">Stove off the ground</label>
+            <div class="unit"><input id="stoveH" type="number" inputmode="numeric" step="1" min="0" value="0"><span>cm</span></div>
+          </div>
+          <div class="field">
+            <label for="floor">Fireplace on</label>
+            <select id="floor">
+              <option value="0">Ground floor</option>
+              <option value="1">First floor</option>
+              <option value="2">Second floor</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="bends">Bends in the flue</label>
+          <select id="bends">
+            <option value="0">Straight up</option>
+            <option value="5">A slight offset (+5%)</option>
+            <option value="10">A big offset (+10%)</option>
+          </select>
+        </div>
+        <details class="more">
+          <summary>Settings</summary>
+          <div class="row2">
+            <div class="field">
+              <label for="storey">Storey height</label>
+              <div class="unit"><input id="storey" type="number" inputmode="decimal" step="0.05" min="0" value="2.6"><span>m</span></div>
+            </div>
+            <div class="field">
+              <label for="clear">Clear the pot by</label>
+              <div class="unit"><input id="clear" type="number" inputmode="numeric" step="5" min="0" value="20"><span>cm</span></div>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label for="rodLiner">Liner rod</label>
+              <div class="unit"><input id="rodLiner" type="number" inputmode="numeric" step="1" min="1" value="90"><span>cm</span></div>
+            </div>
+            <div class="field">
+              <label for="rodOpen">Large rod</label>
+              <div class="unit"><input id="rodOpen" type="number" inputmode="numeric" step="1" min="1" value="100"><span>cm</span></div>
+            </div>
+          </div>
+        </details>
+      </section>
+    </div>
+
+    <div>
+      <section class="plate" aria-live="polite">
+        <div class="k">Take</div>
+        <div class="rods"><b id="rodCount">&ndash;</b><span id="rodWord">rods</span></div>
+        <div class="sub" id="rodSub">Enter the two laser measurements.</div>
+        <div class="stats">
+          <div><small>Pot height</small><strong id="potH">&ndash;</strong></div>
+          <div><small>Flue to sweep</small><strong id="flueL">&ndash;</strong></div>
+          <div><small>Rods reach</small><strong id="reach">&ndash;</strong></div>
+        </div>
+        <p class="msg" id="msg"></p>
+      </section>
+      <div class="actions">
+        <button class="btn" id="copyBtn" type="button">Copy for the job sheet</button>
+        <button class="btn ghost" id="resetBtn" type="button">New chimney</button>
+        <span class="copied" id="copied" role="status"></span>
+      </div>
+
+      <section class="panel diagram" style="margin-top:1rem" aria-label="Diagram">
+        <svg id="dg" viewBox="0 0 360 300" role="img" aria-label="Diagram of the laser shots, the chimney and the rods"></svg>
+        <p class="cap">Drawn to scale from your numbers. Orange: shot to the pot. Blue: shot to the base. Rods stacked up the flue.</p>
+      </section>
+
+      <div class="how">
+        <strong>How to measure</strong>
+        <ol>
+          <li><b>Stand back</b> far enough to see the top of the pot and the bottom of the wall below it. Further back is more accurate.</li>
+          <li><b>Shoot the pot.</b> Hit the top of the pot, or the stack just under it.</li>
+          <li><b>Shoot the base</b> of the wall straight below the chimney, without moving. Or use <b>Level to wall</b> and shoot straight ahead, level.</li>
+          <li>If your laser shows a tilt angle, <b>Angle</b> needs just the pot shot.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>A rough guide: check on the roof before you trust it</span>
+    <span><a href="/builds/">Builds</a> &middot; <a href="/">Home</a></span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const num = (id) => { const v = parseFloat($(id).value); return isFinite(v) ? v : NaN; };
+  const val = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+  const m = (v) => isFinite(v) ? v.toFixed(2) + ' m' : '–';
+  const KEEP = ['laserH', 'storey', 'clear', 'rodLiner', 'rodOpen'];
+  const STORE = 'pobajobs-chimney-v1';
+
+  // Remember the settings (not the measurements) on this phone
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || '{}');
+    KEEP.forEach(k => { if (saved[k] != null) $(k).value = saved[k]; });
+    if (saved.flue) document.querySelector(`input[name="flue"][value="${saved.flue}"]`).checked = true;
+    if (saved.method) document.querySelector(`input[name="method"][value="${saved.method}"]`).checked = true;
+  } catch (e) {}
+  function remember() {
+    try {
+      const o = { flue: val('flue'), method: val('method') };
+      KEEP.forEach(k => o[k] = $(k).value);
+      localStorage.setItem(STORE, JSON.stringify(o));
+    } catch (e) {}
+  }
+
+  // ---- The maths ----
+  // P = laser, B = bottom of the wall, T = top of the pot (assumed straight above B), h = laser height.
+  //   Base of wall:  horizontal distance x = sqrt(PB² - h²); pot above laser = sqrt(PT² - x²)
+  //   Level to wall: x = level shot; pot above laser = sqrt(PT² - x²)
+  //   Angle:         pot above laser = PT · sin(angle); x = PT · cos(angle)
+  // Pot height = h + pot above laser.
+  function solve() {
+    const method = val('method'), pt = num('toPot'), h = Math.max(0, num('laserH') || 0);
+    if (!(pt > 0)) return { error: '' };
+    let x, up;
+    if (method === 'angle') {
+      const a = num('angle');
+      if (!(a > 0 && a < 90)) return { error: '' };
+      up = pt * Math.sin(a * Math.PI / 180); x = pt * Math.cos(a * Math.PI / 180);
+    } else {
+      const pb = num('toBase');
+      if (!(pb > 0)) return { error: '' };
+      if (method === 'base') {
+        if (pb <= h) return { error: 'The base shot is shorter than the laser height. Check the laser height.' };
+        x = Math.sqrt(pb * pb - h * h);
+      } else x = pb;
+      if (pt <= x) return { error: 'The pot shot needs to be longer than the shot to the wall. Did they get swapped?' };
+      up = Math.sqrt(pt * pt - x * x);
+    }
+    const potH = h + up;
+    const floorH = (parseInt($('floor').value, 10) || 0) * (num('storey') || 0);
+    const stoveM = (num('stoveH') || 0) / 100;
+    const start = floorH + stoveM;
+    const bends = (parseFloat($('bends').value) || 0) / 100;
+    const flue = Math.max(0, potH - start) * (1 + bends);
+    const rodCm = val('flue') === 'liner' ? (num('rodLiner') || 90) : (num('rodOpen') || 100);
+    const rodM = rodCm / 100;
+    const clearM = (num('clear') || 0) / 100;
+    const rods = Math.max(1, Math.ceil((flue + clearM - 1e-9) / rodM));
+    return { x, h, up, potH, start, flue, rods, rodM, rodCm, reach: rods * rodM, method, bends };
+  }
+
+  function render() {
+    const r = solve();
+    remember();
+    $('baseField').hidden = val('method') === 'angle';
+    $('angleField').hidden = val('method') !== 'angle';
+    $('baseLabel').textContent = val('method') === 'level' ? 'Level shot to the wall' : 'Laser to the base of the house';
+    $('baseHint').textContent = val('method') === 'level' ? 'Hold the laser level and shoot straight at the wall below the chimney.' : 'Aim at the bottom of the wall, straight below the chimney.';
+    $('msg').textContent = r.error || '';
+    if (!r.potH) {
+      $('rodCount').textContent = '–'; $('rodWord').textContent = 'rods';
+      $('rodSub').textContent = r.error ? 'Check the measurements.' : 'Enter the laser measurements.';
+      ['potH', 'flueL', 'reach'].forEach(id => $(id).textContent = '–');
+      draw(null); return;
+    }
+    const kind = val('flue') === 'liner' ? 'liner' : 'large';
+    $('rodCount').textContent = r.rods;
+    $('rodWord').textContent = `${kind} rod${r.rods === 1 ? '' : 's'}`;
+    $('rodSub').textContent = `${r.rods} × ${r.rodCm} cm reaches ${r.reach.toFixed(2)} m, clearing the pot by ${Math.round((r.reach - r.flue) * 100)} cm.`;
+    $('potH').textContent = m(r.potH);
+    $('flueL').textContent = m(r.flue);
+    $('reach').textContent = m(r.reach);
+    if (r.potH > 25) $('msg').textContent = 'That is a very tall chimney. Worth double-checking the shots.';
+    draw(r);
+  }
+
+  // ---- Diagram, drawn to scale ----
+  function draw(r) {
+    const W = 360, H = 300, G = 268; // ground line y
+    const svg = $('dg');
+    if (!r) {
+      svg.innerHTML = `<line x1="10" y1="${G}" x2="350" y2="${G}" stroke="#5A6168" stroke-width="2"/>
+        <text x="180" y="140" text-anchor="middle" fill="#A9AFB4">Waiting for measurements</text>`;
+      return;
+    }
+    const totalW = r.x + 4, totalH = r.potH + 0.6;            // metres to fit
+    const s = Math.min((W - 60) / totalW, (G - 24) / totalH);   // px per metre
+    const px = 30, wallX = px + r.x * s;                        // laser and wall positions
+    const y = (metres) => G - metres * s;
+    const laserY = y(r.h), potY = y(r.potH);
+    const houseW = Math.min(110, Math.max(60, 5 * s)), ridgeY = y(Math.max(r.potH - 1.4, r.potH * 0.75));
+    const eaveY = y(Math.max(r.potH - 3.2, r.potH * 0.55));
+    const stackX = wallX - 14;
+    // rods up the flue from the fireplace
+    const startY = y(r.start), rodPx = r.rodM * s / (1 + r.bends);
+    let rods = '';
+    for (let i = 0; i < r.rods; i++) {
+      const y1 = startY - i * rodPx, y0 = y1 - rodPx + 1;
+      rods += `<rect x="${stackX + 4}" y="${y0.toFixed(1)}" width="6" height="${(rodPx - 1.5).toFixed(1)}" rx="1.5" fill="${i % 2 ? '#D08A4E' : '#FFB21A'}"/>`;
+    }
+    const brushY = startY - r.rods * rodPx;
+    svg.innerHTML = `
+      <defs><pattern id="brick" width="12" height="8" patternUnits="userSpaceOnUse"><rect width="12" height="8" fill="#4A3A30"/><path d="M0 4h12M6 0v4M0 4v4M12 4v4" stroke="#3A2C24" stroke-width="1"/></pattern></defs>
+      <line x1="0" y1="${G}" x2="${W}" y2="${G}" stroke="#5A6168" stroke-width="2"/>
+      <!-- house -->
+      <polygon points="${wallX - houseW},${eaveY} ${wallX - houseW / 2},${ridgeY} ${wallX},${eaveY}" fill="#3A3F45"/>
+      <rect x="${wallX - houseW}" y="${eaveY}" width="${houseW}" height="${G - eaveY}" fill="#2E3338" stroke="#4A5057"/>
+      <!-- stack and pot, on the wall line -->
+      <rect x="${stackX - 4}" y="${potY + 9}" width="22" height="${eaveY - potY - 9}" fill="url(#brick)"/>
+      <rect x="${stackX + 1}" y="${potY}" width="12" height="10" rx="1" fill="#B8623A"/>
+      <!-- rods + brush -->
+      ${rods}
+      <circle cx="${stackX + 7}" cy="${brushY - 4}" r="6" fill="none" stroke="#EDEAE4" stroke-width="2" stroke-dasharray="2 2"/>
+      <!-- fireplace -->
+      <rect x="${stackX - 6}" y="${startY - 2}" width="26" height="4" fill="#FF6B1A"/>
+      <!-- person + laser -->
+      <line x1="${px}" y1="${G}" x2="${px}" y2="${laserY}" stroke="#A9AFB4" stroke-width="2"/>
+      <circle cx="${px}" cy="${Math.max(laserY - 10, 12)}" r="5" fill="#A9AFB4"/>
+      <rect x="${px - 3}" y="${laserY - 3}" width="9" height="6" rx="1" fill="#FF6B1A"/>
+      <!-- shots -->
+      <line x1="${px + 4}" y1="${laserY}" x2="${stackX + 7}" y2="${potY + 2}" stroke="#FF6B1A" stroke-width="2"/>
+      ${r.method === 'angle' ? '' : r.method === 'level'
+        ? `<line x1="${px + 4}" y1="${laserY}" x2="${wallX}" y2="${laserY}" stroke="#7FB8E0" stroke-width="2" stroke-dasharray="5 4"/>`
+        : `<line x1="${px + 4}" y1="${laserY}" x2="${wallX}" y2="${G}" stroke="#7FB8E0" stroke-width="2" stroke-dasharray="5 4"/>`}
+      <!-- height dimension -->
+      <line x1="${wallX + 14}" y1="${potY}" x2="${wallX + 14}" y2="${G}" stroke="#EDEAE4" stroke-width="1"/>
+      <line x1="${wallX + 9}" y1="${potY}" x2="${wallX + 19}" y2="${potY}" stroke="#EDEAE4"/>
+      <line x1="${wallX + 9}" y1="${G}" x2="${wallX + 19}" y2="${G}" stroke="#EDEAE4"/>
+      <text x="${Math.min(wallX + 22, W - 4)}" y="${(potY + G) / 2}" fill="#EDEAE4" text-anchor="${wallX + 70 > W ? 'end' : 'start'}" dominant-baseline="middle">${r.potH.toFixed(1)} m</text>
+      <!-- distance -->
+      <text x="${(px + wallX) / 2}" y="${G + 16}" fill="#A9AFB4" text-anchor="middle">${r.x.toFixed(1)} m away</text>
+      <text x="${px + 8}" y="${laserY - 6}" fill="#FF6B1A">laser</text>`;
+  }
+
+  // ---- Actions ----
+  $('copyBtn').addEventListener('click', async () => {
+    const r = solve();
+    if (!r.potH) { $('copied').textContent = 'Nothing to copy yet'; return; }
+    const kind = val('flue') === 'liner' ? 'liner' : 'large';
+    const text = `Chimney approx ${r.potH.toFixed(1)} m to the pot. Flue to sweep approx ${r.flue.toFixed(1)} m. Take ${r.rods} ${kind} rods (${r.rodCm} cm), reaching ${r.reach.toFixed(2)} m.`;
+    try { await navigator.clipboard.writeText(text); $('copied').textContent = 'Copied'; }
+    catch (e) { $('copied').textContent = text; }
+    setTimeout(() => { if ($('copied').textContent === 'Copied') $('copied').textContent = ''; }, 2500);
+  });
+  $('resetBtn').addEventListener('click', () => {
+    ['toPot', 'toBase', 'angle'].forEach(id => $(id).value = '');
+    $('stoveH').value = 0; $('floor').value = '0'; $('bends').value = '0';
+    $('copied').textContent = ''; render(); $('toPot').focus();
+  });
+  document.addEventListener('input', render);
+  document.addEventListener('change', render);
+  render();
+})();
+</script>
+</body>
+</html>
