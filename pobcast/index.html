@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Pobcast</title>
-<meta name="description" content="The Pobcast from pobajobs: an easy listen. Goofing around, having a laugh, with a bit of everything dropped in. Coming soon.">
+<meta name="description" content="The Pobcast from pobajobs: an easy listen. Goofing around, having a laugh, with a bit of everything dropped in. On YouTube at @thepobcastpod.">
 <meta name="theme-color" content="#FFF3E0">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -88,6 +88,12 @@
     border: 2px dashed rgba(42, 29, 23, 0.35); color: var(--soft); font-weight: 700; }
   .plat small { font-weight: 500; font-size: 0.8rem; }
   .meanwhile { margin-top: 1.4rem; color: var(--soft); }
+  .plat.live { border-style: solid; border-color: var(--ink); background: #fff; color: var(--ink); text-decoration: none; box-shadow: 3px 3px 0 var(--ink); transition: transform .1s, box-shadow .1s; }
+  .plat.live small { color: var(--tomato); font-weight: 700; }
+  .plat.live:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink); }
+  .ytbtn { display: inline-flex; align-items: center; gap: 0.6rem; margin-top: 1.4rem; font-weight: 700; font-size: 1.05rem; text-decoration: none; color: #fff; background: var(--tomato);
+    border: 2.5px solid var(--ink); border-radius: 999px; padding: 0.7rem 1.4rem; box-shadow: 3px 3px 0 var(--ink); transition: transform .1s, box-shadow .1s; }
+  .ytbtn:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink); }
   .meanwhile a { color: var(--tomato); font-weight: 700; }
 
   /* Suggest a topic */
@@ -152,8 +158,9 @@
   <section class="hero">
     <div>
       <h1><small>pobajobs presents</small>The Pobcast</h1>
-      <span class="sticker">Coming soon</span>
+      <span class="sticker">New on YouTube</span>
       <p class="lede">An easy listen. <em>Goofing around, having a laugh,</em> with a bit of everything dropped in.</p>
+      <a class="ytbtn" href="https://www.youtube.com/@thepobcastpod?sub_confirmation=1" target="_blank" rel="noopener"><svg width="22" height="16" viewBox="0 0 24 17" aria-hidden="true"><rect width="24" height="17" rx="4" fill="#fff"/><path d="M10 5l5 3.5-5 3.5z" fill="#E5533B"/></svg>Subscribe on YouTube</a>
     </div>
     <div class="studio">
       <button class="onair" id="onAir" type="button" aria-label="On air sign. Tap it.">ON AIR</button>
@@ -211,9 +218,9 @@
     <div class="listen">
       <div class="plat">Spotify <small>Soon</small></div>
       <div class="plat">Apple Podcasts <small>Soon</small></div>
-      <div class="plat">YouTube <small>Soon</small></div>
+      <a class="plat live" href="https://www.youtube.com/@thepobcastpod" target="_blank" rel="noopener">YouTube <small>Subscribe &rarr;</small></a>
     </div>
-    <p class="meanwhile">Mic check still pending. In the meantime, <a href="/gaming/">come and watch some gaming</a>.</p>
+    <p class="meanwhile">First episode coming soon. <a href="https://www.youtube.com/@thepobcastpod" target="_blank" rel="noopener">Subscribe on YouTube</a> so you don't miss it, and in the meantime, <a href="/gaming/">come and watch some gaming</a>.</p>
   </section>
 
   <footer>
