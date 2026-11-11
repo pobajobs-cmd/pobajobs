@@ -167,7 +167,9 @@
     .logs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 560px) {
-    .top nav a:not(:first-child):not(.tool) { display: none; }
+    .top nav a:not(.tool) { display: none; }
+    .top nav { gap: 1rem; }
+    .top nav a { white-space: nowrap; }
     .drawer { min-height: 0; }
     .logs { grid-template-columns: 1fr; }
     .spec div { grid-template-columns: 8.5em 1fr; }
@@ -197,6 +199,7 @@
       <a href="/gaming/">Gaming</a>
       <a href="/pobcast/">Pobcast</a>
       <a class="tool" href="/builds/chimney/">Chimney calc</a>
+      <a class="tool" href="/builds/bins/">Bin maker</a>
     </nav>
   </header>
 
