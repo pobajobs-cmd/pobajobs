@@ -1,9 +1,13 @@
-// pobajobs.co.uk: serves the site files, plus one small API for the Pobcast's "Suggest a topic" box.
+// pobajobs.co.uk: serves the site files, plus two small APIs: the Pobcast's "Suggest a topic"
+// box and error reports from the bin maker (/builds/bins/).
 // Only /api/... addresses reach this code (see wrangler.jsonc); everything else is a plain file.
 //
-// Suggestions are stored in the "pobajobs" D1 database. To read them:
+// Both are stored in the "pobajobs" D1 database. To read them:
 //   Cloudflare dashboard > Storage & databases > D1 > pobajobs > Console, then run
 //   SELECT created_at, name, topic FROM suggestions ORDER BY id DESC;
+//   SELECT created_at, session, kind, msg, detail FROM binmaker_events ORDER BY id DESC LIMIT 200;
+// Problems only:
+//   SELECT * FROM binmaker_events WHERE kind NOT IN ('boot','job','download','toast') ORDER BY id DESC;
 
 const MAX_TOPIC = 500;
 const MAX_NAME = 60;
@@ -13,6 +17,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/api/pobcast/suggest') return suggest(request, env, url);
+    if (url.pathname === '/api/binmaker/report') return binmakerReport(request, env, url);
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found.' }, 404);
     return env.ASSETS.fetch(request);
   },
@@ -65,6 +70,60 @@ async function ensureSchema(db) {
     db.prepare('CREATE INDEX IF NOT EXISTS suggestions_ip_time ON suggestions (ip_hash, created_at)'),
   ]);
   schemaReady = true;
+}
+
+// Bin maker: error reports and timings sent by the page itself (no photos or files, just
+// what went wrong, how long things took and the browser/device), to find problems while testing.
+const REPORTS_PER_HOUR = 600; // events from one connection per hour
+
+async function binmakerReport(request, env, url) {
+  if (request.method !== 'POST') return json({ error: 'POST only.' }, 405, { Allow: 'POST' });
+  const origin = request.headers.get('Origin');
+  if (origin && origin !== url.origin) return json({ error: 'Forbidden.' }, 403);
+  const raw = await request.text();
+  if (raw.length > 120000) return json({ error: 'Too big.' }, 413);
+  let body;
+  try { body = JSON.parse(raw); } catch (e) { return json({ error: 'Unexpected format.' }, 400); }
+  const clean = (v, max) => (v == null ? null : String(v).replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').slice(0, max));
+  const events = Array.isArray(body.events) ? body.events.slice(0, 50) : [];
+  if (!events.length) return json({ ok: true });
+
+  await ensureBinmakerSchema(env.DB);
+  const ipHash = await sha256('binmaker:' + (request.headers.get('CF-Connecting-IP') || 'unknown'));
+  const hourAgo = new Date(Date.now() - 3600e3).toISOString();
+  const { results } = await env.DB.prepare('SELECT COUNT(*) AS n FROM binmaker_events WHERE ip_hash = ? AND created_at > ?').bind(ipHash, hourAgo).all();
+  if ((results[0]?.n || 0) >= REPORTS_PER_HOUR) return json({ ok: true, dropped: true });
+
+  const env_ = body.env && typeof body.env === 'object' ? body.env : {};
+  const device = clean(JSON.stringify({ mem: env_.mem, cores: env_.cores, w: env_.w, h: env_.h }), 200);
+  const now = new Date().toISOString();
+  const stmt = env.DB.prepare(`INSERT INTO binmaker_events (created_at, client_time, session, ver, kind, msg, detail, ua, device, ip_hash)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  await env.DB.batch(events.map(e => stmt.bind(now, clean(e.t, 40), clean(body.session, 20), clean(body.ver, 20), clean(e.kind, 30),
+    clean(e.msg, 1000), clean(e.detail, 4000), clean(env_.ua, 300), device, ipHash)));
+  return json({ ok: true });
+}
+
+let binmakerSchemaReady = false;
+async function ensureBinmakerSchema(db) {
+  if (binmakerSchemaReady) return;
+  await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS binmaker_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL,
+      client_time TEXT,
+      session TEXT,
+      ver TEXT,
+      kind TEXT,
+      msg TEXT,
+      detail TEXT,
+      ua TEXT,
+      device TEXT,
+      ip_hash TEXT
+    )`),
+    db.prepare('CREATE INDEX IF NOT EXISTS binmaker_ip_time ON binmaker_events (ip_hash, created_at)'),
+  ]);
+  binmakerSchemaReady = true;
 }
 
 async function sha256(text) {
