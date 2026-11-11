@@ -1,0 +1,1 @@
+"""Geominals Bins, browser build."""
