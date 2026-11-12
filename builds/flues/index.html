@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="darkreader-lock">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Does it need a liner? · pobajobs Builds</title>
+<meta name="description" content="A cut-away chimney you can tap: when an existing chimney needs lining for a stove or open fire, the types of liner, twin-wall flue clearances, and what the Clean Air Act covers.">
+<meta name="theme-color" content="#1B1E21">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Anatomy of a chimney: the cut-away IS the explanation. Tap a part (or its number in the margin),
+     the text beside it answers. On phones the drawing stays pinned while you read underneath.
+     Workshop look from /builds/: graphite bench, ply answer plate, safety orange. */
+  :root {
+    --bench: #1B1E21; --bench-2: #23272B; --line: rgba(160, 190, 210, 0.16); --field: #111315;
+    --ink: #EDEAE4; --soft: #A9AFB4;
+    --ply: #E7D2A9; --ply-edge: #B8975F; --walnut: #5C3B22;
+    --safety: #FF6B1A; --hazard: #FFB21A; --copper: #D08A4E; --sky: #7FB8E0; --warn: #FF8A65; --good: #8FE0A0;
+    --display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --body: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bench); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.5; overflow-x: clip;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 96px 96px; background-attachment: fixed; }
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding-inline: max(16px, 4vw); padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px)); }
+
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: calc(1rem + env(safe-area-inset-top, 0px)) 1rem;
+    font-family: var(--mono); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .top a { text-decoration: none; }
+  .crumb b { color: var(--safety); }
+  .crumb span { color: var(--soft); }
+
+  h1 { margin: 0.5rem 0 0.3rem; font-family: var(--display); font-weight: 900; font-size: clamp(2.4rem, 9vw, 4.2rem); line-height: 0.9; text-transform: uppercase; }
+  .lede { margin: 0 0 1.3rem; color: var(--soft); max-width: 46em; }
+  .lede b { color: var(--ink); }
+
+  /* Choice bars */
+  .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); gap: 0.7rem; margin-bottom: 1rem; }
+  .ctl .k { display: block; font-family: var(--mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); margin: 0 0 0.3rem 2px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
+  .seg button { font: inherit; display: block; text-align: center; padding: 0.5rem 0.25rem; border: 0; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+    letter-spacing: 0.03em; text-transform: uppercase; color: var(--soft); background: transparent; line-height: 1.2; }
+  .seg button small { display: block; font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.66rem; opacity: 0.85; margin-top: 2px; }
+  .seg button[aria-pressed="true"] { background: var(--safety); color: #111; }
+  .seg button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Figure + side */
+  .layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: clamp(1rem, 3vw, 1.6rem); align-items: start; }
+  .panel { background: rgba(17, 19, 21, 0.92); border: 1px solid var(--line); border-radius: 6px; padding: clamp(1rem, 3vw, 1.3rem); }
+  .figure { padding: 0.7rem 0.6rem 0.5rem; position: sticky; top: 10px; z-index: 3; background: #141618; }
+  .fig-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.1rem 0.4rem 0.3rem; }
+  .fig-head b { font-family: var(--display); font-weight: 700; font-size: 1.25rem; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1; }
+  .vchip { font-family: var(--mono); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.25rem 0.55rem; border-radius: 4px; background: var(--ply); color: var(--walnut); white-space: nowrap; }
+  .vchip.red { background: #F3C9BC; color: #8E2A12; }
+  #scene { display: block; width: 100%; height: auto; max-height: calc(100vh - 130px); margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  .pg { cursor: pointer; }
+  .pg .sf { transition: stroke 0.15s; }
+  .pg:hover .sf { stroke: rgba(255, 178, 26, 0.55); stroke-width: 1.4; }
+  .pg.lit .sf { stroke: var(--hazard); stroke-width: 2.2; }
+  .lab { cursor: pointer; }
+  .lab .ring { fill: #2A2F34; stroke: var(--safety); stroke-width: 1.6; }
+  .lab text { font-family: var(--mono); font-weight: 600; fill: var(--ink); pointer-events: none; }
+  .lab:hover .ring { fill: #3A3F45; }
+  .lab.on .ring { fill: var(--safety); stroke: #111; }
+  .lab.on text { fill: #111; }
+  .lab:focus { outline: none; }
+  .lab:focus-visible .ring { stroke: var(--sky); stroke-width: 3; }
+  .lead { stroke: rgba(237, 234, 228, 0.45); stroke-width: 1; fill: none; pointer-events: none; }
+  .lead.on { stroke: var(--safety); stroke-width: 1.6; }
+  .pin { fill: var(--safety); stroke: #111; stroke-width: 1.2; pointer-events: none; }
+  .pin.on { fill: var(--hazard); }
+  @media (prefers-reduced-motion: no-preference) {
+    .lab.hint .ring { animation: ping 1.8s ease-in-out infinite; }
+    @keyframes ping { 50% { stroke-width: 4; stroke: var(--hazard); } }
+    .puff { animation: drift 5s ease-in-out infinite alternate; }
+    @keyframes drift { to { transform: translate(6px, -4px); } }
+  }
+  .cap { font-family: var(--mono); font-size: 0.68rem; color: var(--soft); margin: 0.2rem 0.4rem 0; }
+
+  .side { display: flex; flex-direction: column; gap: 1rem; }
+  /* Plywood answer plate */
+  .plate { position: relative; color: #2B1D10; border-radius: 6px; padding: 1rem 1.2rem 0.95rem;
+    background: repeating-linear-gradient(92deg, rgba(120, 80, 30, 0.07) 0 3px, transparent 3px 11px), radial-gradient(120% 60% at 30% 40%, var(--ply), #D9BF8D);
+    box-shadow: 0 0 0 3px var(--ply-edge), 0 0 0 5px #F1E2C3, 0 0 0 7px var(--ply-edge), 0 14px 30px rgba(0,0,0,0.4); margin: 7px; }
+  .plate .k { font-family: var(--mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #5A4127; }
+  .verdict { font-family: var(--display); font-weight: 900; font-size: clamp(2.4rem, 9vw, 3.3rem); line-height: 0.9; color: var(--walnut); text-transform: uppercase; margin: 0.15rem 0 0.4rem; }
+  .verdict.red { color: #8E2A12; }
+  .plate .sub { font-size: 0.94rem; color: #3E2B19; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin-top: 0.85rem; }
+  .stats div { background: rgba(255, 255, 255, 0.35); border-radius: 4px; padding: 0.45rem 0.55rem; }
+  .stats small { display: block; font-family: var(--mono); font-size: 0.62rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5A4127; }
+  .stats strong { font-family: var(--mono); font-size: 0.92rem; font-variant-numeric: tabular-nums; line-height: 1.25; display: block; }
+
+  /* Part detail */
+  .part .tag { font-family: var(--mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--safety); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+  .part .tag button { font: inherit; font-size: 0.9rem; line-height: 1; color: var(--ink); background: var(--field); border: 1px solid #3A4046; border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; }
+  .part h3 { margin: 0.3rem 0 0.5rem; font-family: var(--display); font-weight: 700; font-size: 1.65rem; text-transform: uppercase; line-height: 1; }
+  .part .say { margin: 0 0 0.5rem; }
+  .part ul { margin: 0.2rem 0 0.5rem; padding-left: 1.1rem; }
+  .part li { margin-bottom: 0.3rem; font-size: 0.95rem; }
+  b.n { font-family: var(--mono); color: var(--hazard); font-weight: 600; }
+  details.dig { border-top: 1px dashed rgba(208, 138, 78, 0.4); padding-top: 0.55rem; margin-top: 0.5rem; }
+  details.dig summary, details.more summary { cursor: pointer; font-family: var(--mono); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--copper); }
+  details.dig[open] summary { margin-bottom: 0.45rem; }
+  .src { font-family: var(--mono); font-size: 0.7rem; color: var(--soft); margin: 0.5rem 0 0; }
+  .src a { color: var(--sky); }
+
+  details.more[open] summary { margin-bottom: 0.8rem; }
+  .field { display: grid; gap: 0.3rem; margin-bottom: 0.8rem; }
+  .field > span { font-weight: 600; font-size: 0.92rem; }
+  .range { display: flex; align-items: center; gap: 0.8rem; }
+  .range input { flex: 1; accent-color: var(--safety); }
+  .range output { font-family: var(--mono); font-weight: 600; min-width: 4.5em; text-align: right; }
+
+  /* Sections below */
+  .below { display: grid; gap: 1rem; margin-top: 1.6rem; }
+  details.sec { background: rgba(17, 19, 21, 0.85); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.2rem; }
+  details.sec > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary b { font-family: var(--display); font-weight: 700; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 0.02em; display: block; line-height: 1; margin-bottom: 0.25rem; }
+  details.sec > summary span.gist { color: var(--soft); font-size: 0.92rem; }
+  details.sec > summary i { font-style: normal; font-family: var(--mono); color: var(--safety); font-size: 1.3rem; flex-shrink: 0; }
+  details.sec[open] > summary i { transform: rotate(45deg); }
+  details.sec[open] > summary { margin-bottom: 1rem; }
+
+  .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; }
+  .step { background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 0.8rem; }
+  .step svg { width: 44px; height: 44px; display: block; margin-bottom: 0.4rem; }
+  .step b { display: block; font-family: var(--display); font-size: 1.15rem; text-transform: uppercase; }
+  .step p { margin: 0.2rem 0 0; font-size: 0.86rem; color: var(--soft); }
+  .forks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.6rem; }
+  .fork { border-radius: 6px; padding: 0.8rem 0.9rem; border: 1.5px solid; }
+  .fork.pass { border-color: var(--good); background: rgba(143, 224, 160, 0.07); }
+  .fork.fail { border-color: var(--warn); background: rgba(255, 138, 101, 0.07); }
+  .fork b { font-family: var(--display); font-size: 1.25rem; text-transform: uppercase; display: block; }
+  .fork.pass b { color: var(--good); } .fork.fail b { color: var(--warn); }
+  .fork p { margin: 0.25rem 0 0; font-size: 0.9rem; }
+
+  /* Liner types */
+  .liners { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.6rem; }
+  .ln { background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 0.8rem; display: grid; grid-template-columns: 52px 1fr; gap: 0.7rem; align-items: start; }
+  .ln svg { width: 52px; height: 52px; }
+  .ln b { display: block; font-size: 0.98rem; line-height: 1.25; }
+  .ln .std { font-family: var(--mono); font-size: 0.68rem; color: var(--hazard); margin: 0.15rem 0 0.3rem; display: block; }
+  .ln p { margin: 0; font-size: 0.86rem; color: var(--soft); }
+  .ln.no { border-color: rgba(255, 138, 101, 0.5); }
+  .ln.no .std { color: var(--warn); }
+
+  /* Clearances */
+  .clear { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+  .cl { background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 0.8rem; }
+  .cl svg { width: 100%; height: auto; display: block; margin-bottom: 0.5rem; }
+  .cl svg text { font-family: var(--mono); font-weight: 600; }
+  .cl b { display: block; font-family: var(--display); font-size: 1.2rem; text-transform: uppercase; }
+  .cl ul { margin: 0.3rem 0 0; padding-left: 1.05rem; font-size: 0.88rem; }
+  .cl li { margin-bottom: 0.25rem; }
+
+  /* Clean Air Act timeline */
+  .tl-wrap { overflow-x: auto; padding-bottom: 0.4rem; }
+  .tl { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); min-width: 900px; position: relative; padding-top: 0.2rem; }
+  .tl::before { content: ""; position: absolute; left: 0; right: 0; top: 34px; height: 3px; background: repeating-linear-gradient(90deg, var(--copper) 0 10px, transparent 10px 16px); }
+  .ev { position: relative; padding: 0 0.7rem 0 0; }
+  .ev .yr { font-family: var(--display); font-weight: 900; font-size: 1.6rem; line-height: 1; }
+  .ev .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--bench); border: 3px solid var(--copper); margin: 5px 0 8px; position: relative; z-index: 1; }
+  .ev.key .dot { background: var(--safety); border-color: var(--safety); }
+  .ev.br .dot { border-color: var(--sky); background: var(--sky); }
+  .ev.br .yr { color: var(--sky); }
+  .ev b { display: block; font-size: 0.92rem; line-height: 1.25; }
+  .ev p { margin: 0.25rem 0 0; font-size: 0.82rem; color: var(--soft); line-height: 1.4; }
+  .sca { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin-top: 1rem; }
+  .tile { background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 0.8rem; }
+  .tile .n { font-family: var(--display); font-weight: 900; font-size: 1.9rem; line-height: 1; color: var(--hazard); }
+  .tile p { margin: 0.3rem 0 0; font-size: 0.88rem; }
+  .callout { margin-top: 1rem; border-left: 4px solid var(--sky); padding: 0.6rem 0.9rem; background: rgba(127, 184, 224, 0.08); border-radius: 0 6px 6px 0; font-size: 0.95rem; }
+  .callout a { color: var(--sky); }
+
+  .tbl { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); font-weight: 600; }
+  td.y { color: var(--good); font-weight: 600; } td.n { color: var(--warn); font-weight: 600; }
+  .myths { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .myth { background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 0.8rem; }
+  .myth s { color: var(--warn); text-decoration-thickness: 2px; display: block; font-weight: 600; }
+  .myth p { margin: 0.35rem 0 0; font-size: 0.9rem; }
+  ol.refs { margin: 0; padding-left: 1.3rem; columns: 2; column-gap: 2rem; font-size: 0.86rem; }
+  ol.refs li { break-inside: avoid; margin-bottom: 0.45rem; }
+  ol.refs a { color: var(--sky); }
+  ol.refs span { display: block; color: var(--soft); font-size: 0.78rem; }
+
+  footer { margin-top: 2.5rem; padding-top: 1.2rem; border-top: 2px dashed rgba(208, 138, 78, 0.35); font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft);
+    display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  footer a { text-decoration: none; }
+
+  @media (max-width: 1000px) { .controls { grid-template-columns: 1fr 1fr; } .controls .ctl:last-child { grid-column: 1 / -1; } }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; gap: 0.8rem; }
+    /* Drawing pinned at the top while the text scrolls underneath it */
+    .figure { top: 0; margin-inline: calc(-1 * max(16px, 4vw)); border-radius: 0; border-left: 0; border-right: 0; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding-top: max(0.5rem, env(safe-area-inset-top, 0px)); }
+    #scene { max-height: 44vh; max-height: 44svh; width: 100%; }
+    .cap { display: none; }
+    .side .part { order: 1; } .side .plate { order: 2; } .side .more { order: 3; }
+    .steps { grid-template-columns: 1fr 1fr; }
+    .sca, .myths, .forks, .clear { grid-template-columns: 1fr; }
+    ol.refs { columns: 1; }
+  }
+  @media (max-width: 520px) { .controls { grid-template-columns: 1fr; } .seg button { font-size: 0.64rem; padding-inline: 0.15rem; } .seg button small { font-size: 0.6rem; } }
+  @media (max-width: 420px) { .stats { grid-template-columns: 1fr 1fr; } .stats div:last-child { grid-column: 1 / -1; } .steps { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="crumb" href="/builds/"><b>POBAJOBS</b> <span>/ Builds / Flues</span></a>
+  </header>
+
+  <h1>Does it need a liner?</h1>
+  <p class="lede"><b>Short answer: not automatically.</b> In England an existing chimney has to be <b>checked and proven</b> for a stove or open fire, not lined by default. Tap any part of the drawing, or its number, to read about it.</p>
+
+  <div class="controls" role="group" aria-label="Set up the chimney">
+    <div class="ctl"><span class="k">Appliance</span>
+      <div class="seg" data-key="app"><button data-v="stove">Stove<small>wood / multi-fuel</small></button><button data-v="open">Open fire<small>no doors</small></button></div></div>
+    <div class="ctl"><span class="k">The job</span>
+      <div class="seg" data-key="job"><button data-v="install">Fitting one<small>new or replacement</small></button><button data-v="none">No work<small>already in</small></button></div></div>
+    <div class="ctl"><span class="k">The chimney or flue</span>
+      <div class="seg" data-key="chim"><button data-v="unlined">Unlined<small>most pre-1965</small></button><button data-v="rigid">Clay / pumice<small>rigid liners</small></button><button data-v="flex">Steel flexi<small>already fitted</small></button><button data-v="cast">Cast / spray<small>in-situ lining</small></button><button data-v="twin">Twin-wall<small>no chimney</small></button></div></div>
+  </div>
+
+  <div class="layout">
+    <section class="panel figure" aria-label="Cut-away chimney">
+      <div class="fig-head"><b id="figTitle">Anatomy of a chimney</b><span class="vchip" id="vchip">Test first</span></div>
+      <svg id="scene" role="group" aria-label="Cut-away of a room and chimney with numbered parts you can select"></svg>
+      <p class="cap" id="cap">Cut away to show the flue inside the brickwork.</p>
+    </section>
+
+    <div class="side">
+      <section class="plate" id="result" aria-live="polite">
+        <div class="k">Liner?</div>
+        <div class="verdict" id="verdict">Test first</div>
+        <div class="sub" id="vsub"></div>
+        <div class="stats">
+          <div><small>Min flue</small><strong id="sFlue">–</strong></div>
+          <div><small>Air vent</small><strong id="sAir">–</strong></div>
+          <div><small>Hearth</small><strong id="sHearth">–</strong></div>
+        </div>
+      </section>
+
+      <section class="panel part" id="part" aria-live="polite"></section>
+
+      <details class="more panel">
+        <summary>Specs</summary>
+        <div class="field" data-for="stove"><span>Heat output</span>
+          <div class="range"><input type="range" id="kw" min="3" max="20" step="1" value="5" aria-label="Heat output in kilowatts"><output id="kwOut">5 kW</output></div></div>
+        <div class="field" data-for="stove"><span>Smoke-exempt stove burning wood, or smokeless fuel only?</span>
+          <div class="seg" data-key="exempt"><button data-v="yes">Yes</button><button data-v="no">No / not sure</button></div></div>
+        <div class="field" data-for="open"><span>Fireplace opening width</span>
+          <div class="range"><input type="range" id="ow" min="350" max="900" step="10" value="410" aria-label="Opening width in millimetres"><output id="owOut">410 mm</output></div></div>
+        <div class="field" data-for="open"><span>Fireplace opening height</span>
+          <div class="range"><input type="range" id="oh" min="400" max="900" step="10" value="550" aria-label="Opening height in millimetres"><output id="ohOut">550 mm</output></div></div>
+        <div class="field"><span>House</span>
+          <div class="seg" data-key="tight"><button data-v="leaky">Pre-2008<small>not sealed up</small></button><button data-v="tight">Air-tight<small>newer or upgraded</small></button></div></div>
+      </details>
+    </div>
+  </div>
+
+  <div class="below">
+    <details class="sec" id="checks" open>
+      <summary><span><b>The four checks</b><span class="gist">What Approved Document J asks for when an existing flue is reused.</span></span><i>+</i></summary>
+      <div class="steps">
+        <div class="step"><svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="12" r="8" fill="none" stroke="#FF6B1A" stroke-width="3"/><path d="M14 12h16M22 4v16M16 6l12 12M28 6L16 18" stroke="#FF6B1A" stroke-width="2"/><rect x="20" y="20" width="4" height="22" fill="#D08A4E"/></svg><b>1 · Sweep</b><p>Clear soot and tar. Tar from wood can be hard to shift and must be removed.</p></div>
+        <div class="step"><svg viewBox="0 0 44 44" aria-hidden="true"><rect x="6" y="12" width="22" height="16" rx="3" fill="none" stroke="#7FB8E0" stroke-width="3"/><circle cx="17" cy="20" r="4" fill="#7FB8E0"/><path d="M28 16l10-5v18l-10-5" fill="none" stroke="#7FB8E0" stroke-width="3"/></svg><b>2 · Look inside</b><p>Visual inspection, ideally CCTV. Condition, size, route, damage.</p></div>
+        <div class="step"><svg viewBox="0 0 44 44" aria-hidden="true"><path d="M22 2v22" stroke="#A9AFB4" stroke-width="2" stroke-dasharray="3 3"/><circle cx="22" cy="31" r="9" fill="#A9AFB4"/></svg><b>3 · Coring ball</b><p>Where there's doubt, drop a ball down to prove the flue is clear.</p></div>
+        <div class="step"><svg viewBox="0 0 44 44" aria-hidden="true"><rect x="14" y="4" width="16" height="36" fill="none" stroke="#EDEAE4" stroke-width="3"/><circle cx="22" cy="30" r="5" fill="#A9AFB4" opacity=".8"/><circle cx="20" cy="20" r="4" fill="#A9AFB4" opacity=".6"/><circle cx="24" cy="12" r="3" fill="#A9AFB4" opacity=".5"/><path d="M30 18h8M30 24h6" stroke="#FF8A65" stroke-width="2"/></svg><b>4 · Smoke test</b><p>Seal top and bottom, fill with smoke, look for leaks anywhere in the house.</p></div>
+      </div>
+      <div class="forks">
+        <div class="fork pass"><b>Passes</b><p>Use it as it is, if the size suits the appliance. No liner is required by the regulations, unless the stove maker asks for one.</p></div>
+        <div class="fork fail"><b>Fails</b><p>Don't use it until it's put right: repair the stack or reline it with one of the solid-fuel linings below. Relining is notifiable work.</p></div>
+      </div>
+      <p class="src">Source: <a href="https://assets.publishing.service.gov.uk/media/6336e58be90e0772dc9651a2/ADJ_2022.pdf">Approved Document J</a> paras 1.35–1.37, Appendix E3 · <a href="https://solidfuel.co.uk/pdfs/BUILDING-REGS-CONSUMER-LEAFLET-2026.pdf">SFA 2026</a></p>
+    </details>
+
+    <details class="sec" id="liners">
+      <summary><span><b>Types of liner</b><span class="gist">Clay and steel aren't the only options. Here's every common lining, and the one never to use.</span></span><i>+</i></summary>
+      <div class="liners">
+        <div class="ln"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="10" y="2" width="32" height="48" fill="#B5654A"/><rect x="16" y="2" width="20" height="48" fill="#D9A37A"/><rect x="20" y="2" width="12" height="48" fill="#17191B"/><path d="M16 14h20M16 28h20M16 42h20" stroke="#8E5A3A" stroke-width="2"/></svg><div><b>Clay / ceramic liners</b><span class="std">BS EN 1457 · rigid</span><p>Sections built in, socket end up. Standard in chimneys built since 1965, and can last the life of the building. Relining means opening up the chimney, and the 20–25 mm walls shrink the flue.</p></div></div>
+        <div class="ln"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="10" y="2" width="32" height="48" fill="#B5654A"/><rect x="15" y="2" width="22" height="48" fill="#A7A39B"/><rect x="20" y="2" width="12" height="48" fill="#17191B"/><path d="M15 18h22M15 34h22" stroke="#7A7670" stroke-width="2"/></svg><div><b>Pumice / concrete liners</b><span class="std">BS EN 1857 · rigid</span><p>Rigid sections or blocks. Pumice insulates well, so it's recommended for wood stoves. Installed the same way as clay.</p></div></div>
+        <div class="ln"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="10" y="2" width="32" height="48" fill="#B5654A"/><path d="M12 2h28v48H12z" fill="#8E8A84"/><circle cx="26" cy="26" r="8" fill="#17191B"/><path d="M14 8c6 4 4 10 0 14M38 30c-6 4-4 10 0 14" stroke="#6B6761" stroke-width="2" fill="none"/></svg><div><b>Pumped refractory concrete</b><span class="std">Cast in-situ · ADJ 2.20</span><p>An inflatable former goes down the flue and lightweight concrete is pumped round it. Fills cracks and strengthens the stack. No British Standard, so the result depends on the installer.</p></div></div>
+        <div class="ln"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="10" y="2" width="32" height="48" fill="#B5654A"/><rect x="13" y="2" width="26" height="48" fill="#17191B"/><rect x="18" y="2" width="16" height="48" rx="3" fill="#C9CDD2"/><path d="M18 8h16M18 14h16M18 20h16M18 26h16M18 32h16M18 38h16M18 44h16" stroke="#8A9096" stroke-width="1.5"/></svg><div><b>Flexible steel (twin-skin)</b><span class="std">BS EN 1856-2 · 904L or 316Ti</span><p>Double-skinned, smooth inside, fitted the right way up. For relining only (ADJ 1.40). Backfill with perlite or vermiculite for wood stoves, never fibreglass. Sweep with a poly brush.</p></div></div>
+        <div class="ln"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="10" y="2" width="32" height="48" fill="#B5654A"/><rect x="15" y="2" width="22" height="48" fill="#17191B"/><path d="M15 2v48M37 2v48" stroke="#D8D2C6" stroke-width="5"/><path d="M26 4v10" stroke="#A9AFB4" stroke-width="2"/><circle cx="26" cy="18" r="4" fill="#A9AFB4"/></svg><div><b>Spray-on lining</b><span class="std">About 7 mm · specialist</span><p>A spray head is drawn up the cleaned flue. Thin, so it keeps the most flue size, and it follows bends. Good for cracked clay liners. Make sure the guarantee is insurance-backed.</p></div></div>
+        <div class="ln"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="10" y="2" width="32" height="48" fill="#B5654A"/><rect x="15" y="2" width="22" height="48" fill="#17191B"/><path d="M15 2v48M37 2v48" stroke="#E9E4F2" stroke-width="3"/><rect x="18" y="20" width="16" height="8" rx="2" fill="#A9AFB4"/></svg><div><b>Ceramic coating</b><span class="std">About 4 mm · specialist</span><p>A plug is pulled up the flue, pressing liquid lining into the walls and sealing cracks. Barely reduces the flue size. Usually guaranteed for ten years.</p></div></div>
+        <div class="ln"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="18" y="2" width="16" height="48" rx="8" fill="#C9CDD2"/><rect x="21" y="2" width="10" height="48" fill="#17191B"/><rect x="14" y="2" width="24" height="5" rx="1" fill="#59616A"/></svg><div><b>Twin-wall system chimney</b><span class="std">BS EN 1856-1 · G50 / G60 typical</span><p>Not a liner: a complete insulated chimney for homes with none. Keep its rated gap to combustibles. See Clearances below.</p></div></div>
+        <div class="ln no"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="10" y="2" width="32" height="48" fill="#B5654A"/><rect x="13" y="2" width="26" height="48" fill="#17191B"/><rect x="21" y="2" width="10" height="48" fill="#C9CDD2"/><path d="M8 8l36 36M44 8L8 44" stroke="#FF8A65" stroke-width="4"/></svg><div><b>Single-skin flexi (gas/oil)</b><span class="std">Never for solid fuel or wood</span><p>Light-gauge liner for gas fires, boilers and oil. It isn't built for a stove or open fire, whatever the price.</p></div></div>
+      </div>
+      <p class="src">Sources: <a href="https://solidfuel.co.uk/pdfs/SFA-Guide-to-Lining-Old-Chimneys-2026.pdf">SFA guide to lining old chimneys 2026</a> · <a href="https://assets.publishing.service.gov.uk/media/6336e58be90e0772dc9651a2/ADJ_2022.pdf">Approved Document J</a> paras 1.27, 1.39–1.40, 2.20, Table 3 · <a href="https://feta.co.uk/client/files/BFCMA/Wood_Burning_Multi_Fuel_in_Residential_Properties_06_02_23.pdf">BFCMA guide</a></p>
+    </details>
+
+    <details class="sec" id="clearances">
+      <summary><span><b>Clearances</b><span class="gist">How far combustibles must be from a chimney, a stove pipe and a twin-wall flue.</span></span><i>+</i></summary>
+      <div class="clear">
+        <div class="cl">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <rect x="40" y="10" width="100" height="110" fill="#B5654A"/><rect x="70" y="10" width="40" height="110" fill="#17191B"/>
+            <text x="90" y="70" font-size="9" fill="#A9AFB4" text-anchor="middle">flue</text>
+            <rect x="152" y="26" width="60" height="12" fill="#C9A774"/><path d="M140 32h12" stroke="#FFB21A" stroke-width="1.5"/>
+            <text x="182" y="20" font-size="10" fill="#FFB21A" text-anchor="middle">40 mm</text>
+            <path d="M110 90h80" stroke="#FFB21A" stroke-width="1.5" stroke-dasharray="3 3"/><rect x="190" y="84" width="24" height="12" fill="#C9A774"/>
+            <text x="152" y="112" font-size="10" fill="#FFB21A" text-anchor="middle">200 mm from inside</text>
+          </svg>
+          <b>Masonry chimney</b>
+          <ul><li>Combustibles at least <b class="n">200 mm</b> from the inside of the flue.</li><li><b class="n">40 mm</b> from the outside face (floorboards and skirting are excepted).</li><li>Metal fixings <b class="n">50 mm</b> from the inside of the flue.</li></ul>
+        </div>
+        <div class="cl">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <circle cx="60" cy="62" r="14" fill="#2A2F34" stroke="#EDEAE4" stroke-width="2"/><text x="60" y="66" font-size="10" fill="#EDEAE4" text-anchor="middle">D</text>
+            <circle cx="60" cy="62" r="42" fill="none" stroke="#FFB21A" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <text x="60" y="122" font-size="10" fill="#FFB21A" text-anchor="middle">3 × D clear</text>
+            <circle cx="152" cy="62" r="14" fill="#2A2F34" stroke="#EDEAE4" stroke-width="2"/>
+            <rect x="180" y="18" width="6" height="88" fill="#A9AFB4"/><rect x="194" y="18" width="18" height="88" fill="#C9A774"/>
+            <path d="M166 62h14" stroke="#FFB21A" stroke-width="1.5"/><text x="166" y="122" font-size="10" fill="#FFB21A" text-anchor="middle">1.5 × D + shield</text>
+            <text x="190" y="12" font-size="8" fill="#A9AFB4" text-anchor="middle">12 mm gap</text>
+          </svg>
+          <b>Single-wall stove pipe</b>
+          <ul><li>At least <b class="n">3 × its diameter</b> from combustibles: <b class="n">450 mm</b> for a 150 mm pipe.</li><li>Down to <b class="n">1.5 × D</b> behind a non-combustible shield that extends 1.5 × D past the pipe, with a <b class="n">12 mm</b> air gap behind it.</li><li>It only links the stove to the chimney. It mustn't pass through roof spaces, partitions, internal walls or floors (ADJ 2.14).</li></ul>
+        </div>
+        <div class="cl">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <rect x="0" y="58" width="220" height="16" fill="#C9A774"/><rect x="82" y="58" width="56" height="16" fill="#141618"/>
+            <rect x="96" y="6" width="28" height="118" fill="#C9CDD2"/><rect x="102" y="6" width="16" height="118" fill="#17191B"/>
+            <path d="M124 66h14" stroke="#FFB21A" stroke-width="1.5"/><text x="172" y="50" font-size="10" fill="#FFB21A" text-anchor="middle">G50 = 50 mm</text>
+            <rect x="76" y="54" width="68" height="4" fill="#8A9096"/><text x="40" y="92" font-size="9" fill="#A9AFB4" text-anchor="middle">joists</text>
+          </svg>
+          <b>Twin-wall flue</b>
+          <ul><li>Keep the maker's rated gap, printed in its designation: <b class="n">G50</b> means 50 mm. G50 and G60 are typical.</li><li>Through floors and ceilings, use the maker's fire-stop or support plates to hold that gap. Use fire-rated parts or casing through compartment floors (ADJ 1.46).</li><li>Box it in with a guard through cupboards, storage and roof spaces (1.45). Sleeve it through walls, and no hidden joints without access (1.43–1.44).</li></ul>
+        </div>
+      </div>
+      <p class="src">Sources: <a href="https://assets.publishing.service.gov.uk/media/6336e58be90e0772dc9651a2/ADJ_2022.pdf">Approved Document J</a> paras 1.42–1.46, 2.14–2.15, 2.18, Diagram 19 · <a href="https://www.lancaster.gov.uk/assets/attach/1352/Guide-to-installing-solid-fuel-stoves-Nov-2013.pdf">LABC stove guide</a> · <a href="https://www.stovesonline.co.uk/twin-wall-flue-boxing.html">Twin-wall boxing</a></p>
+    </details>
+
+    <details class="sec" id="clean-air">
+      <summary><span><b>The Clean Air Act</b><span class="gist">It controls smoke and fuel, not how chimneys are built. Here's what it does cover.</span></span><i>+</i></summary>
+      <div class="tl-wrap"><div class="tl">
+        <div class="ev key"><div class="yr">1952</div><div class="dot"></div><b>The Great Smog</b><p>Five days of coal smoke over London. About 4,000 extra deaths were counted at the time; later estimates go as high as 12,000.</p></div>
+        <div class="ev key"><div class="yr">1956</div><div class="dot"></div><b>Clean Air Act</b><p>Councils can declare smoke control areas, and grants help people convert their fireplaces.</p></div>
+        <div class="ev br"><div class="yr">1965</div><div class="dot"></div><b>Building Regs, not the CAA</b><p>New chimneys must be built with liners. This is the date that matters for lining.</p></div>
+        <div class="ev"><div class="yr">1968</div><div class="dot"></div><b>Clean Air Act</b><p>Dark smoke from a chimney becomes an offence.</p></div>
+        <div class="ev"><div class="yr">1993</div><div class="dot"></div><b>Clean Air Act</b><p>Replaces the 1956 and 1968 Acts. Authorised fuels and exempt appliances are listed under it.</p></div>
+        <div class="ev"><div class="yr">2021</div><div class="dot"></div><b>Wet wood rules</b><p>From May, wood sold in amounts under 2 m³ must be Ready to Burn: 20% moisture or less.</p></div>
+        <div class="ev"><div class="yr">2022</div><div class="dot"></div><b>Smoke penalties</b><p>From May, £175–£300 civil penalties for chimney smoke in a smoke control area. The old "exempt appliance" defence goes.</p></div>
+        <div class="ev"><div class="yr">2023</div><div class="dot"></div><b>House coal</b><p>From May, traditional house coal can no longer be sold in England.</p></div>
+        <div class="ev key"><div class="yr">2026</div><div class="dot"></div><b>Consultation</b><p>In January, Defra opened a UK-wide consultation on further limits. No decision yet.</p></div>
+      </div></div>
+      <div class="sca">
+        <div class="tile"><div class="n">No smoke</div><p>In a smoke control area, smoke can't come from your chimney. Councils can fine the occupier £175–£300.</p></div>
+        <div class="tile"><div class="n">Fuel or stove</div><p>Burn authorised smokeless fuel, or use a Defra-exempt appliance with the fuels it's approved for. Open fires: smokeless fuel only.</p></div>
+        <div class="tile"><div class="n">Buying it</div><p>Buying or selling unauthorised fuel for a non-exempt appliance in a smoke control area is illegal.</p></div>
+      </div>
+      <div class="callout"><b>Why it matters for lining:</b> "pre-Clean Air Act" doesn't mean a chimney is non-compliant. The Act is about what comes <i>out</i> of a chimney. How a chimney is built and tested is covered by Building Regulations Part J. Check whether a home is in a smoke control area on <a href="https://www.gov.uk/smoke-control-area-rules">GOV.UK</a> or with the council.</div>
+      <p class="src">Sources: <a href="https://www.london.gov.uk/programmes-strategies/environment-and-climate-change/environment-and-climate-change-publications/70-years-great-london-smog">GLA, 70 years since the smog</a> · <a href="https://londonmuseum.org.uk/collections/london-stories/the-great-smog-of-1952">London Museum</a> · <a href="https://www.legislation.gov.uk/ukpga/1993/11/contents">Clean Air Act 1993</a> · <a href="https://www.gov.uk/guidance/domestic-solid-fuels-rules-for-local-authorities-in-england">Domestic solid fuels rules</a> · <a href="https://www.gov.uk/government/publications/smoke-control-area-enforcement-local-authorities-in-england/smoke-control-area-enforcement-by-local-authorities-in-england">Smoke control enforcement</a> · <a href="https://www.charnwood.gov.uk/pages/solid_fuel_burning">2026 consultation</a></p>
+    </details>
+
+    <details class="sec" id="myths">
+      <summary><span><b>Myths</b><span class="gist">The things people say about liners, and what the guidance actually says.</span></span><i>+</i></summary>
+      <div class="myths">
+        <div class="myth"><s>"The regs say every stove must be lined."</s><p>They don't. There's no automatic requirement to line an existing chimney. It has to be suitable for the appliance and fuel.</p></div>
+        <div class="myth"><s>"Pre-Clean Air Act chimneys must be lined."</s><p>The Clean Air Act is about smoke. Liners for new chimneys came in with the 1965 Building Regulations. Old chimneys are judged on the tests.</p></div>
+        <div class="myth"><s>"HETAS requires a liner."</s><p>HETAS installers work to Approved Document J. The stove maker's instructions can require a liner, and those must be followed.</p></div>
+        <div class="myth"><s>"Any flexi liner will do."</s><p>Solid fuel needs a twin-skin liner (904L or 316Ti). Single-skin gas liners must never be used with a stove or open fire.</p></div>
+      </div>
+    </details>
+
+    <details class="sec" id="who">
+      <summary><span><b>Who can do what</b><span class="gist">Sweeping, testing and signing off are different jobs.</span></span><i>+</i></summary>
+      <div class="tbl"><table>
+        <thead><tr><th>Route</th><th>Sweep &amp; certify sweeping</th><th>Self-certify an install or liner</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>HETAS registered installer (competent person scheme)</td><td class="y">Yes</td><td class="y">Yes</td><td>Must be registered for that category of work</td></tr>
+          <tr><td>HETAS Approved Chimney Sweep</td><td class="y">Yes</td><td class="n">No</td><td>Needs a HETAS qualification such as H003, H005 or H009, refreshed every 5 years</td></tr>
+          <tr><td>Sweep associations: NACS, Guild, APICS, Sweep Safe</td><td class="y">Yes</td><td class="n">No</td><td>Each has its own entry rules and certificates</td></tr>
+          <tr><td>Building control</td><td>–</td><td>Approves others' work</td><td>The route when the installer isn't on a scheme. A fee applies</td></tr>
+        </tbody>
+      </table></div>
+      <p class="src">Sources: <a href="https://www.hetas.co.uk/app/uploads/2025/03/HSSS_CR-HSSS-Conditions-of-Registration-August-2025.pdf">HETAS sweep scheme conditions</a> · <a href="https://solidfuel.co.uk/pdfs/BUILDING-REGS-CONSUMER-LEAFLET-2026.pdf">SFA 2026</a></p>
+    </details>
+
+    <details class="sec" id="sources">
+      <summary><span><b>Sources</b><span class="gist">Approved Document J is the main one. Everything here links back to something you can check.</span></span><i>+</i></summary>
+      <ol class="refs">
+        <li><a href="https://www.gov.uk/government/publications/combustion-appliances-and-fuel-storage-systems-approved-document-j">Approved Document J</a><span>HM Government, 2010 edition with 2010, 2013 and 2022 amendments</span></li>
+        <li><a href="https://solidfuel.co.uk/pdfs/BUILDING-REGS-CONSUMER-LEAFLET-2026.pdf">Building Regs consumer leaflet 2026</a><span>Solid Fuel Association: no automatic requirement to line</span></li>
+        <li><a href="https://solidfuel.co.uk/pdfs/SFA-Guide-to-Lining-Old-Chimneys-2026.pdf">Guide to lining old chimneys 2026</a><span>Solid Fuel Association: lining methods</span></li>
+        <li><a href="https://solidfuel.co.uk/pdfs/GUIDE-TO-OPEN-FIRE-INSTALLATION-2026.pdf">Guide to open fire installation 2026</a><span>Solid Fuel Association</span></li>
+        <li><a href="https://www.lancaster.gov.uk/assets/attach/1352/Guide-to-installing-solid-fuel-stoves-Nov-2013.pdf">Guide to installing solid fuel stoves</a><span>LABC: pre-1965 chimneys, smoke tests, stove pipe clearances</span></li>
+        <li><a href="https://feta.co.uk/client/files/BFCMA/Wood_Burning_Multi_Fuel_in_Residential_Properties_06_02_23.pdf">Wood burning &amp; multi fuel in residential properties</a><span>BFCMA: chimney and liner types</span></li>
+        <li><a href="https://www.torfaen.gov.uk/en/Related-Documents/Building-Control/BuildingControl-Regulations/Advice-and-Guidance/Guide-to-commissioning-a-solid-fuel-appliance.pdf">Commissioning a solid fuel appliance</a><span>Building control: hearth sizes, Diagram 19 shields</span></li>
+        <li><a href="https://www.legislation.gov.uk/uksi/2022/707/contents/made">Smoke and CO Alarm (Amendment) Regs 2022</a><span>Landlord alarm duties</span></li>
+        <li><a href="https://www.cih.org/news/awaab-s-law-is-now-in-force-in-the-social-housing-sector/">Awaab's Law in force</a><span>Chartered Institute of Housing</span></li>
+        <li><a href="https://www.legislation.gov.uk/ukpga/1993/11/contents">Clean Air Act 1993</a><span>legislation.gov.uk</span></li>
+        <li><a href="https://www.gov.uk/government/publications/smoke-control-area-enforcement-local-authorities-in-england/smoke-control-area-enforcement-by-local-authorities-in-england">Smoke control area enforcement</a><span>GOV.UK, £175–£300 penalties</span></li>
+        <li><a href="https://www.gov.uk/guidance/domestic-solid-fuels-rules-for-local-authorities-in-england">Domestic solid fuels rules</a><span>GOV.UK: Ready to Burn, house coal</span></li>
+        <li><a href="https://www.london.gov.uk/programmes-strategies/environment-and-climate-change/environment-and-climate-change-publications/70-years-great-london-smog">70 years since the Great Smog</a><span>Greater London Authority</span></li>
+        <li><a href="https://www.hetas.co.uk/app/uploads/2025/03/HSSS_CR-HSSS-Conditions-of-Registration-August-2025.pdf">HETAS sweep scheme conditions</a><span>August 2025</span></li>
+      </ol>
+    </details>
+  </div>
+
+  <footer>
+    <span>Guidance for England, Nov 2026 · not legal advice · info from Electric Sweep, Weymouth</span>
+    <span><a href="/builds/chimney/">Chimney calc</a> &middot; <a href="/builds/">Builds</a> &middot; <a href="/">Home</a></span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const ADJ = '<a href="https://assets.publishing.service.gov.uk/media/6336e58be90e0772dc9651a2/ADJ_2022.pdf">Approved Document J</a>';
+  const SFA = '<a href="https://solidfuel.co.uk/pdfs/BUILDING-REGS-CONSUMER-LEAFLET-2026.pdf">SFA 2026</a>';
+  const SFAL = '<a href="https://solidfuel.co.uk/pdfs/SFA-Guide-to-Lining-Old-Chimneys-2026.pdf">SFA lining guide</a>';
+  const LABC = '<a href="https://www.lancaster.gov.uk/assets/attach/1352/Guide-to-installing-solid-fuel-stoves-Nov-2013.pdf">LABC stove guide</a>';
+  const state = { app: 'stove', job: 'install', chim: 'unlined', exempt: 'yes', tight: 'leaky', kw: 5, ow: 410, oh: 550 };
+  let sel = 'flue', touched = false;
+  const fmt = (n) => n.toLocaleString('en-GB');
+  const twin = () => state.chim === 'twin';
+  const N = (t) => `<b class="n">${t}</b>`;
+
+  // ---------- Rules (Approved Document J) ----------
+  function flue() {
+    if (state.app === 'open') {
+      if (state.ow <= 500 && state.oh <= 550) return { short: '200 mm', long: '200 mm round, or square/rectangular of the same area with the smallest side at least 175 mm (Table 2, openings up to 500 × 550 mm).' };
+      const need = Math.round(state.ow * state.oh * 0.15), dia = Math.round(2 * Math.sqrt(need / Math.PI));
+      return { short: '~' + dia + ' mm', long: fmt(need) + ' mm² (about ' + dia + ' mm round): 15% of the fireplace opening (para 2.7).' + (need > 120000 ? ' Over 120,000 mm²: ADJ says get specialist advice.' : '') };
+    }
+    if (state.kw <= 20 && state.exempt === 'yes') return { short: '125 mm', long: '125 mm round, or smallest side 100 mm (straight) or 125 mm (with bends), for stoves up to 20 kW that are smoke-exempt or burn smokeless fuel only (Table 2). Never smaller than the stove outlet.' };
+    return { short: '150 mm', long: '150 mm round, or smallest side 125 mm, for other stoves up to 30 kW (Table 2). Never smaller than the stove outlet.' };
+  }
+  function air() {
+    if (state.app === 'open') { const throat = Math.round(110 * 0.75 * state.ow); return { short: fmt(Math.round(throat / 2)) + ' mm²', long: 'Permanent vents of at least 50% of the throat opening. A typical throat is about 110 mm deep and three-quarters of the opening wide, so about ' + fmt(throat) + ' mm² of throat here.' }; }
+    const mm = state.tight === 'tight' ? 550 * state.kw : 550 * Math.max(0, state.kw - 5);
+    return { short: mm ? fmt(mm) + ' mm²' : 'None', long: mm ? 'Permanent free area of ' + fmt(mm) + ' mm²: 550 mm² per kW' + (state.tight === 'tight' ? ' of output in an air-tight home.' : ' above 5 kW in a pre-2008 home.') + ' A draught stabiliser needs more. An opening window doesn\'t count.' : 'At 5 kW or less in a pre-2008 home with no draught stabiliser, Table 1 doesn\'t call for a permanent vent. The stove maker may still ask for one.' };
+  }
+  function hearth() {
+    if (state.app === 'open') return { short: '500 mm front', long: 'Constructional hearth at least 125 mm thick, 500 mm in front of the recess and 150 mm each side. Superimposed hearth at least 300 mm in front of the fire.' };
+    if (twin()) return { short: '840 × 840', long: 'Freestanding stove: constructional hearth at least 840 × 840 mm and 125 mm thick. A 12 mm board or tiles is allowed only if the stove is tested not to heat the hearth above 100 °C. Visible hearth 225 mm in front (300 mm if used door-open), 150 mm each side.' };
+    return { short: '225 mm front', long: 'In a recess: solid non-combustible hearth at least 125 mm thick. Visible hearth at least 225 mm in front (300 mm if it can be used with the door open) and 150 mm each side.' };
+  }
+  const CHIM = { unlined: 'unlined chimney', rigid: 'clay / pumice liners', flex: 'steel flexi liner', cast: 'cast / sprayed lining', twin: 'twin-wall flue' };
+  function verdict() {
+    if (twin()) return state.job === 'none'
+      ? { v: 'Nothing to line', chip: 'Nothing to line', red: false, sub: 'The twin-wall system is the flue. Keep it swept and serviced, and check its clearances, fire-stops and roof terminal.' }
+      : { v: 'System flue', chip: 'System flue', red: false, sub: 'No chimney, so no lining question: the twin-wall system is the flue. Fit to BS EN 1856-1 (at least T400 N2 D3 G) and keep its rated gap to combustibles.' };
+    if (state.job === 'none') return { v: 'No liner needed', chip: 'No liner needed', red: false, sub: 'No work means nothing triggers lining. Keep it swept, serviced and alarmed, and act on any sign of leaks.' };
+    if (state.chim === 'flex') return { v: 'Replace liner', chip: 'Replace liner', red: true, sub: 'Fitting a new appliance? The existing steel liner should be replaced too, unless it\'s shown to be recent and in good condition (ADJ para 1.39).' };
+    const lead = { unlined: 'An unlined chimney can legally be used. ', rigid: 'Clay and pumice-lined chimneys can be reused. ', cast: 'A cast or sprayed lining can be reused. ' }[state.chim];
+    return { v: 'Test first', chip: 'Test first', red: false, sub: lead + 'Sweep, inspect, coring ball, smoke test. Pass and the right size: no new liner needed. Fail: repair or reline.' };
+  }
+
+  // ---------- Parts ----------
+  const val = (x) => typeof x === 'function' ? x() : x;
+  const PARTS = {
+    smoke: { t: 'Smoke & the Clean Air Act', say: 'What comes out of the top is the Clean Air Act\'s business. How the chimney is built isn\'t.', li: () => ['In a smoke control area, chimney smoke can bring a ' + N('£175–£300') + ' penalty.', 'Burn authorised smokeless fuel, or use a Defra-exempt stove with its approved fuels.', 'Open fires in a smoke control area: smokeless fuel only.'], dig: 'Wood sold in amounts under 2 m³ has had to be Ready to Burn (20% moisture or less) since May 2021. House coal sales ended in May 2023. The Clean Air Act section below has the full timeline.', src: '<a href="https://www.gov.uk/smoke-control-area-rules">GOV.UK smoke control rules</a>' },
+    outlet: { t: () => twin() ? 'Terminal height' : 'Chimney outlet height', say: 'The outlet has to clear the roof so smoke escapes cleanly. The same rules apply to a pot and a twin-wall cap.', li: () => ['Within 600 mm of the ridge: at least ' + N('600 mm') + ' above it.', 'Elsewhere: ' + N('1 m') + ' above where it meets the roof, or as high as the ridge, with ' + N('2.3 m') + ' clear around it.', 'Within 2.3 m of an opening window or rooflight: ' + N('1 m') + ' above the top of it.'], dig: () => 'Within 2.3 m of a neighbouring building: at least 600 mm above it. Thatch and shingle roofs need more clearance (Diagram 18).' + (twin() ? ' Twin-wall above the roof usually needs bracing beyond the maker\'s unsupported height.' : ' Existing stacks rarely change when a flue is reused, but check if the roof has been altered.'), src: ADJ + ' Diagram 17, paras 2.10–2.12' },
+    flue: {
+      t: () => ({ unlined: 'The flue: unlined', rigid: 'The flue: clay / pumice liners', flex: 'The flue: steel flexi liner', cast: 'The flue: cast or sprayed lining', twin: 'Twin-wall system chimney' })[state.chim],
+      say: () => twin() ? 'With no chimney, an insulated twin-wall system is the whole flue: up through the ceiling and out of the roof.' : 'This is the bit the whole question is about. The test result decides, not the age of the house.',
+      li: () => {
+        if (twin()) return ['Factory-made to BS EN 1856-1, at least ' + N('T400 N2 D3 G') + ' for solid fuel (ADJ Table 3).', 'Its designation ends in a ' + N('G') + ' number: the gap to combustibles in mm. G50 means 50 mm.', 'Installed to the maker\'s instructions and BS EN 15287-1. Joints accessible, never hidden in a floor.'];
+        const v = verdict(), out = [v.sub];
+        if (state.chim === 'unlined') out.push('Most pre-1965 chimneys were built without liners. That alone doesn\'t make them non-compliant.');
+        if (state.chim === 'rigid') out.push('Checked the same way: sockets facing up, joints sound, smoke test passed. Clay to BS EN 1457, pumice and concrete to BS EN 1857.');
+        if (state.chim === 'flex') out.push('A new liner for solid fuel must be twin-skin, ' + N('904L or 316Ti') + ' grade, to BS EN 1856-2, never a single-skin gas liner.');
+        if (state.chim === 'cast') out.push('Pumped concrete, spray-on and ceramic linings are put in by specialists. Pumped concrete has no British Standard, so ask for the installer\'s certificate and guarantee.');
+        out.push('The stove maker\'s instructions may require a liner. If they do, fit one.');
+        return out;
+      },
+      dig: () => twin() ? 'Where the chimney runs through a cupboard, storage space or roof space it needs a guard to keep things away (para 1.45). Through a compartment floor, it needs fire-rated components or a casing (para 1.46). Through a wall, a sleeve (para 1.43). The Clearances section below has a drawing.' : 'ADJ para 1.36: when a flue is brought back into use or reused with a different appliance, "the flue and the chimney should be checked and, if necessary, altered". Para 1.38: a flue may need lining to reduce its area, because an oversized flue can be unsafe. Relining is building work in its own right (para 1.35). For every lining method, see Types of liner below.',
+      src: () => ADJ + ' paras 1.35–1.46, Appendix E3 · ' + (twin() ? '<a href="https://www.stovesonline.co.uk/twin-wall-flue-boxing.html">Twin-wall boxing</a>' : SFA + ' · ' + SFAL)
+    },
+    walls: {
+      t: () => twin() ? 'Through the ceiling' : 'Chimney walls',
+      say: () => twin() ? 'Where the flue passes through timber, the gap is set by the flue, not by guesswork.' : 'Keep anything that can burn away from the hot parts.',
+      li: () => twin() ? ['Keep the flue\'s rated gap (often ' + N('50 mm') + ') from joists and boards.', 'Use the maker\'s fire-stop or support plate at each floor or ceiling. Many are ventilated to keep the gap cool.', 'In a roof space or cupboard, box it in with a guard so nothing gets stored against it.'] : ['Combustible material at least ' + N('200 mm') + ' from the inside of a flue or fireplace recess.', 'At least ' + N('40 mm') + ' from the outside of a masonry chimney (floorboards, skirting and mantel-shelves are excepted).', 'Metal fixings at least ' + N('50 mm') + ' from the inside of a flue.'],
+      dig: () => twin() ? 'The G number is tested by the maker and printed on the flue\'s label and data plate. There\'s no set gap from non-combustible materials.' : 'Old chimneys sometimes have joists or timbers built into the breast. The visual inspection and smoke test are where those get found.',
+      src: () => ADJ + (twin() ? ' paras 1.43–1.46 · <a href="https://www.stovesonline.co.uk/twin-wall-flue-boxing.html">Twin-wall boxing</a>' : ' paras 2.17–2.18')
+    },
+    age: { t: 'The age of the house', say: '1965 is the date that matters, and it\'s about new chimneys.', li: () => ['Before 1965, chimneys weren\'t required to be lined.', 'From the 1965 Building Regulations, new chimneys had to be built with liners.', 'Nothing requires older chimneys to be lined because of their age. They\'re judged on the checks.'], dig: 'The Clean Air Act (1956) is often mixed up with this. It controls smoke and fuel in smoke control areas, not chimney construction. Pre-1965 flues were usually parged with lime mortar, which acids and tar wear away over time. That\'s why the smoke test matters.', src: LABC + ' · ' + SFAL },
+    connect: {
+      t: () => twin() ? 'Stove pipe to twin-wall' : 'Stove pipe & register plate',
+      say: 'The short pipe from the stove to the flue. Single-wall pipe gets very hot, so it needs room.',
+      li: () => ['Single-wall pipe: at least ' + N('3 × its diameter') + ' from combustibles, or ' + N('1.5 ×') + ' behind a non-combustible shield with a 12 mm air gap.', 'Bends no more than ' + N('45°') + ' from vertical. A rear outlet\'s horizontal run is ' + N('150 mm') + ' at most.', twin() ? 'It only links the stove to the twin-wall, in the same room. It mustn\'t pass through a ceiling, wall or floor (ADJ 2.14).' : 'There must be a way to sweep the whole flue, through the stove or a soot door in the register plate.'],
+      dig: 'No more than four changes of direction, and no more than two between sweeping points. A 90° bend counts as two. Concealed flues need 300 × 300 mm inspection hatches.',
+      src: ADJ + ' paras 1.47–1.51, 2.14–2.15, Diagram 19 · ' + LABC
+    },
+    appliance: { t: () => state.app === 'open' ? 'The open fire' : 'The stove', say: () => state.app === 'open' ? 'Open fires need a big flue and plenty of air.' : 'Install exactly to the maker\'s instructions. Where they ask for more than the regs, they win.', li: () => state.app === 'open' ? ['Throat about ' + N('110 mm') + ' front to back, three-quarters of the opening wide.', 'Spillage test with doors and windows shut and fans running at commissioning.', 'Ecodesign rules don\'t apply to open fires.'] : ['New stoves sold must meet Ecodesign limits. Existing ones can stay.', 'Spillage test under fire at commissioning (para 1.55).', 'Swapping an open fire for a stove? Sweep again about a month later to clear soot falls.'], dig: () => 'Flue for this setup: ' + flue().long, src: ADJ + ' · <a href="https://solidfuel.co.uk/pdfs/GUIDE-TO-OPEN-FIRE-INSTALLATION-2026.pdf">SFA open fire guide</a>' },
+    hearth: { t: 'Hearth', say: () => hearth().long, li: () => ['Combustibles beside a hearth: at least ' + N('150 mm') + ' from the appliance.', 'Under a constructional hearth, combustibles need a ' + N('50 mm') + ' air gap, or must be ' + N('250 mm') + ' below the top.'], dig: 'The visible hearth edge should be marked with a change of level, so people know where to keep things clear.', src: ADJ + ' paras 2.22–2.30 · <a href="https://www.torfaen.gov.uk/en/Related-Documents/Building-Control/BuildingControl-Regulations/Advice-and-Guidance/Guide-to-commissioning-a-solid-fuel-appliance.pdf">Commissioning guide</a>' },
+    air: { t: 'Air vent', say: () => air().long, li: () => ['Permanent vents only: trickle vents and windows don\'t count.', 'Air-tight homes (below 5.0 m³/h·m²) need air for every kW, not just above 5.'], dig: 'With a draught stabiliser: 300 mm² per kW for the first 5 kW, then 850 mm² per kW above that (pre-2008 homes). The maker\'s figure wins if it\'s bigger.', src: ADJ + ' para 2.2, Table 1' },
+    co: { t: 'CO alarm', say: 'Required in the room. For landlords, in every room with a fixed combustion appliance, old or new.', li: () => ['Ceiling: at least ' + N('300 mm') + ' from any wall. Wall: high up, but not within 150 mm of the ceiling.', 'Between ' + N('1 m and 3 m') + ' from the appliance, to BS EN 50291-1.', 'Social landlords have been covered since 1 October 2022, and must repair or replace a faulty alarm once told.'], dig: 'Under Awaab\'s Law (since 27 October 2025), social landlords must investigate and make safe emergency hazards, such as a suspected CO leak, within 24 hours.', src: ADJ + ' paras 2.34–2.36 · <a href="https://www.legislation.gov.uk/uksi/2022/707/contents/made">Alarm Regs 2022</a> · <a href="https://www.cih.org/news/awaab-s-law-is-now-in-force-in-the-social-housing-sector/">CIH</a>' },
+    plate: { t: 'Notice plate & paperwork', say: 'The evidence that the flue was proven safe.', li: () => ['A notice plate shows the flue type and size, suitable appliances and the install date.', 'Keep the compliance certificate, plus smoke test and sweep records.', 'Installs: a registered installer self-certifies, or building control approves.'], dig: 'For a housing association, a property file with the sweep certificate, CCTV, smoke test result, flue size and certificate is the case for using a chimney unlined.', src: ADJ + ' paras 1.57–1.59 · ' + SFA }
+  };
+
+  // Anchor points (x, y, z) per part, and which margin its number sits in
+  const ANCH = {
+    masonry: { smoke: [5.05, 0.6, 14.9, 'L'], flue: [5.0, 1.45, 4.6, 'L'], plate: [1.8, 0, 3.1, 'L'], connect: [5.0, 1.2, 2.1, 'L'], appliance: [4.75, 1.95, 0.9, 'L'], air: [0, 6.2, 0.8, 'L'],
+               outlet: [5.95, 1.2, 12.2, 'R'], walls: [6.6, 0.6, 5.3, 'R'], co: [8.55, 0, 5.2, 'R'], age: [6.6, 0.8, 3.1, 'R'], hearth: [6.2, 3.1, 0.18, 'R'] },
+    twin: { smoke: [5.05, 2.2, 13.9, 'L'], flue: [5.0, 2.45, 4.3, 'L'], plate: [1.8, 0, 3.1, 'L'], connect: [5.0, 2.4, 1.95, 'L'], appliance: [4.7, 2.85, 0.9, 'L'], air: [0, 6.2, 0.8, 'L'],
+            outlet: [5.2, 2.2, 12.4, 'R'], walls: [5.55, 2.2, 6.4, 'R'], co: [8.55, 0, 5.2, 'R'], hearth: [6.4, 3.8, 0.12, 'R'] }
+  };
+
+  // ---------- Isometric drawing ----------
+  const S = 22, C = Math.cos(Math.PI / 6);
+  const P = (x, y, z) => [(x - y) * C * S, (x + y) * 0.5 * S - z * S];
+  const f1 = (v) => v.toFixed(1);
+  const pts = (arr) => arr.map(p => { const q = P(...p); return f1(q[0]) + ',' + f1(q[1]); }).join(' ');
+  const poly = (arr, fill, extra = '') => `<polygon class="sf" points="${pts(arr)}" fill="${fill}" stroke="#111315" stroke-width="0.7" stroke-linejoin="round" ${extra}/>`;
+  const line = (a, b, stroke, w = 0.6, extra = '') => { const p = P(...a), q = P(...b); return `<line x1="${f1(p[0])}" y1="${f1(p[1])}" x2="${f1(q[0])}" y2="${f1(q[1])}" stroke="${stroke}" stroke-width="${w}" ${extra}/>`; };
+  function shade(hex, f) { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(Math.min(255, v * f))); return '#' + ((1 << 24) + (c[0] << 16) + (c[1] << 8) + c[2]).toString(16).slice(1); }
+  function box(x0, x1, y0, y1, z0, z1, c, o = {}) {
+    let s = '';
+    if (o.right !== false) s += poly([[x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [x1, y0, z0]], o.rightc || shade(c, 0.72));
+    if (o.left !== false) s += poly([[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], o.leftc || shade(c, 0.88));
+    if (o.top !== false) s += poly([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], o.topc || shade(c, 1.08));
+    return s;
+  }
+  // a face on the plane y = Y (seen from the front-left) with rectangular holes cut in it
+  function faceY(Y, x0, x1, z0, z1, holes, fill) {
+    const r = (a, b, c, d) => { const p = [[a, Y, d], [b, Y, d], [b, Y, c], [a, Y, c]].map(q => P(...q)); return 'M' + p.map(q => f1(q[0]) + ',' + f1(q[1])).join('L') + 'Z'; };
+    return `<path class="sf" d="${r(x0, x1, z0, z1)}${holes.map(h => r(...h)).join('')}" fill="${fill}" fill-rule="evenodd" stroke="#111315" stroke-width="0.7"/>`;
+  }
+  // brick courses on a y-face, skipping holes
+  function coursesY(Y, x0, x1, z0, z1, holes, stroke) {
+    let s = '';
+    for (let z = z0 + 0.3; z < z1 - 0.05; z += 0.3) {
+      let segs = [[x0, x1]];
+      holes.forEach(([a, b, c, d]) => { if (z > c && z < d) segs = segs.flatMap(([u, v]) => { const out = []; if (a > u) out.push([u, Math.min(a, v)]); if (b < v) out.push([Math.max(b, u), v]); return out; }); });
+      segs.forEach(([u, v]) => { if (v - u > 0.05) s += line([u, Y + 0.005, z], [v, Y + 0.005, z], stroke, 0.5, 'opacity="0.75"'); });
+    }
+    return s;
+  }
+  function coursesX(X, y0, y1, z0, z1, stroke) { let s = ''; for (let z = z0 + 0.3; z < z1 - 0.05; z += 0.3) s += line([X + 0.005, y0, z], [X + 0.005, y1, z], stroke, 0.5, 'opacity="0.75"'); return s; }
+  // vertical cylinder (pipes)
+  function cyl(cx, cy, z0, z1, r, fill, cap) {
+    const [sx, yt] = P(cx, cy, z1), yb = P(cx, cy, z0)[1], rx = 1.2247 * r * S, ry = 0.7071 * r * S;
+    return `<path class="sf" d="M${f1(sx - rx)},${f1(yt)}L${f1(sx - rx)},${f1(yb)}A${f1(rx)},${f1(ry)} 0 0 0 ${f1(sx + rx)},${f1(yb)}L${f1(sx + rx)},${f1(yt)}Z" fill="${fill}" stroke="#111315" stroke-width="0.7"/>` +
+      `<ellipse class="sf" cx="${f1(sx)}" cy="${f1(yt)}" rx="${f1(rx)}" ry="${f1(ry)}" fill="${cap || '#D3D7DB'}" stroke="#111315" stroke-width="0.7"/>`;
+  }
+  const ring = (cx, cy, z, r, stroke, extra = '') => { const [sx, sy] = P(cx, cy, z); return `<ellipse cx="${f1(sx)}" cy="${f1(sy)}" rx="${f1(1.2247 * r * S)}" ry="${f1(0.7071 * r * S)}" fill="none" stroke="${stroke}" ${extra}/>`; };
+  const G = (part, inner) => `<g class="pg${sel === part ? ' lit' : ''}" data-part="${part}">${inner}</g>`;
+
+  const COL = { plaster: '#E6DDCC', floor: '#C9A774', brick: '#B5654A', brickDk: '#8E4A36', slate: '#56606A', stone: '#9C978F', iron: '#3B4148', pot: '#C4693E', soot: '#141618', steel: '#C9CDD2', clay: '#D9A37A' };
+
+  function room() {
+    let s = '';
+    s += box(-0.4, 10, -0.4, 8, -0.5, 0, COL.floor, { topc: '#D6B786' });
+    for (let y = 1; y < 8; y++) s += line([0, y, 0], [10, y, 0], '#A88A5C', 0.6);
+    s += box(-0.4, 10, -0.4, 0, 0, 6, COL.plaster);
+    s += box(-0.4, 0, 0, 8, 0, 6, COL.plaster);
+    s += poly([[0, 0.001, 0.3], [10, 0.001, 0.3], [10, 0.001, 0], [0, 0.001, 0]], '#CFC4AF');
+    s += poly([[0.001, 0, 0.3], [0.001, 8, 0.3], [0.001, 8, 0], [0.001, 0, 0]], '#BDB29E');
+    s += G('plate', poly([[1.2, 0.01, 3.5], [2.4, 0.01, 3.5], [2.4, 0.01, 2.8], [1.2, 0.01, 2.8]], '#F5F2EA') + [3.3, 3.1, 2.95].map((z, i) => line([1.35, 0.02, z], [i === 2 ? 1.9 : 2.25, 0.02, z], '#5A6168', 1)).join(''));
+    s += G('co', poly([[8.2, 0.01, 5.45], [8.9, 0.01, 5.45], [8.9, 0.01, 5.0], [8.2, 0.01, 5.0]], '#F5F2EA') + `<circle cx="${f1(P(8.75, 0.02, 5.25)[0])}" cy="${f1(P(8.75, 0.02, 5.25)[1])}" r="1.8" fill="#3BB273"/>`);
+    let v = poly([[0.01, 5.7, 1.1], [0.01, 6.7, 1.1], [0.01, 6.7, 0.5], [0.01, 5.7, 0.5]], '#D4CBB8');
+    for (let i = 0; i < 4; i++) { const z = 0.62 + i * 0.13; v += line([0.02, 5.8, z], [0.02, 6.6, z], '#5A6168', 1); }
+    s += G('air', v);
+    return s;
+  }
+  function roofSlice(y1) {
+    const rz = (y) => 10.3 - (y + 0.6) * 0.55;
+    let s = poly([[2.8, y1, rz(y1)], [7.2, y1, rz(y1)], [7.2, -0.6, rz(-0.6)], [2.8, -0.6, rz(-0.6)]], COL.slate);
+    s += poly([[2.8, y1, rz(y1)], [7.2, y1, rz(y1)], [7.2, y1, rz(y1) - 0.3], [2.8, y1, rz(y1) - 0.3]], shade(COL.slate, 0.7));
+    s += poly([[7.2, -0.6, rz(-0.6)], [7.2, y1, rz(y1)], [7.2, y1, rz(y1) - 0.3], [7.2, -0.6, rz(-0.6) - 0.3]], shade(COL.slate, 0.6));
+    for (let y = y1 - 0.6; y > -0.6; y -= 0.6) s += line([2.8, y, rz(y)], [7.2, y, rz(y)], '#454D55', 0.7);
+    return s;
+  }
+  const puffs = (x, y, z) => [[0, 0, 0, 7, 0.55], [0.3, -0.2, 0.8, 10, 0.4], [0.9, -0.6, 1.7, 13, 0.28]].map(([dx, dy, dz, r, o]) => { const [cx, cy] = P(x + dx, y + dy, z + dz); return `<circle class="puff sf" cx="${f1(cx)}" cy="${f1(cy)}" r="${r}" fill="#C9CED3" opacity="${o}" stroke="none"/>`; }).join('');
+
+  // what's inside the cut window, on plane y = Y
+  function linerIn(Y, z0, z1) {
+    const ch = state.chim; let s = '';
+    const flat = (a, b, fill, dy = 0) => `<polygon points="${pts([[a, Y + dy, z1], [b, Y + dy, z1], [b, Y + dy, z0], [a, Y + dy, z0]])}" fill="${fill}"/>`;
+    if (ch === 'flex') { s += flat(4.78, 5.22, COL.steel); for (let z = z0 + 0.12; z < z1; z += 0.2) s += line([4.78, Y + 0.01, z], [5.22, Y + 0.01, z], '#8A9096', 0.8); }
+    else if (ch === 'rigid') { s += flat(4.65, 5.35, COL.clay) + flat(4.78, 5.22, '#2A1E18', 0.01); for (let z = z0 + 0.6; z < z1; z += 0.6) s += line([4.65, Y + 0.02, z], [5.35, Y + 0.02, z], '#8E5A3A', 1.2); }
+    else if (ch === 'cast') { s += flat(4.6, 5.4, '#8E8A84') + flat(4.76, 5.24, '#2B2B2B', 0.01); }
+    else { for (let z = z0 + 0.3; z < z1; z += 0.3) s += line([4.6, Y + 0.01, z], [5.4, Y + 0.01, z], '#4A3226', 0.7); }
+    return s;
+  }
+
+  // an open box cut into a wall face: back, left side and floor, seen through a hole in the plane y = yF
+  function cavity(x0, x1, z0, z1, yB, yF) {
+    return poly([[x0, yB, z1], [x1, yB, z1], [x1, yB, z0], [x0, yB, z0]], COL.soot) +
+      poly([[x0, yB, z1], [x0, yF, z1], [x0, yF, z0], [x0, yB, z0]], '#2C221D') +
+      poly([[x0, yB, z0], [x1, yB, z0], [x1, yF, z0], [x0, yF, z0]], '#3A2E28');
+  }
+  function masonryScene() {
+    const open = state.app === 'open';
+    const B = { x0: 3.4, x1: 6.6, y1: 1.4, z1: 6 };                  // chimney breast
+    const OP = [3.95, 6.05, 0, 2.4], WIN = [4.45, 5.55, 2.9, 5.85];  // fireplace opening, cut-away window
+    let s = room();
+    // breast side + top, recess interior and window interior, then the front face with holes over them
+    const side = poly([[B.x1, 0, B.z1], [B.x1, B.y1, B.z1], [B.x1, B.y1, 0], [B.x1, 0, 0]], shade(COL.brick, 0.72)) + coursesX(B.x1, 0, B.y1, 0, B.z1, '#6E3828') +
+      poly([[B.x0, 0, B.z1], [B.x1, 0, B.z1], [B.x1, B.y1, B.z1], [B.x0, B.y1, B.z1]], '#7A6A60');
+    let inside = poly([[OP[0], 0.45, OP[3]], [OP[1], 0.45, OP[3]], [OP[1], 0.45, 0], [OP[0], 0.45, 0]], '#2A2320');
+    inside += poly([[OP[0], 0.45, OP[3]], [OP[0], B.y1, OP[3]], [OP[0], B.y1, 0], [OP[0], 0.45, 0]], '#3A2E28');
+    for (let z = 0.3; z < OP[3]; z += 0.3) inside += line([OP[0], 0.46, z], [OP[1], 0.46, z], '#1C1714', 0.5);
+    const win = cavity(WIN[0], WIN[1], WIN[2], WIN[3], 1.0, B.y1) + linerIn(1.12, WIN[2], WIN[3]);
+    s += G('walls', side) + inside + G('flue', win);
+    s += G('walls', faceY(B.y1, B.x0, B.x1, 0, B.z1, [OP, WIN], shade(COL.brick, 0.9)) + coursesY(B.y1, B.x0, B.x1, 0, B.z1, [OP, WIN], COL.brickDk));
+    // dashed cut edge round the window, and the lintel
+    s += G('flue', `<polygon points="${pts([[WIN[0], B.y1, WIN[2]], [WIN[0], B.y1, WIN[3]], [WIN[1], B.y1, WIN[3]], [WIN[1], B.y1, WIN[2]]])}" fill="none" stroke="#FFE2B8" stroke-width="1" stroke-dasharray="3 2" opacity="0.85"/>`);
+    s += poly([[OP[0] - 0.1, B.y1 + 0.01, OP[3] + 0.25], [OP[1] + 0.1, B.y1 + 0.01, OP[3] + 0.25], [OP[1] + 0.1, B.y1 + 0.01, OP[3]], [OP[0] - 0.1, B.y1 + 0.01, OP[3]]], '#6B625B');
+    // date stone on the side of the breast
+    s += G('age', poly([[B.x1 + 0.01, 0.35, 3.45], [B.x1 + 0.01, 1.15, 3.45], [B.x1 + 0.01, 1.15, 2.8], [B.x1 + 0.01, 0.35, 2.8]], '#D8CFBF') +
+      (() => { const [ox, oy] = P(B.x1 + 0.02, 0.42, 2.95); return `<text transform="matrix(${-C},0.5,0,1,${f1(ox)},${f1(oy)})" font-size="6.5" fill="#5A4436" font-family="IBM Plex Mono, monospace" font-weight="600">c.1930</text>`; })());
+    // hearth: in front, and into the recess
+    s += G('hearth', box(3.3, 6.7, 1.4, 3.5, 0, 0.18, COL.stone, { topc: '#B3AEA6' }) + poly([[OP[0], 0.45, 0.01], [OP[1], 0.45, 0.01], [OP[1], B.y1, 0.01], [OP[0], B.y1, 0.01]], '#8C8780'));
+    // appliance sits in the recess
+    if (open) {
+      s += G('appliance', box(4.45, 5.55, 0.7, 1.3, 0.0, 0.4, COL.iron) +
+        `<path class="sf" d="M${pts([[4.6, 1.3, 0.4]])} Q${pts([[4.8, 1.3, 1.4]])} ${pts([[5.0, 1.3, 1.8]])} Q${pts([[5.15, 1.3, 1.2]])} ${pts([[5.4, 1.3, 0.4]])} Z" fill="#FF8A3D" stroke="none"/>` +
+        `<path d="M${pts([[4.8, 1.31, 0.4]])} Q${pts([[4.95, 1.31, 1.0]])} ${pts([[5.05, 1.31, 1.25]])} Q${pts([[5.15, 1.31, 0.8]])} ${pts([[5.25, 1.31, 0.4]])} Z" fill="#FFD166"/>`);
+    } else {
+      s += G('connect', box(4.86, 5.14, 1.06, 1.34, 1.45, 2.38, COL.iron));
+      s += G('appliance', box(4.45, 5.55, 0.85, 1.95, 0.0, 1.45, COL.iron, { topc: '#4A5158' }) +
+        poly([[4.6, 1.96, 1.2], [5.4, 1.96, 1.2], [5.4, 1.96, 0.35], [4.6, 1.96, 0.35]], '#2A1A10') +
+        poly([[4.67, 1.97, 1.0], [5.33, 1.97, 1.0], [5.33, 1.97, 0.4], [4.67, 1.97, 0.4]], '#FF8A3D', 'opacity="0.92"') +
+        poly([[4.8, 1.98, 0.7], [5.2, 1.98, 0.7], [5.2, 1.98, 0.4], [4.8, 1.98, 0.4]], '#FFD166', 'opacity="0.9"'));
+    }
+    // stack: through the loft (cut open), then the roof, then above the roof with the pot
+    const SH = [[4.45, 5.55, 6, 9.4]], SH2 = [[4.45, 5.55, 9.6, 12.15]];
+    s += G('walls', poly([[6.0, 0.1, 9.4], [6.0, 1.2, 9.4], [6.0, 1.2, 6], [6.0, 0.1, 6]], shade(COL.brick, 0.72)) + coursesX(6.0, 0.1, 1.2, 6, 9.4, '#6E3828'));
+    s += G('flue', cavity(4.45, 5.55, 6, 9.4, 0.85, 1.2) + linerIn(0.95, 6, 9.4));
+    s += G('walls', faceY(1.2, 4.0, 6.0, 6, 9.4, SH, shade(COL.brick, 0.9)) + coursesY(1.2, 4.0, 6.0, 6, 9.4, SH, COL.brickDk));
+    s += roofSlice(2.6);
+    s += G('outlet', poly([[6.0, 0.1, 12.4], [6.0, 1.2, 12.4], [6.0, 1.2, 9.4], [6.0, 0.1, 9.4]], shade(COL.brick, 0.72)) + coursesX(6.0, 0.1, 1.2, 9.4, 12.4, '#6E3828'));
+    s += G('flue', cavity(4.45, 5.55, 9.6, 12.15, 0.85, 1.2) + linerIn(0.95, 9.6, 12.15));
+    s += G('outlet', faceY(1.2, 4.0, 6.0, 9.4, 12.4, SH2, shade(COL.brick, 0.9)) + coursesY(1.2, 4.0, 6.0, 9.4, 12.4, SH2, COL.brickDk) +
+      box(3.85, 6.15, -0.05, 1.35, 12.4, 12.65, '#8E8A84') + box(4.65, 5.35, 0.3, 1.0, 12.65, 13.7, COL.pot) + poly([[4.8, 0.45, 13.7], [5.2, 0.45, 13.7], [5.2, 0.85, 13.7], [4.8, 0.85, 13.7]], '#1A1210'));
+    s += G('smoke', puffs(5.05, 0.6, 14.4));
+    return s;
+  }
+
+  function twinScene() {
+    const PX = 5.0, PY = 2.2;
+    let s = room();
+    s += G('hearth', box(3.5, 6.5, 0.9, 4.0, 0, 0.15, COL.stone, { topc: '#B3AEA6' }));
+    s += G('appliance', box(4.45, 5.55, 1.6, 2.8, 0.15, 1.5, COL.iron, { topc: '#4A5158' }) +
+      poly([[4.6, 2.81, 1.25], [5.4, 2.81, 1.25], [5.4, 2.81, 0.4], [4.6, 2.81, 0.4]], '#2A1A10') +
+      poly([[4.67, 2.82, 1.05], [5.33, 2.82, 1.05], [5.33, 2.82, 0.45], [4.67, 2.82, 0.45]], '#FF8A3D', 'opacity="0.92"'));
+    s += G('connect', cyl(PX, PY, 1.5, 2.7, 0.17, '#2E3338', '#454B52'));
+    s += G('flue', cyl(PX, PY, 2.7, 6.0, 0.27, 'url(#steelG)'));
+    // ceiling slice with fire-stop plate and the rated gap marked
+    s += G('walls', box(3.0, 7.0, 0, 4.2, 6.0, 6.45, '#D8CFBF', { topc: '#C9BFAD' }) +
+      poly([[PX - 0.65, PY - 0.65, 6.46], [PX + 0.65, PY - 0.65, 6.46], [PX + 0.65, PY + 0.65, 6.46], [PX - 0.65, PY + 0.65, 6.46]], '#9EA4AA') +
+      ring(PX, PY, 6.47, 0.48, '#FFB21A', 'stroke-width="1.4" stroke-dasharray="3 2"'));
+    s += G('flue', cyl(PX, PY, 6.45, 8.8, 0.27, 'url(#steelG)'));
+    s += roofSlice(3.4);
+    s += G('outlet', ring(PX, PY, 8.95, 0.42, '#111315', 'stroke-width="0.6" fill="#7E858C"') + cyl(PX, PY, 8.8, 12.0, 0.27, 'url(#steelG)') +
+      cyl(PX, PY, 12.0, 12.15, 0.29, '#9EA4AA') + `<polygon class="sf" points="${pts([[PX - 0.5, PY, 12.55], [PX, PY - 0.5, 12.8], [PX + 0.5, PY, 12.55], [PX, PY + 0.5, 12.3]])}" fill="#7E858C" stroke="#111315" stroke-width="0.7"/>` +
+      line([PX - 0.25, PY + 0.25, 12.15], [PX - 0.25, PY + 0.25, 12.4], '#5A6168', 1.2) + line([PX + 0.25, PY - 0.25, 12.15], [PX + 0.25, PY - 0.25, 12.6], '#5A6168', 1.2));
+    s += G('smoke', puffs(5.05, 2.2, 13.3));
+    return s;
+  }
+
+  // ---------- Draw + numbered margins ----------
+  const svg = $('scene');
+  const DEFS = '<defs><linearGradient id="steelG" x1="0" x2="1"><stop offset="0" stop-color="#8F969D"/><stop offset="0.35" stop-color="#E4E7EA"/><stop offset="1" stop-color="#7A8188"/></linearGradient></defs>';
+  let order = [];
+  const bbCache = {};
+  function draw() {
+    const mode = twin() ? 'twin' : 'masonry';
+    svg.innerHTML = DEFS + `<g id="art">${mode === 'twin' ? twinScene() : masonryScene()}</g><g id="ann"></g>`;
+    const key = mode + state.app;
+    if (!bbCache[key]) { const b = $('art').getBBox(); bbCache[key] = { x: b.x, y: b.y, w: b.width, h: b.height }; }
+    const bb = bbCache[key];
+    // numbers stay about 13 px on screen whatever the drawing's scale
+    const box0 = svg.parentElement.getBoundingClientRect();
+    const maxH = matchMedia('(max-width: 860px)').matches ? window.innerHeight * 0.44 : window.innerHeight - 130;
+    let r = 11, gut = 0, vb;
+    for (let i = 0; i < 3; i++) {
+      gut = r * 2 + 14;
+      vb = [bb.x - gut - 6, bb.y - 8, bb.w + 2 * gut + 12, bb.h + 16];
+      const w = Math.max(200, box0.width - 16), sc = Math.min(w / vb[2], maxH / vb[3]);
+      r = Math.max(9, Math.min(15, 12.5 / sc));
+    }
+    svg.setAttribute('viewBox', vb.map(f1).join(' '));
+    const A = ANCH[mode];
+    const items = Object.keys(A).map(k => { const [x, y, z, side] = A[k]; const [ax, ay] = P(x, y, z); return { k, ax, ay, side }; });
+    const L = items.filter(i => i.side === 'L').sort((a, b) => a.ay - b.ay), R = items.filter(i => i.side === 'R').sort((a, b) => a.ay - b.ay);
+    order = L.concat(R).map(i => i.k);
+    const gap = r * 2 + 6, top = bb.y + r, bot = bb.y + bb.h - r;
+    [L, R].forEach(col => {
+      col.forEach((it, i) => { it.y = Math.max(it.ay, i ? col[i - 1].y + gap : top); });
+      for (let i = col.length - 1; i >= 0; i--) { const lim = i === col.length - 1 ? bot : col[i + 1].y - gap; if (col[i].y > lim) col[i].y = lim; }
+    });
+    let ann = '';
+    const lx = bb.x - gut / 2 - 2, rx = bb.x + bb.w + gut / 2 + 2;
+    [L, R].forEach((col, ci) => col.forEach(it => {
+      const n = order.indexOf(it.k) + 1, on = it.k === sel, cx = ci ? rx : lx, ex = ci ? cx - r : cx + r;
+      const knee = ci ? Math.min(ex - 6, it.ax + 12) : Math.max(ex + 6, it.ax - 12);
+      ann += `<path class="lead${on ? ' on' : ''}" d="M${f1(ex)},${f1(it.y)} L${f1(knee)},${f1(it.y)} L${f1(it.ax)},${f1(it.ay)}"/>`;
+      ann += `<circle class="pin${on ? ' on' : ''}" cx="${f1(it.ax)}" cy="${f1(it.ay)}" r="${f1(Math.max(2.6, r * 0.28))}"/>`;
+      ann += `<g class="lab${on ? ' on' : ''}${!touched && it.k === 'flue' ? ' hint' : ''}" data-part="${it.k}" tabindex="0" role="button" aria-label="${n}. ${val(PARTS[it.k].t)}"><circle class="ring" cx="${f1(cx)}" cy="${f1(it.y)}" r="${f1(r)}"/><text x="${f1(cx)}" y="${f1(it.y + r * 0.36)}" text-anchor="middle" style="font-size:${f1(r)}px">${n}</text></g>`;
+    }));
+    $('ann').innerHTML = ann;
+  }
+
+  function renderPart() {
+    if (!order.includes(sel)) sel = 'flue';
+    const p = PARTS[sel], n = order.indexOf(sel) + 1;
+    $('part').innerHTML = `<div class="tag"><span>Part ${n} of ${order.length}</span><span><button data-step="-1" aria-label="Previous part">&larr;</button> <button data-step="1" aria-label="Next part">&rarr;</button></span></div><h3>${val(p.t)}</h3><p class="say">${val(p.say)}</p><ul>${val(p.li).map(x => `<li>${x}</li>`).join('')}</ul>` +
+      `<details class="dig"><summary>Dig deeper</summary><p style="margin:0;font-size:.92rem">${val(p.dig)}</p></details><p class="src">Source: ${val(p.src)}</p>`;
+  }
+
+  function render() {
+    // a twin-wall flue serves a stove, not an open fire
+    if (twin() && state.app === 'open') state.app = 'stove';
+    document.querySelector('[data-key="app"] [data-v="open"]').disabled = twin();
+    document.querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(state[seg.dataset.key] === b.dataset.v))));
+    document.querySelectorAll('[data-for]').forEach(el => { el.hidden = el.dataset.for !== state.app; });
+    $('kwOut').textContent = state.kw + ' kW'; $('owOut').textContent = state.ow + ' mm'; $('ohOut').textContent = state.oh + ' mm';
+    const v = verdict();
+    $('verdict').textContent = v.v; $('verdict').classList.toggle('red', v.red); $('vsub').textContent = v.sub;
+    $('vchip').textContent = v.chip; $('vchip').classList.toggle('red', v.red);
+    $('figTitle').textContent = twin() ? 'Anatomy of a twin-wall flue' : 'Anatomy of a chimney';
+    $('cap').textContent = twin() ? 'No chimney: an insulated twin-wall flue up through the ceiling and roof.' : 'Cut away to show the flue inside the brickwork (' + CHIM[state.chim] + ').';
+    $('sFlue').textContent = flue().short; $('sAir').textContent = air().short; $('sHearth').textContent = hearth().short;
+    draw(); renderPart();
+  }
+
+  function pick(k) { if (!PARTS[k]) return; sel = k; touched = true; draw(); renderPart(); }
+  // On phones, bring the text up to sit just under the pinned drawing
+  function showText() {
+    if (!matchMedia('(max-width: 860px)').matches) return;
+    const figH = document.querySelector('.figure').getBoundingClientRect().height, top = $('part').getBoundingClientRect().top;
+    if (Math.abs(top - figH - 8) > 4) window.scrollBy({ top: top - figH - 8, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+  svg.addEventListener('click', e => { const g = e.target.closest('[data-part]'); if (g) { pick(g.dataset.part); showText(); } });
+  svg.addEventListener('keydown', e => { const g = e.target.closest('.lab'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(g.dataset.part); requestAnimationFrame(() => { const f = svg.querySelector(`.lab[data-part="${sel}"]`); if (f) f.focus(); }); } });
+  $('part').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (!b) return; const i = (order.indexOf(sel) + Number(b.dataset.step) + order.length) % order.length; pick(order[i]); showText(); });
+  document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; state[seg.dataset.key] = b.dataset.v; render(); }));
+  [['kw', 'kw'], ['ow', 'ow'], ['oh', 'oh']].forEach(([id, key]) => $(id).addEventListener('input', () => { state[key] = Number($(id).value); render(); }));
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
+
+  // Shareable presets: #ha-replacement, #ha-existing
+  const PRESETS = { 'ha-replacement': { app: 'stove', job: 'install', chim: 'unlined' }, 'ha-existing': { app: 'stove', job: 'none', chim: 'unlined' } };
+  function fromHash() { const p = PRESETS[location.hash.slice(1)]; if (p) { Object.assign(state, p); sel = 'flue'; } }
+  window.addEventListener('hashchange', () => { fromHash(); render(); });
+  fromHash();
+  render();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+})();
+</script>
+</body>
+</html>
