@@ -49,7 +49,7 @@
   .dl svg { width: 18px; height: 18px; flex-shrink: 0; }
 
   /* Choice bars */
-  .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); gap: 0.7rem; margin-bottom: 1rem; }
+  .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2.3fr) minmax(0, 1fr); gap: 0.7rem; margin-bottom: 1rem; }
   .ctl .k { display: block; font-family: var(--mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); margin: 0 0 0.3rem 2px; }
   .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
   .seg button { font: inherit; display: block; text-align: center; padding: 0.5rem 0.25rem; border: 0; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
@@ -168,6 +168,7 @@
   .cl b { display: block; font-family: var(--display); font-size: 1.2rem; text-transform: uppercase; }
   .cl ul { margin: 0.3rem 0 0; padding-left: 1.05rem; font-size: 0.88rem; }
   .cl li { margin-bottom: 0.25rem; }
+  .cl li b.n { display: inline; font-family: var(--mono); font-size: inherit; text-transform: none; }
 
   /* Clean Air Act timeline */
   .tl-wrap { overflow-x: auto; padding-bottom: 0.4rem; }
@@ -206,7 +207,7 @@
     display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   footer a { text-decoration: none; }
 
-  @media (max-width: 1000px) { .controls { grid-template-columns: 1fr 1fr; } .controls .ctl:last-child { grid-column: 1 / -1; } }
+  @media (max-width: 1000px) { .controls { grid-template-columns: 1fr 1fr; } .controls .ctl-chim { grid-column: 1 / -1; } }
   @media (max-width: 860px) {
     .layout { grid-template-columns: 1fr; gap: 0.8rem; }
     /* Drawing pinned at the top while the text scrolls underneath it */
@@ -231,15 +232,17 @@
   <h1>Does it need a liner?</h1>
   <p class="lede"><b>Short answer: not automatically.</b> In England an existing chimney has to be <b>checked and proven</b> for a stove or open fire, not lined by default. Tap any part of the drawing, or its number, to read about it.</p>
 
-  <a class="dl" href="electric-sweep-chimney-lining-guide.pdf" download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Download the printable guide <small>PDF · 6 pages</small></a>
+  <a class="dl" href="electric-sweep-chimney-lining-guide.pdf" download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Download the printable guide <small>PDF · 7 pages</small></a>
 
   <div class="controls" role="group" aria-label="Set up the chimney">
     <div class="ctl"><span class="k">Appliance</span>
       <div class="seg" data-key="app"><button data-v="stove">Stove<small>wood / multi-fuel</small></button><button data-v="open">Open fire<small>no doors</small></button></div></div>
     <div class="ctl"><span class="k">The job</span>
       <div class="seg" data-key="job"><button data-v="install">Fitting one<small>new or replacement</small></button><button data-v="none">No work<small>already in</small></button></div></div>
-    <div class="ctl"><span class="k">The chimney or flue</span>
+    <div class="ctl ctl-chim"><span class="k">The chimney or flue</span>
       <div class="seg" data-key="chim"><button data-v="unlined">Unlined<small>most pre-1965</small></button><button data-v="rigid">Clay / pumice<small>rigid liners</small></button><button data-v="flex">Steel flexi<small>already fitted</small></button><button data-v="cast">Cast / spray<small>in-situ lining</small></button><button data-v="twin">Twin-wall<small>no chimney</small></button></div></div>
+    <div class="ctl"><span class="k">The roof</span>
+      <div class="seg" data-key="roof"><button data-v="tile">Tile / slate</button><button data-v="thatch">Thatch</button></div></div>
   </div>
 
   <div class="layout">
@@ -352,6 +355,30 @@
       <p class="src">Sources: <a href="https://assets.publishing.service.gov.uk/media/6336e58be90e0772dc9651a2/ADJ_2022.pdf">Approved Document J</a> paras 1.42–1.46, 2.14–2.15, 2.18, Diagram 19 · <a href="https://www.lancaster.gov.uk/assets/attach/1352/Guide-to-installing-solid-fuel-stoves-Nov-2013.pdf">LABC stove guide</a> · <a href="https://www.stovesonline.co.uk/twin-wall-flue-boxing.html">Twin-wall boxing</a></p>
     </details>
 
+    <details class="sec" id="thatched-roofs">
+      <summary><span><b>Thatched roofs</b><span class="gist">Thatch changes the advice. Here's what the regulations, HETAS, insurers and the fire service say.</span></span><i>+</i></summary>
+      <div class="callout" style="margin-top:0;border-left-color:var(--safety);background:rgba(255,107,26,0.08)"><b>The honest position:</b> Approved Document J doesn't require a liner on thatch any more than on tiles. But thatch guidance from Historic England, the Fire Protection Association and NFU Mutual says to line the flue of any stove, and their headline advice is that wood-burning and multi-fuel stoves shouldn't be used under thatch at all. Insurers often set their own conditions on top.</div>
+      <div class="clear" style="margin-top:1rem">
+        <div class="cl">
+          <svg viewBox="0 0 220 130" aria-hidden="true"><path d="M0 110 L110 40 L220 110 Z" fill="#C9A24A"/><path d="M0 110 L110 40 L220 110" fill="none" stroke="#7A5E22" stroke-width="3"/><rect x="128" y="18" width="26" height="70" fill="#B5654A"/><rect x="134" y="8" width="14" height="12" fill="#C4693E"/><path d="M168 8v52" stroke="#FFB21A" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M163 8h10M163 60h10" stroke="#FFB21A" stroke-width="1.5"/><text x="194" y="38" font-size="11" fill="#FFB21A" text-anchor="middle">1.8 m</text></svg>
+          <b>Outlet height</b>
+          <ul><li>Outlet at least <b class="n">1.8 m</b> above the thatch surface.</li><li>Less than 600 mm above the ridge? Keep it <b class="n">2.3 m</b> horizontally from the thatch.</li><li>Re-thatching adds depth, so re-check the height afterwards.</li></ul>
+        </div>
+        <div class="cl">
+          <svg viewBox="0 0 220 130" aria-hidden="true"><rect x="80" y="6" width="60" height="118" fill="#B5654A"/><rect x="92" y="6" width="36" height="118" fill="#17191B"/><rect x="99" y="6" width="22" height="118" rx="3" fill="#C9CDD2"/><rect x="104" y="6" width="12" height="118" fill="#3B4148"/><path d="M0 60 L80 40 M140 40 L220 60" stroke="#C9A24A" stroke-width="16"/><text x="110" y="70" font-size="9" fill="#EDEAE4" text-anchor="middle" transform="rotate(-90 110 70)">insulated</text></svg>
+          <b>Line it</b>
+          <ul><li>CCTV survey first, to find defects at thatch level.</li><li>Preferred: a <b class="n">rigid twin-wall insulated</b> liner. Where that won't fit, a twin-wall flexible liner.</li><li>No suitable liner possible? The guidance says don't fit a wood or multi-fuel stove.</li></ul>
+        </div>
+        <div class="cl">
+          <svg viewBox="0 0 220 130" aria-hidden="true"><rect x="96" y="40" width="28" height="80" fill="#B5654A"/><rect x="100" y="28" width="20" height="14" fill="#C4693E"/><path d="M92 18h36v12H92z" fill="none" stroke="#A9AFB4" stroke-width="2"/><path d="M80 6l60 40M140 6L80 46" stroke="#FF8A65" stroke-width="4"/><text x="40" y="96" font-size="10" fill="#FF8A65" text-anchor="middle">no spark</text><text x="40" y="110" font-size="10" fill="#FF8A65" text-anchor="middle">arrestor</text><text x="180" y="96" font-size="10" fill="#FFB21A" text-anchor="middle">sweep</text><text x="180" y="110" font-size="10" fill="#FFB21A" text-anchor="middle">2–4× a year</text></svg>
+          <b>Running it</b>
+          <ul><li>No spark arrestor. A mesh bird guard is fine.</li><li>Sweep at least <b class="n">twice a year</b> burning wood, up to four times with daily use.</li><li>Fit a flue pipe thermometer. Dry wood only, no slumbering, refuel on a bed of embers.</li></ul>
+        </div>
+      </div>
+      <p style="margin:0.9rem 0 0;font-size:0.92rem;color:var(--soft)">Before any work: tell the insurer, and on listed buildings or in conservation areas, speak to the conservation officer. Research found thatch fires start from sparks and embers leaving the pot and from hot gases leaking through stack defects, and that spark arrestors made little or no difference.</p>
+      <p class="src">Sources: <a href="https://assets.publishing.service.gov.uk/media/6336e58be90e0772dc9651a2/ADJ_2022.pdf">Approved Document J</a> para 2.12, Diagram 18 · <a href="https://historicengland.org.uk/advice/technical-advice/emergency-and-fire/fire-advice/reducing-fires-in-thatched-roof-properties/">Historic England, reducing fires in thatched properties</a> · <a href="https://www.hetas.co.uk/?p=384178">HETAS: installations in thatch properties</a> · <a href="https://www.hawkins.biz/?p=9146">Hawkins: thatch fires and stoves</a> · <a href="https://www.dwfire.org.uk/safety/thatched-properties/">Dorset &amp; Wiltshire Fire</a></p>
+    </details>
+
     <details class="sec" id="clean-air">
       <summary><span><b>The Clean Air Act</b><span class="gist">It controls smoke and fuel, not how chimneys are built. Here's what it does cover.</span></span><i>+</i></summary>
       <div class="tl-wrap"><div class="tl">
@@ -401,7 +428,7 @@
     <details class="sec" id="sources">
       <summary><span><b>Sources</b><span class="gist">Approved Document J is the main one. Everything here links back to something you can check.</span></span><i>+</i></summary>
       <ol class="refs">
-        <li><a href="electric-sweep-chimney-lining-guide.pdf" download>Printable guide (PDF)</a><span>Everything on this page, on six A4 pages</span></li>
+        <li><a href="electric-sweep-chimney-lining-guide.pdf" download>Printable guide (PDF)</a><span>Everything on this page, on seven A4 pages</span></li>
         <li><a href="https://www.gov.uk/government/publications/combustion-appliances-and-fuel-storage-systems-approved-document-j">Approved Document J</a><span>HM Government, 2010 edition with 2010, 2013 and 2022 amendments</span></li>
         <li><a href="https://solidfuel.co.uk/pdfs/BUILDING-REGS-CONSUMER-LEAFLET-2026.pdf">Building Regs consumer leaflet 2026</a><span>Solid Fuel Association: no automatic requirement to line</span></li>
         <li><a href="https://solidfuel.co.uk/pdfs/SFA-Guide-to-Lining-Old-Chimneys-2026.pdf">Guide to lining old chimneys 2026</a><span>Solid Fuel Association: lining methods</span></li>
@@ -409,6 +436,8 @@
         <li><a href="https://www.lancaster.gov.uk/assets/attach/1352/Guide-to-installing-solid-fuel-stoves-Nov-2013.pdf">Guide to installing solid fuel stoves</a><span>LABC: pre-1965 chimneys, smoke tests, stove pipe clearances</span></li>
         <li><a href="https://feta.co.uk/client/files/BFCMA/Wood_Burning_Multi_Fuel_in_Residential_Properties_06_02_23.pdf">Wood burning &amp; multi fuel in residential properties</a><span>BFCMA: chimney and liner types</span></li>
         <li><a href="https://www.torfaen.gov.uk/en/Related-Documents/Building-Control/BuildingControl-Regulations/Advice-and-Guidance/Guide-to-commissioning-a-solid-fuel-appliance.pdf">Commissioning a solid fuel appliance</a><span>Building control: hearth sizes, Diagram 19 shields</span></li>
+        <li><a href="https://historicengland.org.uk/advice/technical-advice/emergency-and-fire/fire-advice/reducing-fires-in-thatched-roof-properties/">Reducing fires in thatched properties</a><span>Historic England, FPA and NFU Mutual research and guidance</span></li>
+        <li><a href="https://www.hetas.co.uk/?p=384178">Installations in thatch properties</a><span>HETAS</span></li>
         <li><a href="https://www.legislation.gov.uk/uksi/2022/707/contents/made">Smoke and CO Alarm (Amendment) Regs 2022</a><span>Landlord alarm duties</span></li>
         <li><a href="https://www.cih.org/news/awaab-s-law-is-now-in-force-in-the-social-housing-sector/">Awaab's Law in force</a><span>Chartered Institute of Housing</span></li>
         <li><a href="https://www.legislation.gov.uk/ukpga/1993/11/contents">Clean Air Act 1993</a><span>legislation.gov.uk</span></li>
@@ -433,10 +462,13 @@
   const SFA = '<a href="https://solidfuel.co.uk/pdfs/BUILDING-REGS-CONSUMER-LEAFLET-2026.pdf">SFA 2026</a>';
   const SFAL = '<a href="https://solidfuel.co.uk/pdfs/SFA-Guide-to-Lining-Old-Chimneys-2026.pdf">SFA lining guide</a>';
   const LABC = '<a href="https://www.lancaster.gov.uk/assets/attach/1352/Guide-to-installing-solid-fuel-stoves-Nov-2013.pdf">LABC stove guide</a>';
-  const state = { app: 'stove', job: 'install', chim: 'unlined', exempt: 'yes', tight: 'leaky', kw: 5, ow: 410, oh: 550 };
+  const state = { app: 'stove', job: 'install', chim: 'unlined', roof: 'tile', exempt: 'yes', tight: 'leaky', kw: 5, ow: 410, oh: 550 };
   let sel = 'flue', touched = false;
   const fmt = (n) => n.toLocaleString('en-GB');
   const twin = () => state.chim === 'twin';
+  const thatch = () => state.roof === 'thatch';
+  const FPA = '<a href="https://historicengland.org.uk/advice/technical-advice/emergency-and-fire/fire-advice/reducing-fires-in-thatched-roof-properties/">Historic England / FPA / NFU Mutual</a>';
+  const HTH = '<a href="https://www.hetas.co.uk/?p=384178">HETAS on thatch</a>';
   const N = (t) => `<b class="n">${t}</b>`;
 
   // ---------- Rules (Approved Document J) ----------
@@ -464,6 +496,11 @@
     if (twin()) return state.job === 'none'
       ? { v: 'Nothing to line', chip: 'Nothing to line', red: false, sub: 'The twin-wall system is the flue. Keep it swept and serviced, and check its clearances, fire-stops and roof terminal.' }
       : { v: 'System flue', chip: 'System flue', red: false, sub: 'No chimney, so no lining question: the twin-wall system is the flue. Fit to BS EN 1856-1 (at least T400 N2 D3 G) and keep its rated gap to combustibles.' };
+    if (thatch()) {
+      if (state.job === 'none') return { v: 'Check it', chip: 'Thatch: check it', red: false, sub: 'No work means the regulations don\'t trigger lining. On thatch, though, insurers and fire services advise a CCTV survey, sweeping at least twice a year, and a pot at least 1.8 m above the thatch.' };
+      if (state.chim === 'flex') return { v: 'Replace liner', chip: 'Replace liner', red: true, sub: 'Replace the old steel liner with the new appliance unless it\'s recent and sound (ADJ 1.39). On thatch, the guidance prefers a rigid twin-wall insulated liner.' };
+      return { v: 'Line it', chip: 'Thatch: line it', red: true, sub: 'The regulations alone don\'t require a liner, but thatch guidance from Historic England, the Fire Protection Association and NFU Mutual says line the flue, ideally with a rigid twin-wall insulated liner, after a CCTV survey. Check the insurer\'s conditions.' };
+    }
     if (state.job === 'none') return { v: 'No liner needed', chip: 'No liner needed', red: false, sub: 'No work means nothing triggers lining. Keep it swept, serviced and alarmed, and act on any sign of leaks.' };
     if (state.chim === 'flex') return { v: 'Replace liner', chip: 'Replace liner', red: true, sub: 'Fitting a new appliance? The existing steel liner should be replaced too, unless it\'s shown to be recent and in good condition (ADJ para 1.39).' };
     const lead = { unlined: 'An unlined chimney can legally be used. ', rigid: 'Clay and pumice-lined chimneys can be reused. ', cast: 'A cast or sprayed lining can be reused. ' }[state.chim];
@@ -473,14 +510,15 @@
   // ---------- Parts ----------
   const val = (x) => typeof x === 'function' ? x() : x;
   const PARTS = {
-    smoke: { t: 'Smoke & the Clean Air Act', say: 'What comes out of the top is the Clean Air Act\'s business. How the chimney is built isn\'t.', li: () => ['In a smoke control area, chimney smoke can bring a ' + N('£175–£300') + ' penalty.', 'Burn authorised smokeless fuel, or use a Defra-exempt stove with its approved fuels.', 'Open fires in a smoke control area: smokeless fuel only.'], dig: 'Wood sold in amounts under 2 m³ has had to be Ready to Burn (20% moisture or less) since May 2021. House coal sales ended in May 2023. The Clean Air Act section below has the full timeline.', src: '<a href="https://www.gov.uk/smoke-control-area-rules">GOV.UK smoke control rules</a>' },
-    outlet: { t: () => twin() ? 'Terminal height' : 'Chimney outlet height', say: 'The outlet has to clear the roof so smoke escapes cleanly. The same rules apply to a pot and a twin-wall cap.', li: () => ['Within 600 mm of the ridge: at least ' + N('600 mm') + ' above it.', 'Elsewhere: ' + N('1 m') + ' above where it meets the roof, or as high as the ridge, with ' + N('2.3 m') + ' clear around it.', 'Within 2.3 m of an opening window or rooflight: ' + N('1 m') + ' above the top of it.'], dig: () => 'Within 2.3 m of a neighbouring building: at least 600 mm above it. Thatch and shingle roofs need more clearance (Diagram 18).' + (twin() ? ' Twin-wall above the roof usually needs bracing beyond the maker\'s unsupported height.' : ' Existing stacks rarely change when a flue is reused, but check if the roof has been altered.'), src: ADJ + ' Diagram 17, paras 2.10–2.12' },
+    smoke: { t: () => thatch() ? 'Smoke, sparks & thatch' : 'Smoke & the Clean Air Act', say: () => thatch() ? 'On a thatched roof, embers leaving the pot are one of the main ways thatch catches fire.' : 'What comes out of the top is the Clean Air Act\'s business. How the chimney is built isn\'t.', li: () => thatch() ? ['Burn dry wood (' + N('20%') + ' moisture or less) and don\'t slumber the stove or run it very low.', 'Let it burn down to embers before refuelling, and open the door slowly.', 'Fit a mesh bird guard if needed, but ' + N('no spark arrestor') + '.', 'In a smoke control area, chimney smoke can also bring a £175–£300 penalty.'] : ['In a smoke control area, chimney smoke can bring a ' + N('£175–£300') + ' penalty.', 'Burn authorised smokeless fuel, or use a Defra-exempt stove with its approved fuels.', 'Open fires in a smoke control area: smokeless fuel only.'], dig: () => thatch() ? 'Research funded by Historic England and NFU Mutual found thatch is lit by high-energy sparks and embers from the chimney, and by hot gases leaking through defects in the stack. Spark arrestors made little or no difference. See the Thatched roofs section below.' : 'Wood sold in amounts under 2 m³ has had to be Ready to Burn (20% moisture or less) since May 2021. House coal sales ended in May 2023. The Clean Air Act section below has the full timeline.', src: () => thatch() ? FPA + ' · ' + HTH : '<a href="https://www.gov.uk/smoke-control-area-rules">GOV.UK smoke control rules</a>' },
+    outlet: { t: () => thatch() ? 'Outlet height over thatch' : twin() ? 'Terminal height' : 'Chimney outlet height', say: () => thatch() ? 'Thatch is an easily ignited roof covering, so the outlet needs much more clearance (ADJ para 2.12, Diagram 18).' : 'The outlet has to clear the roof so smoke escapes cleanly. The same rules apply to a pot and a twin-wall cap.', li: () => thatch() ? ['Outlet at least ' + N('1.8 m') + ' above the surface of the thatch.', 'If it\'s less than 600 mm above the ridge, keep it at least ' + N('2.3 m') + ' horizontally from the thatch.', 'No spark arrestor: ADJ says they\'re hard to maintain and can cause blockages and flue fires.'] : ['Within 600 mm of the ridge: at least ' + N('600 mm') + ' above it.', 'Elsewhere: ' + N('1 m') + ' above where it meets the roof, or as high as the ridge, with ' + N('2.3 m') + ' clear around it.', 'Within 2.3 m of an opening window or rooflight: ' + N('1 m') + ' above the top of it.'], dig: () => thatch() ? 'Every re-thatch adds depth and eats into the height above the thatch, so re-check it after re-thatching. Raising a stack on a listed building or in a conservation area may need consent. If the height can\'t be achieved, the thatch guidance says a wood or multi-fuel stove isn\'t advisable.' : 'Within 2.3 m of a neighbouring building: at least 600 mm above it. Thatch and shingle roofs need more clearance (Diagram 18).' + (twin() ? ' Twin-wall above the roof usually needs bracing beyond the maker\'s unsupported height.' : ' Existing stacks rarely change when a flue is reused, but check if the roof has been altered.'), src: () => ADJ + (thatch() ? ' para 2.12, Diagram 18 · <a href="https://www.hawkins.biz/?p=9146">Hawkins</a> · ' + HTH : ' Diagram 17, paras 2.10–2.12') },
     flue: {
       t: () => ({ unlined: 'The flue: unlined', rigid: 'The flue: clay / pumice liners', flex: 'The flue: steel flexi liner', cast: 'The flue: cast or sprayed lining', twin: 'Twin-wall system chimney' })[state.chim],
       say: () => twin() ? 'With no chimney, an insulated twin-wall system is the whole flue: up through the ceiling and out of the roof.' : 'This is the bit the whole question is about. The test result decides, not the age of the house.',
       li: () => {
         if (twin()) return ['Factory-made to BS EN 1856-1, at least ' + N('T400 N2 D3 G') + ' for solid fuel (ADJ Table 3).', 'Its designation ends in a ' + N('G') + ' number: the gap to combustibles in mm. G50 means 50 mm.', 'Installed to the maker\'s instructions and BS EN 15287-1. Joints accessible, never hidden in a floor.'];
         const v = verdict(), out = [v.sub];
+        if (thatch()) out.push('Thatch: get a ' + N('CCTV survey') + ' of the stack. Gases leaking through defects at thatch level are a known cause of thatch fires.');
         if (state.chim === 'unlined') out.push('Most pre-1965 chimneys were built without liners. That alone doesn\'t make them non-compliant.');
         if (state.chim === 'rigid') out.push('Checked the same way: sockets facing up, joints sound, smoke test passed. Clay to BS EN 1457, pumice and concrete to BS EN 1857.');
         if (state.chim === 'flex') out.push('A new liner for solid fuel must be twin-skin, ' + N('904L or 316Ti') + ' grade, to BS EN 1856-2, never a single-skin gas liner.');
@@ -494,7 +532,7 @@
     walls: {
       t: () => twin() ? 'Through the ceiling' : 'Chimney walls',
       say: () => twin() ? 'Where the flue passes through timber, the gap is set by the flue, not by guesswork.' : 'Keep anything that can burn away from the hot parts.',
-      li: () => twin() ? ['Keep the flue\'s rated gap (often ' + N('50 mm') + ') from joists and boards.', 'Use the maker\'s fire-stop or support plate at each floor or ceiling. Many are ventilated to keep the gap cool.', 'In a roof space or cupboard, box it in with a guard so nothing gets stored against it.'] : ['Combustible material at least ' + N('200 mm') + ' from the inside of a flue or fireplace recess.', 'At least ' + N('40 mm') + ' from the outside of a masonry chimney (floorboards, skirting and mantel-shelves are excepted).', 'Metal fixings at least ' + N('50 mm') + ' from the inside of a flue.'],
+      li: () => thatch() && !twin() ? ['Where the stack passes through the thatch, cracks and open joints can let hot gases into the thatch. A CCTV survey finds them.', 'Combustible material at least ' + N('200 mm') + ' from the inside of the flue, ' + N('40 mm') + ' from the outside face.', 'Ventilation around the chimney can help, and HETAS installers may refuse a job that can\'t be made compliant.'] : twin() ? ['Keep the flue\'s rated gap (often ' + N('50 mm') + ') from joists and boards.', 'Use the maker\'s fire-stop or support plate at each floor or ceiling. Many are ventilated to keep the gap cool.', 'In a roof space or cupboard, box it in with a guard so nothing gets stored against it.'] : ['Combustible material at least ' + N('200 mm') + ' from the inside of a flue or fireplace recess.', 'At least ' + N('40 mm') + ' from the outside of a masonry chimney (floorboards, skirting and mantel-shelves are excepted).', 'Metal fixings at least ' + N('50 mm') + ' from the inside of a flue.'],
       dig: () => twin() ? 'The G number is tested by the maker and printed on the flue\'s label and data plate. There\'s no set gap from non-combustible materials.' : 'Old chimneys sometimes have joists or timbers built into the breast. The visual inspection and smoke test are where those get found.',
       src: () => ADJ + (twin() ? ' paras 1.43–1.46 · <a href="https://www.stovesonline.co.uk/twin-wall-flue-boxing.html">Twin-wall boxing</a>' : ' paras 2.17–2.18')
     },
@@ -579,12 +617,27 @@
     return s;
   }
   function roofSlice(y1) {
+    if (thatch()) return thatchSlice(y1);
     const rz = (y) => 10.3 - (y + 0.6) * 0.55;
     let s = poly([[2.8, y1, rz(y1)], [7.2, y1, rz(y1)], [7.2, -0.6, rz(-0.6)], [2.8, -0.6, rz(-0.6)]], COL.slate);
     s += poly([[2.8, y1, rz(y1)], [7.2, y1, rz(y1)], [7.2, y1, rz(y1) - 0.3], [2.8, y1, rz(y1) - 0.3]], shade(COL.slate, 0.7));
     s += poly([[7.2, -0.6, rz(-0.6)], [7.2, y1, rz(y1)], [7.2, y1, rz(y1) - 0.3], [7.2, -0.6, rz(-0.6) - 0.3]], shade(COL.slate, 0.6));
     for (let y = y1 - 0.6; y > -0.6; y -= 0.6) s += line([2.8, y, rz(y)], [7.2, y, rz(y)], '#454D55', 0.7);
     return s;
+  }
+  function thatchSlice(y1) {
+    const rz = (y) => 10.9 - (y + 0.6) * 0.55, T = 0.75, gold = '#C9A24A';
+    let s = poly([[2.6, y1, rz(y1)], [7.4, y1, rz(y1)], [7.4, -0.6, rz(-0.6)], [2.6, -0.6, rz(-0.6)]], gold);
+    s += poly([[2.6, y1, rz(y1)], [7.4, y1, rz(y1)], [7.4, y1, rz(y1) - T], [2.6, y1, rz(y1) - T]], '#9C7B33');
+    s += poly([[7.4, -0.6, rz(-0.6)], [7.4, y1, rz(y1)], [7.4, y1, rz(y1) - T], [7.4, -0.6, rz(-0.6) - T]], '#86692B');
+    for (let x = 2.75; x < 7.4; x += 0.22) s += line([x, y1 + 0.01, rz(y1) - 0.05], [x + 0.05, y1 + 0.01, rz(y1) - T + 0.05], '#7A5E22', 0.6);
+    for (let y = y1 - 0.4; y > -0.6; y -= 0.4) s += line([2.6, y, rz(y)], [7.4, y, rz(y)], '#B08A3A', 0.6, 'opacity="0.8"');
+    return s;
+  }
+  // dimension from thatch surface to the outlet
+  function thatchDim(x, y, zFrom, zTo) {
+    const a = P(x, y, zFrom), b = P(x, y, zTo), tick = (p) => `<line x1="${f1(p[0] - 4)}" y1="${f1(p[1])}" x2="${f1(p[0] + 4)}" y2="${f1(p[1])}" stroke="#FFB21A" stroke-width="1.4"/>`;
+    return `<g pointer-events="none"><line x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}" stroke="#FFB21A" stroke-width="1.4" stroke-dasharray="3 2"/>${tick(a)}${tick(b)}<text x="${f1(a[0] + 6)}" y="${f1((a[1] + b[1]) / 2 + 4)}" font-family="IBM Plex Mono, monospace" font-weight="600" font-size="11" fill="#FFB21A" stroke="#141618" stroke-width="3" paint-order="stroke">≥1.8 m</text></g>`;
   }
   const puffs = (x, y, z) => [[0, 0, 0, 7, 0.55], [0.3, -0.2, 0.8, 10, 0.4], [0.9, -0.6, 1.7, 13, 0.28]].map(([dx, dy, dz, r, o]) => { const [cx, cy] = P(x + dx, y + dy, z + dz); return `<circle class="puff sf" cx="${f1(cx)}" cy="${f1(cy)}" r="${r}" fill="#C9CED3" opacity="${o}" stroke="none"/>`; }).join('');
 
@@ -650,6 +703,7 @@
     s += G('outlet', faceY(1.2, 4.0, 6.0, 9.4, 12.4, SH2, shade(COL.brick, 0.9)) + coursesY(1.2, 4.0, 6.0, 9.4, 12.4, SH2, COL.brickDk) +
       box(3.85, 6.15, -0.05, 1.35, 12.4, 12.65, '#8E8A84') + box(4.65, 5.35, 0.3, 1.0, 12.65, 13.7, COL.pot) + poly([[4.8, 0.45, 13.7], [5.2, 0.45, 13.7], [5.2, 0.85, 13.7], [4.8, 0.85, 13.7]], '#1A1210'));
     s += G('smoke', puffs(5.05, 0.6, 14.4));
+    if (thatch()) s += thatchDim(6.75, 1.3, 10.9 - (1.3 + 0.6) * 0.55, 13.7);
     return s;
   }
 
@@ -672,6 +726,7 @@
       cyl(PX, PY, 12.0, 12.15, 0.29, '#9EA4AA') + `<polygon class="sf" points="${pts([[PX - 0.5, PY, 12.55], [PX, PY - 0.5, 12.8], [PX + 0.5, PY, 12.55], [PX, PY + 0.5, 12.3]])}" fill="#7E858C" stroke="#111315" stroke-width="0.7"/>` +
       line([PX - 0.25, PY + 0.25, 12.15], [PX - 0.25, PY + 0.25, 12.4], '#5A6168', 1.2) + line([PX + 0.25, PY - 0.25, 12.15], [PX + 0.25, PY - 0.25, 12.6], '#5A6168', 1.2));
     s += G('smoke', puffs(5.05, 2.2, 13.3));
+    if (thatch()) s += thatchDim(5.9, 2.2, 10.9 - (2.2 + 0.6) * 0.55, 12.8);
     return s;
   }
 
@@ -683,7 +738,7 @@
   function draw() {
     const mode = twin() ? 'twin' : 'masonry';
     svg.innerHTML = DEFS + `<g id="art">${mode === 'twin' ? twinScene() : masonryScene()}</g><g id="ann"></g>`;
-    const key = mode + state.app;
+    const key = mode + state.app + state.roof;
     if (!bbCache[key]) { const b = $('art').getBBox(); bbCache[key] = { x: b.x, y: b.y, w: b.width, h: b.height }; }
     const bb = bbCache[key];
     // numbers stay about 13 px on screen whatever the drawing's scale
@@ -736,7 +791,7 @@
     $('verdict').textContent = v.v; $('verdict').classList.toggle('red', v.red); $('vsub').textContent = v.sub;
     $('vchip').textContent = v.chip; $('vchip').classList.toggle('red', v.red);
     $('figTitle').textContent = twin() ? 'Anatomy of a twin-wall flue' : 'Anatomy of a chimney';
-    $('cap').textContent = twin() ? 'No chimney: an insulated twin-wall flue up through the ceiling and roof.' : 'Cut away to show the flue inside the brickwork (' + CHIM[state.chim] + ').';
+    $('cap').textContent = (thatch() ? 'Thatched roof. ' : '') + (twin() ? 'No chimney: an insulated twin-wall flue up through the ceiling and roof.' : 'Cut away to show the flue inside the brickwork (' + CHIM[state.chim] + ').');
     $('sFlue').textContent = flue().short; $('sAir').textContent = air().short; $('sHearth').textContent = hearth().short;
     draw(); renderPart();
   }
@@ -756,7 +811,7 @@
   let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw, 150); });
 
   // Shareable presets: #ha-replacement, #ha-existing
-  const PRESETS = { 'ha-replacement': { app: 'stove', job: 'install', chim: 'unlined' }, 'ha-existing': { app: 'stove', job: 'none', chim: 'unlined' } };
+  const PRESETS = { 'ha-replacement': { app: 'stove', job: 'install', chim: 'unlined', roof: 'tile' }, 'ha-existing': { app: 'stove', job: 'none', chim: 'unlined', roof: 'tile' }, 'thatch': { app: 'stove', job: 'install', chim: 'unlined', roof: 'thatch' } };
   function fromHash() { const p = PRESETS[location.hash.slice(1)]; if (p) { Object.assign(state, p); sel = 'flue'; } }
   window.addEventListener('hashchange', () => { fromHash(); render(); });
   fromHash();
