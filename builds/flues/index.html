@@ -42,6 +42,12 @@
   .lede { margin: 0 0 1.3rem; color: var(--soft); max-width: 46em; }
   .lede b { color: var(--ink); }
 
+  .dl { display: inline-flex; align-items: center; gap: 0.6rem; margin: -0.4rem 0 1.3rem; padding: 0.6rem 0.95rem; border-radius: 4px; text-decoration: none;
+    background: var(--safety); color: #111; font-family: var(--mono); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; box-shadow: 0 3px 0 #A8410A; }
+  .dl:active { transform: translateY(1px); }
+  .dl small { font-weight: 500; text-transform: none; letter-spacing: 0; opacity: 0.8; }
+  .dl svg { width: 18px; height: 18px; flex-shrink: 0; }
+
   /* Choice bars */
   .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); gap: 0.7rem; margin-bottom: 1rem; }
   .ctl .k { display: block; font-family: var(--mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); margin: 0 0 0.3rem 2px; }
@@ -225,6 +231,8 @@
   <h1>Does it need a liner?</h1>
   <p class="lede"><b>Short answer: not automatically.</b> In England an existing chimney has to be <b>checked and proven</b> for a stove or open fire, not lined by default. Tap any part of the drawing, or its number, to read about it.</p>
 
+  <a class="dl" href="electric-sweep-chimney-lining-guide.pdf" download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Download the printable guide <small>PDF · 6 pages</small></a>
+
   <div class="controls" role="group" aria-label="Set up the chimney">
     <div class="ctl"><span class="k">Appliance</span>
       <div class="seg" data-key="app"><button data-v="stove">Stove<small>wood / multi-fuel</small></button><button data-v="open">Open fire<small>no doors</small></button></div></div>
@@ -393,6 +401,7 @@
     <details class="sec" id="sources">
       <summary><span><b>Sources</b><span class="gist">Approved Document J is the main one. Everything here links back to something you can check.</span></span><i>+</i></summary>
       <ol class="refs">
+        <li><a href="electric-sweep-chimney-lining-guide.pdf" download>Printable guide (PDF)</a><span>Everything on this page, on six A4 pages</span></li>
         <li><a href="https://www.gov.uk/government/publications/combustion-appliances-and-fuel-storage-systems-approved-document-j">Approved Document J</a><span>HM Government, 2010 edition with 2010, 2013 and 2022 amendments</span></li>
         <li><a href="https://solidfuel.co.uk/pdfs/BUILDING-REGS-CONSUMER-LEAFLET-2026.pdf">Building Regs consumer leaflet 2026</a><span>Solid Fuel Association: no automatic requirement to line</span></li>
         <li><a href="https://solidfuel.co.uk/pdfs/SFA-Guide-to-Lining-Old-Chimneys-2026.pdf">Guide to lining old chimneys 2026</a><span>Solid Fuel Association: lining methods</span></li>
@@ -413,7 +422,7 @@
 
   <footer>
     <span>Guidance for England, Nov 2026 · not legal advice · info from Electric Sweep, Weymouth</span>
-    <span><a href="/builds/chimney/">Chimney calc</a> &middot; <a href="/builds/">Builds</a> &middot; <a href="/">Home</a></span>
+    <span><a href="electric-sweep-chimney-lining-guide.pdf" download>PDF guide</a> &middot; <a href="/builds/chimney/">Chimney calc</a> &middot; <a href="/builds/">Builds</a> &middot; <a href="/">Home</a></span>
   </footer>
 </div>
 
