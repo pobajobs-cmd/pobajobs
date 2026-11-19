@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brain Tree</title>
+<meta name="description" content="Brain Tree: projects, to-dos and notes in one tree.">
+<meta name="robots" content="noindex">
+<meta name="darkreader-lock">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1B19" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Brain Tree">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-pane="nav">
+<div id="app">
+  <aside id="nav" aria-label="Lists">
+    <header class="brand">
+      <img src="icon.svg" alt="" width="28" height="28">
+      <h1>Brain Tree</h1>
+    </header>
+    <div class="searchbox"><input type="search" id="search" placeholder="Search" autocomplete="off" enterkeyhint="search"></div>
+    <div class="navscroll">
+      <nav id="smart"></nav>
+      <div class="secthead"><span>Projects</span><button id="newProject" class="iconbtn" data-act="new-project" aria-label="New project"></button></div>
+      <div id="projects"></div>
+      <nav id="lower"></nav>
+    </div>
+    <footer id="syncbar"></footer>
+  </aside>
+
+  <section id="list" aria-label="Items">
+    <header class="bar">
+      <button id="listBack" class="back" data-act="back-nav"></button>
+      <h2 id="listTitle"></h2>
+      <button id="newBtn" class="iconbtn accent" data-act="new" aria-label="New"></button>
+    </header>
+    <div class="listscroll">
+      <div id="listHead"></div>
+      <form id="quickAdd" autocomplete="off"><span class="tick ghost"></span><input placeholder="Add a to-do" enterkeyhint="done"></form>
+      <div id="listBody"></div>
+    </div>
+  </section>
+
+  <main id="detail" aria-label="Item"></main>
+</div>
+
+<div id="modal" hidden></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="lightbox" hidden><img alt=""></div>
+
+<div id="login" hidden>
+  <form class="card">
+    <img src="icon.svg" alt="" width="64" height="64">
+    <h2>Brain Tree</h2>
+    <p>Sign in once on each device. After that it works offline and syncs when there’s signal.</p>
+    <input type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required>
+    <button type="submit" class="primary">Sign in</button>
+    <p class="err" role="alert"></p>
+    <button type="button" class="skip link">Use it on this device without syncing for now</button>
+  </form>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
