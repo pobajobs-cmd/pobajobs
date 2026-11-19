@@ -1,6 +1,9 @@
-// pobajobs.co.uk: serves the site files, plus two small APIs: the Pobcast's "Suggest a topic"
-// box and error reports from the bin maker (/builds/bins/).
+// pobajobs.co.uk: serves the site files, plus small APIs: the Pobcast's "Suggest a topic"
+// box, error reports from the bin maker (/builds/bins/) and Brain Tree's sync (/builds/braintree/,
+// in worker-braintree.js).
 // Only /api/... addresses reach this code (see wrangler.jsonc); everything else is a plain file.
+
+import { handleBraintree } from './worker-braintree.js';
 //
 // Both are stored in the "pobajobs" D1 database. To read them:
 //   Cloudflare dashboard > Storage & databases > D1 > pobajobs > Console, then run
@@ -18,6 +21,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/api/pobcast/suggest') return suggest(request, env, url);
     if (url.pathname === '/api/binmaker/report') return binmakerReport(request, env, url);
+    if (url.pathname === '/api/braintree' || url.pathname.startsWith('/api/braintree/')) return handleBraintree(request, env, url);
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found.' }, 404);
     return env.ASSETS.fetch(request);
   },

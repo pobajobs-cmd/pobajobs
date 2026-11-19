@@ -1,5 +1,7 @@
 # Files in the repo that should NOT be published on the website
 worker.js
+worker-braintree.js
+_dev
 wrangler.jsonc
 .pages.yml
 _concepts
