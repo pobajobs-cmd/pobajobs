@@ -1,0 +1,191 @@
+<title>Brain Tree Looks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: a designer's pin-up wall. Logo tiles in a grid, then theme swatches shown as tiny working screens. */
+  :root {
+    --bg: #F4F1EC; --panel: #FFFFFF; --ink: #1E1B17; --soft: #6B655C; --line: rgba(40, 30, 15, 0.12);
+    --accent: #C8372D;
+    --display: 'Fraunces', Georgia, serif;
+    --body: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #171512; --panel: #221F1B; --ink: #EEE8DF; --soft: #A69E92; --line: rgba(255, 240, 220, 0.10); --accent: #EF6A5E; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #171512; --panel: #221F1B; --ink: #EEE8DF; --soft: #A69E92; --line: rgba(255, 240, 220, 0.10); --accent: #EF6A5E; color-scheme: dark; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 2rem 4rem; }
+  h1 { font: 700 clamp(2rem, 6vw, 3.2rem)/1.05 var(--display); letter-spacing: -0.02em; margin: 0 0 0.5rem; text-wrap: balance; }
+  h2 { font: 650 1.6rem/1.15 var(--display); margin: 3rem 0 0.4rem; text-wrap: balance; }
+  .lede { color: var(--soft); max-width: 62ch; margin: 0; }
+  .tag { font: 600 0.72rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 16px; margin-top: 1.2rem; }
+  .logo { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
+  .logo .tiles { display: flex; align-items: flex-end; gap: 14px; }
+  .logo .big { width: 96px; height: 96px; border-radius: 22px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,0.18); flex-shrink: 0; }
+  .logo .small { width: 40px; height: 40px; border-radius: 9px; overflow: hidden; box-shadow: 0 3px 8px rgba(0,0,0,0.18); }
+  .logo .tiny { width: 18px; height: 18px; border-radius: 4px; overflow: hidden; }
+  .logo svg { display: block; width: 100%; height: 100%; }
+  .logo h3 { margin: 0; font: 650 1.1rem/1.2 var(--display); }
+  .logo p { margin: 0; color: var(--soft); font-size: 0.92rem; }
+  .logo .num { font: 600 0.75rem var(--mono); color: var(--soft); }
+
+  .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 18px; margin-top: 1.2rem; }
+  .theme { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+  .theme header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .theme h3 { margin: 0; font: 650 1.15rem var(--display); }
+  .theme p { margin: 0; color: var(--soft); font-size: 0.9rem; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mock { border-radius: 10px; overflow: hidden; border: 1px solid var(--line); font: 10px/1.3 -apple-system, 'Segoe UI', system-ui, sans-serif; display: grid; grid-template-columns: 34% 1fr; min-height: 150px; background: var(--t-bg); color: var(--t-ink); }
+  .mock .side { background: var(--t-side); padding: 8px 6px; display: grid; align-content: start; gap: 3px; }
+  .mock .side b { font-size: 10px; margin-bottom: 3px; }
+  .mock .side span { padding: 3px 5px; border-radius: 4px; color: var(--t-soft); white-space: nowrap; overflow: hidden; }
+  .mock .side span.on { background: color-mix(in srgb, var(--t-accent) 22%, var(--t-card)); color: var(--t-ink); }
+  .mock .main { padding: 8px; display: grid; align-content: start; gap: 5px; min-width: 0; }
+  .mock .main b { font-size: 12px; }
+  .mock .row { display: flex; align-items: center; gap: 5px; background: var(--t-card); border-radius: 5px; padding: 4px 5px; white-space: nowrap; overflow: hidden; }
+  .mock .row i { width: 8px; height: 8px; border-radius: 50%; border: 1.3px solid var(--t-soft); flex-shrink: 0; }
+  .mock .row i.done { background: var(--t-accent); border-color: var(--t-accent); }
+  .mock .chip { margin-left: auto; font-size: 8px; padding: 1px 4px; border-radius: 3px; background: color-mix(in srgb, var(--t-string) 18%, var(--t-card)); color: var(--t-string); }
+  .mock .btn { justify-self: start; margin-top: 2px; font-size: 9px; font-weight: 600; padding: 3px 7px; border-radius: 5px; background: var(--t-accent); color: var(--t-on); }
+  .mock .string { height: 2px; background: var(--t-string); border-radius: 2px; margin: 2px 0; opacity: 0.85; }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+  .swatches span { display: inline-flex; align-items: center; gap: 5px; font: 500 0.75rem var(--mono); color: var(--soft); }
+  .swatches i { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--line); }
+
+  .custom { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-top: 1.2rem; display: grid; gap: 10px; }
+  .custom dl { margin: 0; display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: 8px 16px; }
+  .custom dt { font-weight: 600; }
+  .custom dd { margin: 0; color: var(--soft); }
+  .fonts { display: flex; flex-wrap: wrap; gap: 10px; }
+  .fonts span { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  @media (max-width: 520px) { .custom dl { grid-template-columns: 1fr; } .custom dd { margin-bottom: 6px; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+
+<div class="wrap">
+  <span class="tag">Brain Tree · options board</span>
+  <h1>Logos and looks to pick from</h1>
+  <p class="lede">Seven logo ideas, each shown at home-screen size, app-switcher size and browser-tab size, plus six colour themes as they'd look in the app, in light and dark. Tell me the numbers you like, or mix them (“logo 3 in the Blueprint colours”).</p>
+
+  <h2>Logos</h2>
+  <p class="lede">The current one is number 1. They all hold up at tiny sizes, which matters for the tab icon.</p>
+  <div class="grid" id="logos"></div>
+
+  <h2>Themes</h2>
+  <p class="lede">These are going into the app as Settings → Appearance, so you can switch any time. Each one has a light and a dark version that follows your phone, or you can pin one.</p>
+  <div class="themes" id="themes"></div>
+
+  <h2>What else you can change</h2>
+  <div class="custom">
+    <dl>
+      <dt>Main colour</dt><dd>Buttons, ticks, today's items, the selected row. Pick any colour to override the theme's.</dd>
+      <dt>String colour</dt><dd>The corkboard strings, plus overdue and warning bits. Red by default.</dd>
+      <dt>Light or dark</dt><dd>Follow the phone, always light, or always dark.</dd>
+      <dt>Text style</dt><dd><span class="fonts"><span style="font-family: -apple-system, 'Segoe UI', system-ui, sans-serif">System</span><span style="font-family: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', system-ui, sans-serif">Rounded</span><span style="font-family: ui-serif, 'New York', Georgia, serif">Serif</span><span style="font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace">Mono</span></span></dd>
+      <dt>Text size</dt><dd>Small, normal or large.</dd>
+      <dt>Corkboard background</dt><dd>Cork, blueprint grid, dotted paper or plain.</dd>
+    </dl>
+  </div>
+</div>
+
+<script>
+const LOGOS = [
+  { name: 'Pin tree', idea: 'The current one: pins joined by red string, branching like a family tree.', svg: `
+    <rect width="512" height="512" fill="#F2C14E"/>
+    <g stroke="#B8322A" stroke-width="16" stroke-linecap="round" fill="none"><path d="M256 150L160 290M256 150L352 290M160 290L112 400M160 290L208 400M352 290L352 400"/></g>
+    <g fill="#FFF8E7" stroke="#3A2A12" stroke-width="14"><circle cx="256" cy="150" r="44"/><circle cx="160" cy="290" r="34"/><circle cx="352" cy="290" r="34"/><circle cx="112" cy="400" r="26"/><circle cx="208" cy="400" r="26"/><circle cx="352" cy="400" r="26"/></g>` },
+  { name: 'Brain canopy', idea: 'A tree whose leafy top is a brain. Says the name in one picture.', svg: `
+    <rect width="512" height="512" fill="#1F3A2C"/>
+    <g fill="none" stroke="#F1E6CF" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M256 128C226 98 166 104 156 146C114 152 102 204 128 228C104 258 128 306 172 302C188 328 232 326 256 302"/>
+      <path d="M256 128C286 98 346 104 356 146C398 152 410 204 384 228C408 258 384 306 340 302C324 328 280 326 256 302"/>
+      <path d="M256 128V410M256 410C236 424 214 430 192 432M256 410C276 424 298 430 320 432"/>
+      <path d="M256 200L200 176M256 250L318 222"/>
+    </g>
+    <g fill="#E9B949"><circle cx="200" cy="176" r="18"/><circle cx="318" cy="222" r="18"/><circle cx="256" cy="300" r="16"/></g>` },
+  { name: 'Pushpin', idea: 'One red pin with its string running off into branches. Most "detective board".', svg: `
+    <rect width="512" height="512" fill="#C9A06B"/>
+    <g fill="#B88C57" opacity=".55"><circle cx="90" cy="80" r="6"/><circle cx="420" cy="120" r="5"/><circle cx="380" cy="420" r="7"/><circle cx="120" cy="380" r="5"/><circle cx="300" cy="300" r="4"/><circle cx="60" cy="250" r="4"/><circle cx="450" cy="300" r="5"/></g>
+    <g fill="none" stroke="#C0261F" stroke-width="12" stroke-linecap="round"><path d="M200 196C230 300 300 300 330 360M262 286C300 270 360 260 400 280M330 360C330 400 360 420 390 430"/></g>
+    <g fill="#F7EBD3" stroke="#5A3A1C" stroke-width="8"><circle cx="400" cy="280" r="20"/><circle cx="390" cy="430" r="20"/></g>
+    <path d="M200 200L176 290" stroke="#6E6E6E" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="200" cy="166" r="70" fill="#D7322A"/><circle cx="200" cy="166" r="70" fill="none" stroke="#8E1D17" stroke-width="10"/>
+    <circle cx="178" cy="142" r="20" fill="#F48A80"/>` },
+  { name: 'Sprout', idea: 'A seedling with two leaves and a root node. Friendly, "ideas growing".', svg: `
+    <rect width="512" height="512" fill="#EAF1E1"/>
+    <path d="M256 420V250" stroke="#2E6B40" stroke-width="22" stroke-linecap="round"/>
+    <path d="M256 280C256 200 196 150 120 160C120 236 176 286 256 280Z" fill="#4FA36A"/>
+    <path d="M256 250C256 170 316 120 392 130C392 206 336 256 256 250Z" fill="#2E8B57"/>
+    <path d="M150 420H362" stroke="#8A6A43" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="256" cy="420" r="24" fill="#C8372D"/>` },
+  { name: 'bt monogram', idea: 'A drawn “bt” whose letter ends are joined pins. Matches the pobajobs workshop look.', svg: `
+    <rect width="512" height="512" fill="#1B1E21"/>
+    <g fill="none" stroke="#EDEAE4" stroke-width="30" stroke-linecap="round">
+      <path d="M170 110V390"/><circle cx="236" cy="322" r="66"/>
+      <path d="M352 140V352C352 380 368 392 396 392"/><path d="M310 216H398"/>
+    </g>
+    <path d="M170 110L352 140" stroke="#FF6B1A" stroke-width="10" stroke-dasharray="4 18" stroke-linecap="round"/>
+    <g fill="#FF6B1A"><circle cx="170" cy="110" r="26"/><circle cx="352" cy="140" r="26"/><circle cx="396" cy="392" r="20"/></g>` },
+  { name: 'Polaroids', idea: 'Three snapshots on cork, strung together. The corkboard view, as an icon.', svg: `
+    <rect width="512" height="512" fill="#B98A57"/>
+    <g fill="#A87A49" opacity=".6"><circle cx="70" cy="420" r="7"/><circle cx="460" cy="80" r="6"/><circle cx="440" cy="440" r="6"/><circle cx="60" cy="60" r="5"/></g>
+    <g transform="rotate(-8 170 180)"><rect x="90" y="96" width="160" height="176" rx="6" fill="#FFFDF7"/><rect x="104" y="110" width="132" height="116" fill="#F2C14E"/></g>
+    <g transform="rotate(7 350 210)"><rect x="270" y="130" width="160" height="176" rx="6" fill="#FFFDF7"/><rect x="284" y="144" width="132" height="116" fill="#5B8DB8"/></g>
+    <g transform="rotate(-3 250 380)"><rect x="170" y="300" width="160" height="176" rx="6" fill="#FFFDF7"/><rect x="184" y="314" width="132" height="116" fill="#4FA36A"/></g>
+    <g fill="none" stroke="#C0261F" stroke-width="9" stroke-linecap="round"><path d="M170 104C230 150 290 120 350 138M170 104C190 220 230 260 250 306M350 138C340 220 300 260 250 306"/></g>
+    <g fill="#D7322A"><circle cx="170" cy="104" r="16"/><circle cx="350" cy="138" r="16"/><circle cx="250" cy="306" r="16"/></g>` },
+  { name: 'Constellation', idea: 'Stars joined into a tree on a blueprint night sky. Calm, techy.', svg: `
+    <rect width="512" height="512" fill="#14324A"/>
+    <g stroke="#2A5878" stroke-width="2"><path d="M0 128H512M0 256H512M0 384H512M128 0V512M256 0V512M384 0V512"/></g>
+    <g fill="none" stroke="#BFD8EA" stroke-width="7" stroke-linecap="round"><path d="M256 120L176 236L120 360M176 236L238 360M256 120L340 240L396 352M340 240L300 392"/></g>
+    <g fill="#F5FAFF"><circle cx="176" cy="236" r="16"/><circle cx="120" cy="360" r="12"/><circle cx="238" cy="360" r="12"/><circle cx="340" cy="240" r="16"/><circle cx="396" cy="352" r="12"/><circle cx="300" cy="392" r="12"/></g>
+    <path d="M256 84L268 112L298 116L276 136L282 166L256 151L230 166L236 136L214 116L244 112Z" fill="#FF6B1A"/>` },
+];
+
+const THEMES = [
+  { id: 'notepad', name: 'Notepad', idea: 'Warm paper and honey yellow. Calm, like a notes app. (Current.)',
+    light: { bg: '#F7F5F0', side: '#EFECE5', card: '#FFFFFF', ink: '#1F1D1A', soft: '#6F6A62', accent: '#C98A00', string: '#C8372D', on: '#1A1305' },
+    dark: { bg: '#1C1B19', side: '#161513', card: '#252421', ink: '#EDEAE3', soft: '#A8A298', accent: '#E7B23A', string: '#EF6A5E', on: '#1A1305' } },
+  { id: 'cork', name: 'Corkboard', idea: 'Kraft paper, walnut and rust. Leans into the detective board.',
+    light: { bg: '#EFE4D2', side: '#E5D6BE', card: '#FFFBF3', ink: '#2B2118', soft: '#6E5C48', accent: '#A0522D', string: '#C62828', on: '#FFFFFF' },
+    dark: { bg: '#241C15', side: '#1C150F', card: '#30261C', ink: '#F1E6D6', soft: '#BDA88E', accent: '#D9894F', string: '#EF5B4C', on: '#1A1006' } },
+  { id: 'blueprint', name: 'Blueprint', idea: 'Navy and safety orange, the same family as your Builds site.',
+    light: { bg: '#EEF3F7', side: '#E2EAF1', card: '#FFFFFF', ink: '#14324A', soft: '#4F6A80', accent: '#FF6B1A', string: '#D0402B', on: '#111111' },
+    dark: { bg: '#11263A', side: '#0C1D2D', card: '#183149', ink: '#E6EEF5', soft: '#9DB3C6', accent: '#FF8A3D', string: '#FF6B57', on: '#111111' } },
+  { id: 'forest', name: 'Forest', idea: 'Greens and moss with a brick-red string. Goes with the Sprout logo.',
+    light: { bg: '#F2F5EF', side: '#E6ECE1', card: '#FFFFFF', ink: '#1D2A20', soft: '#5D6B5F', accent: '#2F7D4F', string: '#B5452B', on: '#FFFFFF' },
+    dark: { bg: '#151C17', side: '#101511', card: '#1F2821', ink: '#E3EBE3', soft: '#9DB0A0', accent: '#5CC283', string: '#E86A50', on: '#0E1A12' } },
+  { id: 'ink', name: 'Ink', idea: 'Black and white with only the string in colour. Most minimal.',
+    light: { bg: '#FAFAFA', side: '#F0F0F0', card: '#FFFFFF', ink: '#111111', soft: '#555555', accent: '#111111', string: '#D32F2F', on: '#FFFFFF' },
+    dark: { bg: '#0E0E0E', side: '#080808', card: '#1A1A1A', ink: '#F2F2F2', soft: '#A0A0A0', accent: '#F2F2F2', string: '#FF5A4F', on: '#111111' } },
+  { id: 'dusk', name: 'Dusk', idea: 'Lavender and raspberry. Softer, a bit more playful.',
+    light: { bg: '#F6F3FA', side: '#ECE6F4', card: '#FFFFFF', ink: '#221B2E', soft: '#675C78', accent: '#7A4FD0', string: '#D9466F', on: '#FFFFFF' },
+    dark: { bg: '#19151F', side: '#131018', card: '#241E2C', ink: '#ECE6F5', soft: '#ABA0BC', accent: '#A98BF0', string: '#F06A90', on: '#160F22' } },
+];
+
+const svg = s => `<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${s}</svg>`;
+document.getElementById('logos').innerHTML = LOGOS.map((l, i) => `
+  <article class="logo">
+    <div class="tiles"><div class="big">${svg(l.svg)}</div><div class="small">${svg(l.svg)}</div><div class="tiny">${svg(l.svg)}</div></div>
+    <span class="num">Logo ${i + 1}</span>
+    <h3>${l.name}</h3>
+    <p>${l.idea}</p>
+  </article>`).join('');
+
+const mock = t => `
+  <div class="mock" style="--t-bg:${t.bg};--t-side:${t.side};--t-card:${t.card};--t-ink:${t.ink};--t-soft:${t.soft};--t-accent:${t.accent};--t-string:${t.string};--t-on:${t.on}">
+    <div class="side"><b>Brain Tree</b><span class="on">Today</span><span>Upcoming</span><span>Notes</span><span>Garden office</span></div>
+    <div class="main"><b>Today</b>
+      <div class="row"><i></i>Pour concrete base<span class="chip">Overdue</span></div>
+      <div class="row"><i class="done"></i>Order timber</div>
+      <div class="string"></div>
+      <span class="btn">New project</span>
+    </div>
+  </div>`;
+document.getElementById('themes').innerHTML = THEMES.map(t => `
+  <article class="theme">
+    <header><h3>${t.name}</h3><span class="tag">${t.id === 'notepad' ? 'current' : ''}</span></header>
+    <div class="pair">${mock(t.light)}${mock(t.dark)}</div>
+    <p>${t.idea}</p>
+    <div class="swatches"><span><i style="background:${t.light.accent}"></i>main</span><span><i style="background:${t.light.string}"></i>string</span><span><i style="background:${t.light.bg}"></i>paper</span><span><i style="background:${t.dark.bg}"></i>night</span></div>
+  </article>`).join('');
+</script>
