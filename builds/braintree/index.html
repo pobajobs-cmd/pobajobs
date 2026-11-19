@@ -17,6 +17,8 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
+<script>/* Paint in the saved look straight away (theme.js keeps this copy up to date). */
+try { var l = JSON.parse(localStorage.getItem('bt-look')); if (l) { var r = document.documentElement; for (var k in l.vars) r.style.setProperty(k, l.vars[k]); r.style.fontSize = l.size + 'px'; r.style.colorScheme = l.dark ? 'dark' : 'light'; r.dataset.mode = l.dark ? 'dark' : 'light'; r.dataset.board = l.board; r.dataset.boardstyle = l.boardStyle || 'corkboard'; } } catch (e) {}</script>
 </head>
 <body data-pane="nav">
 <div id="app">
@@ -39,6 +41,7 @@
     <header class="bar">
       <button id="listBack" class="back" data-act="back-nav"></button>
       <h2 id="listTitle"></h2>
+      <button id="boardBtn" class="iconbtn" data-act="open-board" aria-label="Corkboard" title="Corkboard"></button>
       <button id="newBtn" class="iconbtn accent" data-act="new" aria-label="New"></button>
     </header>
     <div class="listscroll">
@@ -48,6 +51,7 @@
     </div>
   </section>
 
+  <section id="board" aria-label="Corkboard"></section>
   <main id="detail" aria-label="Item"></main>
 </div>
 

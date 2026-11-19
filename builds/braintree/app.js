@@ -4,8 +4,10 @@
 
 import * as store from './store.js';
 import { createEditor, textOf, firstPhoto, escHtml as esc } from './editor.js';
+import { createBoard, COLOURS } from './board.js';
+import * as theme from './theme.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.3.0';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project' };
 const SMART = [
@@ -28,6 +30,9 @@ const ICON = {
   move: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M10 13.5h6M13.5 11l2.5 2.5-2.5 2.5"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  board: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1.5"/><circle cx="16" cy="9" r="1.5"/><circle cx="12" cy="15" r="1.5"/><path d="M8 9l4 6 4-6"/></svg>',
+  string: '<svg viewBox="0 0 24 24"><circle cx="5" cy="7" r="2"/><circle cx="19" cy="7" r="2"/><path d="M5 7c3 9 11 9 14 0"/></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   back: '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
   caret: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
   photo: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>',
@@ -79,7 +84,7 @@ function fmtWhen(iso) {
 
 function buildIndex() {
   const byId = new Map(), kids = new Map(), trashed = [];
-  for (const r of store.all()) if (!r.deleted) byId.set(r.id, r);
+  for (const r of store.all()) if (!r.deleted && r.data.type !== 'pref') byId.set(r.id, r);
   const aliveMemo = new Map();
   const alive = (r, depth = 0) => {
     if (aliveMemo.has(r.id)) return aliveMemo.get(r.id);
@@ -121,13 +126,16 @@ const byPinnedUpdated = (a, b) => (b.data.pinned ? 1 : 0) - (a.data.pinned ? 1 :
 
 function parseHash() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
-  if (parts[0] === 'project') return { view: null, project: parts[1] || null, item: parts[2] || null };
-  return { view: parts[0] || null, project: null, item: parts[1] || null };
+  if (parts[0] === 'project') return { view: null, project: parts[1] || null, item: parts[2] || null, board: null };
+  if (parts[0] === 'board') return { view: 'board', project: null, board: parts[1] || 'home', item: parts[2] || null };
+  return { view: parts[0] || null, project: null, item: parts[1] || null, board: null };
 }
 
 function go(next, replace = false) {
   const r = { ...route, ...next };
-  const hash = r.project ? `#/project/${r.project}${r.item ? '/' + r.item : ''}` : r.view ? `#/${r.view}${r.item ? '/' + r.item : ''}` : '#/';
+  const hash = r.project ? `#/project/${r.project}${r.item ? '/' + r.item : ''}`
+    : r.view === 'board' ? `#/board/${r.board || 'home'}${r.item ? '/' + r.item : ''}`
+    : r.view ? `#/${r.view}${r.item ? '/' + r.item : ''}` : '#/';
   if (replace) history.replaceState(null, '', hash); else if (location.hash !== hash) location.hash = hash;
   if (replace || location.hash === hash) onRoute();
 }
@@ -154,11 +162,35 @@ function queueRender() {
 function render() {
   I = buildIndex();
   if (route.project && !I.byId.has(route.project)) { go({ project: null, view: 'today', item: null }, true); return; }
+  if (route.view === 'board' && route.board !== 'home' && !I.byId.has(route.board)) { go({ board: 'home', item: null }, true); return; }
+  const onBoard = route.view === 'board' && !search;
+  document.body.dataset.view = onBoard ? 'board' : 'lists';
+  document.body.toggleAttribute('data-drawer', onBoard && !!route.item);
   document.body.dataset.pane = route.item ? 'detail' : (route.view || route.project || search) ? 'list' : 'nav';
   renderNav();
-  renderList();
+  if (onBoard) {
+    board ??= createBoard($('#board'), boardApi);
+    board.show(route.board);
+  } else renderList();
   renderDetail();
 }
+
+let board = null;
+const boardApi = {
+  store,
+  index: () => I,
+  open: id => go({ item: id }),
+  selected: () => route.item,
+  today: () => today(),
+  fmtDay: s => fmtDay(s),
+  progress: id => progress(id),
+  titleOf: r => titleOf(r),
+  toast: (...a) => toast(...a),
+  newItem: (type, parent, extra) => newItem(type, parent ?? null, extra),
+  placePicker: (key, exclude, onPick) => pickItem({ title: 'Bring onto this board', exclude: new Set(exclude), onPick }),
+  style: () => theme.current(store).boardStyle,
+};
+const boardName = () => (theme.current(store).boardStyle === 'whiteboard' ? 'Whiteboard' : 'Corkboard');
 
 function renderNav() {
   const t = today();
@@ -171,7 +203,10 @@ function renderNav() {
     <a href="#/${s.id}" class="navrow ${active(s.id) ? 'on' : ''}" data-view="${s.id}">
       <span class="ic ic-${s.id}">${ICON[s.icon]}</span><span class="name">${s.name}</span>
       ${counts[s.id] ? `<span class="count ${s.id === 'today' && I.live.some(r => isOpen(r) && r.data.due && r.data.due < t) ? 'late' : ''}">${counts[s.id]}</span>` : ''}
-    </a>`).join('');
+    </a>`).join('') + `
+    <a href="#/board/home" class="navrow ${!search && route.view === 'board' && route.board === 'home' ? 'on' : ''}" data-view="board">
+      <span class="ic ic-board">${ICON.board}</span><span class="name">${boardName()}</span>
+    </a>`;
 
   // Project tree: projects nest under the nearest project above them.
   const projects = I.live.filter(r => r.data.type === 'project' && !r.data.done);
@@ -182,7 +217,7 @@ function renderNav() {
     const { total, done } = progress(p.id);
     const shut = collapsed.has(p.id);
     return `
-      <div class="navrow proj ${route.project === p.id && !search ? 'on' : ''}" data-project="${p.id}" style="--depth:${depth}">
+      <div class="navrow proj ${(route.project === p.id || (route.view === 'board' && route.board === p.id)) && !search ? 'on' : ''}" data-project="${p.id}" style="--depth:${depth}">
         <button class="caret ${subs ? '' : 'none'} ${shut ? '' : 'open'}" data-toggle="${p.id}" aria-label="Show or hide sub-projects">${subs ? ICON.caret : ''}</button>
         <span class="ic">${ICON.folder}</span><span class="name">${esc(titleOf(p))}</span>
         ${total ? `<span class="count">${done}/${total}</span>` : ''}
@@ -349,7 +384,7 @@ function rowHTML(r, { trash = false, inProject = false } = {}) {
   const lead = type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="${d.done ? 'Mark not done' : 'Mark done'}"></button>`
     : `<span class="ic t-${type}">${type === 'project' ? ICON.folder : ICON.note}</span>`;
   return `
-    <div class="row ${sel} t-${type} ${d.done ? 'is-done' : ''}" data-open="${r.id}" role="button" tabindex="0">
+    <div class="row ${sel} t-${type} ${d.done ? 'is-done' : ''} ${d.color ? 'c-' + d.color : ''}" data-open="${r.id}" role="button" tabindex="0">
       ${trash ? `<span class="ic">${type === 'project' ? ICON.folder : type === 'task' ? ICON.check : ICON.note}</span>` : lead}
       <span class="main">
         <span class="title">${d.pinned ? `<span class="pinmark">${ICON.pin}</span>` : ''}${esc(titleOf(r))}</span>
@@ -394,9 +429,11 @@ function buildDetail(host, r) {
       <button class="back" data-act="back">${ICON.back}<span>Back</span></button>
       <nav class="crumbs"></nav>
       <div class="acts">
+        <button data-act="board" class="boardbtn" title="Open this project's corkboard">${ICON.board}</button>
         <button data-act="pin" title="Pin to top">${ICON.pin}</button>
         <button data-act="move" title="Move into a project">${ICON.move}</button>
         <button data-act="trash" title="Delete">${ICON.trash}</button>
+        <button data-act="back" class="closer" title="Close">${ICON.close}</button>
       </div>
     </header>
     <div class="scroll">
@@ -413,9 +450,15 @@ function buildDetail(host, r) {
         <label class="chip date"><span>Due</span><input type="date" class="due"><button type="button" class="x" data-clear="due" aria-label="Clear due date">×</button></label>
         <button class="chip where" data-act="move"></button>
       </div>
+      <div class="swatchrow" role="group" aria-label="Colour">
+        <button class="sw none" data-colour-pick="" title="No colour">×</button>
+        ${COLOURS.map(c => `<button class="sw c-${c}" data-colour-pick="${c}" title="${c[0].toUpperCase() + c.slice(1)}"></button>`).join('')}
+        <button class="chip frametoggle" data-act="frame-toggle" hidden></button>
+      </div>
       <section class="inside top"></section>
       <div class="editor"></div>
       <section class="inside bottom"></section>
+      <section class="links"></section>
       <footer class="stamp"></footer>
     </div>`;
 
@@ -444,7 +487,8 @@ function buildDetail(host, r) {
     onImage: src => { $('#lightbox img').src = src; $('#lightbox').hidden = false; },
   });
   editor.setHTML(r.data.body || '');
-  if (r.data.created === r.data.updated && !r.data.title) setTimeout(() => title.focus(), 50);
+  // Brand new: straight into naming it (a placeholder name like "New section" is selected, ready to type over).
+  if (r.data.created === r.data.updated) setTimeout(() => { title.focus(); title.select(); }, 50);
 }
 
 function saveTitle() {
@@ -486,6 +530,26 @@ function updateDetail(r) {
   const parent = I.parentOf(r);
   $('.props .where', host).innerHTML = `${ICON.folder}<span>${parent ? esc(titleOf(parent)) : 'No project'}</span>`;
   $('.acts [data-act=pin]', host).classList.toggle('on', !!d.pinned);
+  $('.acts .boardbtn', host).hidden = type !== 'project' || (route.view === 'board' && route.board === r.id);
+  for (const b of host.querySelectorAll('[data-colour-pick]')) b.classList.toggle('on', (d.color || '') === b.dataset.colourPick);
+  // Seen from a board: a project here can be shown as a section (a frame you drop cards into).
+  const ft = $('.frametoggle', host);
+  ft.hidden = !(route.view === 'board' && type === 'project' && r.id !== route.board && board);
+  if (!ft.hidden) ft.textContent = board.isFrameHere(r.id) ? 'Show as a card on this board' : 'Show as a section on this board';
+
+  // Strings: links this item has to others, and others to it.
+  const outgoing = (d.links || []).map(l => ({ id: l.to, label: l.label, from: r.id, to: l.to }));
+  const incoming = I.live.filter(x => x.id !== r.id && (x.data.links || []).some(l => l.to === r.id))
+    .map(x => ({ id: x.id, label: x.data.links.find(l => l.to === r.id).label, from: x.id, to: r.id }));
+  const strings = [...outgoing, ...incoming].filter(x => I.byId.has(x.id));
+  $('.links', host).innerHTML = `
+    <div class="ihead"><h3>Strings</h3><span class="add"><button data-act="tie">+ Tie to…</button></span></div>
+    ${strings.length ? strings.map(x => { const o = I.byId.get(x.id); return `
+      <div class="lrow" data-open="${x.id}" role="button" tabindex="0">
+        <span class="ic t-${o.data.type}">${o.data.type === 'project' ? ICON.folder : o.data.type === 'task' ? ICON.check : ICON.note}</span>
+        <span class="name">${esc(titleOf(o))}</span>${x.label ? `<em>${esc(x.label)}</em>` : ''}
+        <button class="untie" data-untie="${x.from}|${x.to}" aria-label="Cut this string">${ICON.close}</button>
+      </div>`; }).join('') : '<p class="hint">Tie this to anything else in Brain Tree, here or by dragging a card’s pin on a corkboard.</p>'}`;
 
   // Body: only replace it from outside (another device) when you're not typing in it.
   if (!editor.element.contains(document.activeElement) && !editor.pending && editor.getHTML() !== (d.body || '')) editor.setHTML(d.body || '');
@@ -597,6 +661,34 @@ function movePicker(id) {
   });
 }
 
+// Pick any item: search box plus a list (projects first, then most recently edited).
+function pickItem({ title, exclude = new Set(), onPick }) {
+  const pool = I.live.filter(r => !exclude.has(r.id))
+    .sort((a, b) => (a.data.type === 'project' ? 0 : 1) - (b.data.type === 'project' ? 0 : 1) || (b.data.updated || '').localeCompare(a.data.updated || ''));
+  const rows = q => {
+    const s = q.trim().toLowerCase();
+    const hits = (s ? pool.filter(r => (titleOf(r) + ' ' + textOf(r.data.body)).toLowerCase().includes(s)) : pool).slice(0, 60);
+    return hits.length ? hits.map(r => { const p = I.project(r); return `
+      <button class="pick" data-pickitem="${r.id}">${r.data.type === 'project' ? ICON.folder : r.data.type === 'task' ? ICON.check : ICON.note}
+        <span>${esc(titleOf(r))}</span>${p ? `<em>${esc(titleOf(p))}</em>` : ''}</button>`; }).join('') : '<p class="hint">Nothing matches.</p>';
+  };
+  modal(`
+    <h2>${esc(title)}</h2>
+    <input class="picksearch" type="search" placeholder="Search" autocomplete="off">
+    <div class="picks">${rows('')}</div>
+    <div class="mbtns"><button data-close>Cancel</button></div>`, el => {
+    const input = el.querySelector('.picksearch');
+    input.addEventListener('input', () => { el.querySelector('.picks').innerHTML = rows(input.value); });
+    if (wide.matches) setTimeout(() => input.focus(), 30);
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-pickitem]');
+      if (!b) return;
+      closeModal();
+      onPick(b.dataset.pickitem);
+    });
+  });
+}
+
 function compareModal(id) {
   const r = store.get(id);
   if (!r?.conflict) return;
@@ -630,9 +722,25 @@ function compareModal(id) {
 
 async function settingsModal() {
   const s = store.status;
+  const p = theme.current(store);
+  const dark = document.documentElement.dataset.mode === 'dark';
+  const th = theme.THEMES.find(t => t.id === p.theme) || theme.THEMES[0];
+  const seg = (k, options) => `<div class="seg" role="group">${Object.entries(options).map(([v, label]) => `<button data-k="${k}" data-v="${v}" class="${p[k] === v ? 'on' : ''}">${label}</button>`).join('')}</div>`;
   modal(`
     <h2>Brain Tree</h2>
     <div class="settings">
+      <h3>Appearance</h3>
+      <div class="themepick">${theme.THEMES.map(t => `
+        <button data-theme="${t.id}" class="${p.theme === t.id ? 'on' : ''}" style="--a:${(dark ? t.dark : t.light).accent};--b:${(dark ? t.dark : t.light).bg};--c:${(dark ? t.dark : t.light).card};--s:${(dark ? t.dark : t.light).string}">
+          <i><b></b><u></u></i><span>${t.name}</span></button>`).join('')}</div>
+      <div class="setrow"><span>Light or dark</span>${seg('mode', { auto: 'Match phone', light: 'Light', dark: 'Dark' })}</div>
+      <div class="setrow"><span>Main colour</span><span class="colour"><input type="color" data-colour="accent" value="${p.accent || (dark ? th.dark : th.light).accent}" aria-label="Main colour"><button data-reset="accent" class="link" ${p.accent ? '' : 'hidden'}>Use theme’s</button></span></div>
+      <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${p.string || (dark ? th.dark : th.light).string}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use theme’s</button></span></div>
+      <div class="setrow"><span>Text style</span>${seg('font', Object.fromEntries(Object.entries(theme.FONTS).map(([k, f]) => [k, `<span style="font-family:${f.stack.replace(/"/g, "'")}">${f.name}</span>`])))}</div>
+      <div class="setrow"><span>Text size</span>${seg('size', { small: 'Small', normal: 'Normal', large: 'Large' })}</div>
+      <div class="setrow"><span>Board style</span>${seg('boardStyle', theme.BOARD_STYLES)}</div>
+      <div class="setrow"><span>Board background</span>${seg('board', theme.BOARDS)}</div>
+      <h3>This device</h3>
       <label>This device’s name<input class="devname" value="${esc(store.device())}" maxlength="40"></label>
       <p class="hint">Shown when the same thing is changed on two devices.</p>
       <div class="kv"><span>Sync</span><b>${esc(s.state === 'idle' ? 'Working' : s.state)}${s.message ? ': ' + esc(s.message) : ''}</b></div>
@@ -652,6 +760,27 @@ async function settingsModal() {
       <button data-close>Close</button>
     </div>`, el => {
     el.querySelector('.devname').addEventListener('change', e => store.setDevice(e.target.value));
+    // Appearance changes show straight away and are saved (and synced) as you go.
+    const setPref = async (patch, reopen) => {
+      await theme.save(store, { ...theme.current(store), ...patch });
+      if (reopen) { const top = el.scrollTop; await settingsModal(); $('#modal .sheet').scrollTop = top; }
+    };
+    for (const input of el.querySelectorAll('[data-colour]')) {
+      input.addEventListener('input', () => theme.apply({ ...theme.current(store), [input.dataset.colour]: input.value }));
+      input.addEventListener('change', () => setPref({ [input.dataset.colour]: input.value }, true));
+    }
+    el.addEventListener('click', e => {
+      const t = e.target.closest('[data-theme]'), s = e.target.closest('[data-k]'), r = e.target.closest('[data-reset]');
+      if (t) setPref({ theme: t.dataset.theme, accent: null, string: null }, true);
+      else if (s && s.dataset.k === 'boardStyle') {
+        // Each style gets its natural background, unless you've picked a different one.
+        const cur = theme.current(store);
+        const board = s.dataset.v === 'whiteboard' && cur.board === 'cork' ? 'dots' : s.dataset.v === 'corkboard' && cur.board === 'dots' ? 'cork' : cur.board;
+        setPref({ boardStyle: s.dataset.v, board }, true);
+      }
+      else if (s) setPref({ [s.dataset.k]: s.dataset.v }, true);
+      else if (r) setPref({ [r.dataset.reset]: null }, true);
+    });
     el.addEventListener('click', async e => {
       const b = e.target.closest('[data-s]');
       if (!b) return;
@@ -761,6 +890,15 @@ document.addEventListener('click', async e => {
     if (confirm('Delete this for good, on every device? This can’t be undone.')) purge([x.dataset.purge]);
     return;
   }
+  if ((x = el('[data-colour-pick]')) && editingId) { store.update(editingId, { color: x.dataset.colourPick || undefined }); return; }
+  if ((x = el('[data-untie]'))) {
+    e.stopPropagation();
+    const [from, to] = x.dataset.untie.split('|');
+    const links = store.get(from)?.data.links || [];
+    store.update(from, { links: links.filter(l => l.to !== to) });
+    toast('String cut.', 'Undo', () => store.update(from, { links }));
+    return;
+  }
   if ((x = el('[data-done]'))) { const k = x.dataset.done; openDone.has(k) ? openDone.delete(k) : openDone.add(k); render(); return; }
   if ((x = el('[data-toggle]'))) {
     e.stopPropagation();
@@ -785,7 +923,7 @@ document.addEventListener('click', async e => {
   }
   if ((x = el('[data-open]'))) {
     const id = x.dataset.open;
-    if (x.closest('.crumbs') || x.closest('.inside') || x.closest('#listBody') || x.closest('#listHead')) openItem(id);
+    if (x.closest('.crumbs') || x.closest('.inside') || x.closest('.links') || x.closest('#listBody') || x.closest('#listHead')) openItem(id);
     return;
   }
   if ((x = el('[data-act]'))) {
@@ -799,6 +937,14 @@ document.addEventListener('click', async e => {
     else if (a === 'new') newMenu(route.project || undefined);
     else if (a === 'new-project') { const pid = await newItem('project', null); go({ project: pid, view: null, item: pid }); }
     else if (a === 'empty-trash') { if (confirm(`Delete all ${I.trashed.length} item(s) in Recently deleted for good, on every device?`)) purge(I.trashed.map(r => r.id)); }
+    else if (id && a === 'frame-toggle' && board) board.toggleFrame(id);
+    else if (a === 'board-list') go(route.board && route.board !== 'home' ? { view: null, project: route.board, item: null } : { view: 'today', item: null });
+    else if (a === 'open-board') go({ view: 'board', board: route.project || 'home', project: null, item: null });
+    else if (id && a === 'board') go({ view: 'board', board: id, project: null, item: null });
+    else if (id && a === 'tie') {
+      const links = store.get(id)?.data.links || [];
+      pickItem({ title: 'Tie a string to…', exclude: new Set([id, ...links.map(l => l.to)]), onPick: to => store.update(id, { links: [...(store.get(id)?.data.links || []), { to }] }) });
+    }
     else if (id && a === 'tick') toggleDone(id);
     else if (id && a === 'pin') { const r = store.get(id); store.update(id, { pinned: r.data.pinned ? undefined : true }); }
     else if (id && a === 'move') movePicker(id);
@@ -854,6 +1000,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
   $('#nav .brand').insertAdjacentHTML('beforeend', `<button class="iconbtn" data-act="settings" aria-label="Settings">${ICON.gear}</button>`);
   $('#newProject').innerHTML = ICON.plus;
   $('#newBtn').innerHTML = ICON.plus;
+  $('#boardBtn').innerHTML = ICON.board;
   $('#listBack').innerHTML = ICON.back + '<span>Lists</span>';
   try {
     await store.load();
@@ -861,8 +1008,10 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
     document.body.innerHTML = `<p style="padding:2rem;font-family:system-ui">Brain Tree couldn’t open its storage on this device: ${esc(e.message)}. Private browsing can block it.</p>`;
     return;
   }
+  theme.apply(theme.current(store));
+  theme.watch(() => theme.current(store));
   store.onChange(ids => {
-    if (ids && editingId && ids.includes(editingId)) { /* updateDetail handles outside changes */ }
+    if (ids && ids.includes(theme.PREF_ID)) theme.apply(theme.current(store));
     queueRender();
   });
   onRoute();

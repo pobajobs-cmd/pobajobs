@@ -114,9 +114,11 @@ export function newId() {
   return [...b].map(x => x.toString(36).padStart(2, '0')).join('').slice(0, 20);
 }
 
-export async function create(data) {
+export function create(data) { return createWithId(newId(), data); }
+
+export async function createWithId(id, data) {
   const now = new Date().toISOString();
-  const rec = { id: newId(), data: { created: now, updated: now, order: Date.now(), ...data }, deleted: false, rev: 0, baseRev: 0, dirty: true, editSeq: 1, conflict: null };
+  const rec = { id, data: { created: now, updated: now, order: Date.now(), ...data }, deleted: false, rev: 0, baseRev: 0, dirty: true, editSeq: 1, conflict: null, baseData: null };
   items.set(rec.id, rec);
   await putItems([rec]);
   emit([rec.id]);
@@ -128,6 +130,9 @@ export async function create(data) {
 export async function update(id, patch) {
   const rec = items.get(id);
   if (!rec || rec.deleted) return;
+  // Remember the synced version this edit starts from, so edits on two devices to
+  // different parts of an item can be merged instead of asking which to keep.
+  if (!rec.dirty && rec.rev) rec.baseData = structuredClone(rec.data);
   const data = { ...rec.data, ...patch, updated: new Date().toISOString() };
   for (const k of Object.keys(data)) if (data[k] === undefined) delete data[k];
   rec.data = data; rec.dirty = true; rec.editSeq = (rec.editSeq || 0) + 1;
@@ -162,9 +167,10 @@ export async function resolve(id, choice) {
   if (choice === 'mine') {
     rec.rev = rec.baseRev = theirs.rev;
     rec.dirty = true; rec.editSeq = (rec.editSeq || 0) + 1;
+    rec.baseData = theirs.data ? structuredClone(theirs.data) : null;
   } else {
     rec.data = theirs.data || {}; rec.deleted = !!theirs.deleted;
-    rec.rev = rec.baseRev = theirs.rev; rec.dirty = false;
+    rec.rev = rec.baseRev = theirs.rev; rec.dirty = false; rec.baseData = null;
   }
   rec.conflict = null;
   await putItems([rec]);
@@ -250,18 +256,20 @@ export async function sync() {
         continue;
       }
 
+      const sentData = new Map(dirty.map(r => [r.id, r.deleted ? null : structuredClone(r.data)]));
       const changed = new Map();
       for (const a of res.accepted) {
         const r = items.get(a.id);
         if (!r) continue;
         r.rev = r.baseRev = a.rev;
-        if (r.editSeq === sent.get(a.id)) r.dirty = false;
+        if (r.editSeq === sent.get(a.id)) { r.dirty = false; r.baseData = null; }
+        else r.baseData = sentData.get(a.id);
         changed.set(r.id, r);
       }
       for (const c of res.conflicts) {
         const r = items.get(c.id);
         if (!r) continue;
-        r.conflict = { rev: c.rev, data: c.data, deleted: c.deleted, device: c.device, updated_at: c.updated_at };
+        clash(r, { rev: c.rev, data: c.data, deleted: c.deleted, device: c.device, updated_at: c.updated_at });
         changed.set(r.id, r);
       }
       for (const x of res.rejected || []) setStatus('error', x.error);
@@ -275,7 +283,7 @@ export async function sync() {
         if (it.rev <= (r.rev || 0)) continue;
         if (r.dirty) {
           // Unsent edits here, newer version there.
-          if (!r.conflict || it.rev > r.conflict.rev) r.conflict = { rev: it.rev, data: it.data, deleted: it.deleted, device: it.device, updated_at: it.updated_at };
+          if (!r.conflict || it.rev > r.conflict.rev) clash(r, { rev: it.rev, data: it.data, deleted: it.deleted, device: it.device, updated_at: it.updated_at });
         } else {
           r.data = it.data || {}; r.deleted = it.deleted; r.rev = r.baseRev = it.rev;
         }
@@ -291,7 +299,8 @@ export async function sync() {
       await saveMeta('seq');
       if (changed.size || gone.length) emit([...changed.keys(), ...gone.map(r => r.id)]);
 
-      const stillDirty = [...items.values()].some(r => r.dirty && !r.conflict && !sent.has(r.id));
+      // Anything changed since this round started (including quietly merged items) goes up now.
+      const stillDirty = [...items.values()].some(r => r.dirty && !r.conflict && (!sent.has(r.id) || r.editSeq !== sent.get(r.id)));
       if (!res.more && !stillDirty && dirty.length < 200) break;
     }
     status.lastSync = Date.now();
@@ -305,6 +314,65 @@ export async function sync() {
     syncing = false;
     if (syncAgain) { syncAgain = false; scheduleSync(300); }
   }
+}
+
+// ---------- Merging ----------
+
+// This device's unsent edit meets a newer version from another device. If the two changed
+// different things (say, the title here and the due date there, or cards moved on different
+// boards), combine them quietly. Only real clashes are kept for you to pick.
+function clash(r, theirs) {
+  const merged = autoMerge(r, theirs);
+  if (merged) {
+    r.data = merged; r.rev = r.baseRev = theirs.rev; r.baseData = structuredClone(theirs.data);
+    r.dirty = true; r.editSeq = (r.editSeq || 0) + 1; r.conflict = null;
+    return;
+  }
+  r.conflict = theirs;
+}
+
+function autoMerge(r, theirs) {
+  if (r.deleted || theirs.deleted || !theirs.data) return null;
+  // Settings: the newest wins.
+  if (r.data.type === 'pref') return (theirs.data.updated || '') > (r.data.updated || '') ? structuredClone(theirs.data) : { ...r.data };
+  const base = r.baseData;
+  if (!base) return null;
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const out = structuredClone(theirs.data);
+  const keys = new Set([...Object.keys(base), ...Object.keys(r.data), ...Object.keys(theirs.data)]);
+  keys.delete('updated');
+  for (const k of keys) {
+    const mine = r.data[k], other = theirs.data[k], was = base[k];
+    if (same(mine, was) || same(mine, other)) continue;      // only they changed it, or both made the same change
+    if (same(other, was)) { if (mine === undefined) delete out[k]; else out[k] = structuredClone(mine); continue; } // only we changed it
+    if (k === 'cork') { const m = mergeKeyed(was, mine, other); if (!m) return null; out[k] = m; continue; }
+    if (k === 'links') { out[k] = mergeLinks(was, mine, other); continue; }
+    return null; // both changed the same thing differently
+  }
+  out.updated = [r.data.updated || '', theirs.data.updated || ''].sort().pop();
+  return out;
+}
+
+// Board positions: merge per board; a clash only if both moved the same card on the same board.
+function mergeKeyed(was = {}, mine = {}, other = {}) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const out = { ...other };
+  for (const k of new Set([...Object.keys(was), ...Object.keys(mine), ...Object.keys(other)])) {
+    if (same(mine[k], was[k]) || same(mine[k], other[k])) continue;
+    if (same(other[k], was[k])) { if (mine[k] === undefined) delete out[k]; else out[k] = mine[k]; continue; }
+    out[k] = mine[k]; // both moved it: this device's spot wins, nothing worth asking about
+  }
+  return out;
+}
+
+// Strings: keep every string either side added, drop any either side removed.
+function mergeLinks(was = [], mine = [], other = []) {
+  const key = l => l.to;
+  const wasK = new Set(was.map(key)), mineK = new Set(mine.map(key));
+  const removed = new Set([...wasK].filter(k => !mineK.has(k)));
+  const out = new Map(other.filter(l => !removed.has(key(l))).map(l => [key(l), l]));
+  for (const l of mine) if (!wasK.has(key(l))) out.set(key(l), l);
+  return [...out.values()];
 }
 
 // ---------- Photos ----------

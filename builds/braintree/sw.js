@@ -2,8 +2,8 @@
 // Your data isn't here (that's in IndexedDB); /api/ requests always go to the network.
 // Bump VERSION whenever any file below changes, so devices pick up the new copy.
 
-const VERSION = 'braintree-0.1.0';
-const FILES = ['./', 'app.js', 'store.js', 'editor.js', 'styles.css', 'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
+const VERSION = 'braintree-0.3.0';
+const FILES = ['./', 'app.js', 'store.js', 'editor.js', 'board.js', 'theme.js', 'styles.css', 'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
