@@ -39,10 +39,24 @@ export async function handleBraintree(request, env, url) {
     if (path.startsWith('/files/')) return await getFile(env, path.slice('/files/'.length));
     if (path === '/stats') return await stats(env);
     if (path === '/ping') return json({ ok: true });
+    if (path === '/video') return await videoInfo(url);
     return json({ error: 'Not found.' }, 404);
   } catch (e) {
     return json({ error: 'Server error: ' + (e && e.message ? e.message : String(e)) }, 500);
   }
+}
+
+// ---------- YouTube clip titles ----------
+
+// GET /video?id=<YouTube video id>: its title and channel, from YouTube's public oEmbed
+// (asked from here because YouTube doesn't let pages ask it directly).
+async function videoInfo(url) {
+  const id = url.searchParams.get('id') || '';
+  if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return json({ error: 'That isn’t a YouTube video id.' }, 400);
+  const res = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id), { cf: { cacheTtl: 86400 } });
+  if (!res.ok) return json({ error: res.status === 404 || res.status === 401 ? 'That video is private, removed or can’t be embedded.' : 'YouTube didn’t answer (' + res.status + ').' }, 404);
+  const o = await res.json();
+  return json({ title: String(o.title || '').slice(0, 200), author: String(o.author_name || '').slice(0, 100) });
 }
 
 // ---------- Sign-in ----------
