@@ -236,7 +236,7 @@ a { color: inherit; text-decoration: none; }
 .tools button:hover { background: var(--hover); color: var(--ink); }
 .tools button.on { background: var(--accent-bg); color: var(--accent-ink); }
 .tools .sep { width: 1px; height: 20px; background: var(--line); margin: 0 0.3rem; flex-shrink: 0; }
-@media (max-width: 480px) { .tools button { width: 32px; } .tools .sep { margin: 0 0.15rem; } }
+@media (max-width: 480px) { .tools { flex-wrap: wrap; } .tools button { width: 32px; } .tools .sep { margin: 0 0.15rem; } }
 .body { min-height: 40vh; outline: none; font-size: 1.05rem; line-height: 1.6; overflow-wrap: anywhere; padding-bottom: 2rem; }
 .body:empty::before { content: attr(data-placeholder); color: var(--faint); pointer-events: none; }
 .body p { margin: 0 0 0.5em; }
@@ -389,7 +389,7 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
   body[data-view="board"] #app { grid-template-columns: 100%; }
   body[data-view="board"][data-pane="detail"] #board, body[data-view="board"][data-pane="nav"] #board { display: none; }
   body[data-view="board"][data-drawer] .closer { display: none !important; }
-  body[data-view="board"][data-drawer] #detail { border: 0; box-shadow: none; }
+  body[data-view="board"][data-drawer] #detail { width: 100%; border: 0; box-shadow: none; }
 }
 
 .boardhead { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.9rem; min-height: 52px; border-bottom: 1px solid var(--line); background: var(--bg); z-index: 4; }
@@ -648,5 +648,89 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .stringpop button.danger { color: var(--string); }
 .boardhint { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 6; margin: 0; padding: 0.45rem 0.9rem; border-radius: 14px; background: var(--card); color: var(--soft); font-size: 0.85rem; box-shadow: var(--shadow); width: max-content; max-width: calc(100% - 24px); text-align: center; pointer-events: none; }
 .tying .boardhint { color: var(--ink); box-shadow: 0 0 0 2px var(--wire), var(--shadow); }
+
+/* ---------- YouTube clips ---------- */
+
+.pclip, .body .clip { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: #1B1B1B; user-select: none; -webkit-user-select: none; }
+.pcard .pclip { margin: 0 0 10px; border-radius: 3px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+.body .clip { margin: 0.5em 0; border-radius: 12px; max-width: 640px; }
+.body .clip.playing { overflow: visible; background: #000; }
+.pclip .cthumb, .body .clip .cthumb { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: cover; margin: 0; border-radius: 0; cursor: default; pointer-events: none; }
+.cplay { position: absolute; left: 50%; top: 50%; width: 58px; height: 40px; margin: -20px 0 0 -29px; border-radius: 11px; background: rgba(18, 18, 18, 0.78); display: grid; place-items: center; transition: background 0.15s; }
+.cplay:hover { background: #D7261E; }
+.cplay svg { width: 24px; height: 24px; fill: #FFF; stroke: none; }
+.cinfo { position: absolute; left: 0; right: 0; bottom: 0; display: grid; padding: 1.4rem 0.65rem 0.45rem; background: linear-gradient(transparent, rgba(0, 0, 0, 0.78)); color: #FFF; font-size: 0.8rem; line-height: 1.25; pointer-events: none; text-align: left; }
+.cinfo b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.cinfo i { font-style: normal; opacity: 0.85; font-variant-numeric: tabular-nums; }
+.cedit, .cbig { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; padding: 0.25rem 0.55rem; border-radius: 8px; background: rgba(18, 18, 18, 0.72); color: #FFF; font-size: 0.78rem; font-weight: 600; }
+.cbig { padding: 0.3rem; }
+.cbig svg { width: 16px; height: 16px; }
+.body .clip iframe, .vbig iframe, .mplay iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: inherit; }
+.cstop { position: absolute; top: -12px; right: -12px; z-index: 1; width: 30px; height: 30px; border-radius: 50%; background: #222; color: #FFF; font-size: 14px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); }
+.pcard.playing { transform: none; }
+/* The player over a card (its own layer, so redrawing the board doesn't restart it). */
+.media { position: absolute; left: 0; top: 0; z-index: 3; }
+.mplay { position: absolute; background: #000; border-radius: 3px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+.mclose, .mbig { position: absolute; top: -15px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: #222; color: #FFF; font-size: 14px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); transform: scale(var(--iz, 1)); }
+.mclose { right: -15px; }
+.mbig { right: 22px; }
+.mbig svg { width: 15px; height: 15px; }
+/* The clip dialog and the big player. */
+.field { display: grid; gap: 0.3rem; margin: 0.55rem 0; font-size: 0.85rem; color: var(--soft); }
+.field input { border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.7rem; background: var(--bg); color: var(--ink); font-size: 16px; outline: none; min-width: 0; }
+.field input:focus { box-shadow: 0 0 0 2px var(--accent); }
+.ctimes { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.cprev { display: flex; align-items: center; gap: 0.7rem; margin: 0.4rem 0; }
+.cprev img { width: 112px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; background: #222; flex-shrink: 0; }
+.cprev span { font-weight: 600; font-size: 0.92rem; }
+.cerr { color: var(--string); min-height: 1.2em; font-size: 0.88rem; margin: 0.2rem 0 0; }
+.mbtns .grow { flex: 1; }
+.mbtns a.link { align-self: center; }
+.sheet.wide { width: min(940px, 100%); }
+.vbig { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
+.vmeta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.7rem; align-items: baseline; margin-top: 0.7rem; }
+.vmeta span { color: var(--soft); font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+
+/* ---------- Drawings ---------- */
+
+svg.drawing { display: block; width: 100%; height: auto; fill: none; stroke: none; }
+.pcard .pdraw { margin: 0 0 10px; border-radius: 3px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
+.pcard .pdraw svg { max-height: 240px; }
+.pcard .pmore { margin: 0.35rem 0 0; color: var(--paper-soft); font-size: 0.8rem; }
+.body .drawblock { position: relative; display: block; margin: 0.5em 0; max-width: 680px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.body .drawblock svg { max-height: 60vh; }
+.body .drawblock .dedit { position: absolute; top: 8px; right: 8px; padding: 0.25rem 0.55rem; border-radius: 8px; background: rgba(18, 18, 18, 0.66); color: #FFF; font-size: 0.78rem; font-weight: 600; }
+
+#drawpad { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; background: var(--bg); padding-top: env(safe-area-inset-top); }
+#drawpad .dhead { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--line); }
+#drawpad .dhead h2 { flex: 1; margin: 0; font-size: 1.05rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#drawpad .dhead button { padding: 0.45rem 0.85rem; border-radius: 9px; font-weight: 600; }
+#drawpad .dhead button:not(.primary) { color: var(--accent-ink); }
+#drawpad .dwrap { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none;
+  background-color: #FFFEFA; background-image: radial-gradient(circle, rgba(60, 50, 30, 0.22) 1.2px, transparent 1.7px); }
+#drawpad .dcanvas { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: none; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+#drawpad .dsel { fill: none; stroke: var(--accent); }
+#drawpad .dhandle { fill: #FFF; stroke: var(--accent); cursor: nwse-resize; }
+#drawpad .dtext { position: absolute; z-index: 2; margin: 0; padding: 4px 6px; border: 0; border-radius: 4px; outline: 2px solid var(--accent); background: rgba(255, 254, 250, 0.94); resize: none; overflow: hidden; text-align: center; font-family: -apple-system, 'Segoe UI', system-ui, sans-serif; }
+#drawpad .dhint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); margin: 0; padding: 0.35rem 0.8rem; border-radius: 12px; background: rgba(255, 255, 255, 0.92); color: #555; font-size: 0.82rem; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); pointer-events: none; }
+#drawpad .dtools { display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card); overflow-x: auto; scrollbar-width: none; }
+#drawpad .dtools button { width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; color: var(--soft); }
+#drawpad .dtools button:hover { background: var(--hover); color: var(--ink); }
+#drawpad .dtools button.on { background: var(--accent-bg); color: var(--accent-ink); }
+#drawpad .dtools button:disabled { opacity: 0.35; }
+#drawpad .dtools .sep { width: 1px; height: 24px; margin: 0 4px; flex-shrink: 0; background: var(--line); }
+@media (max-width: 420px) { #drawpad .dtools { gap: 1px; padding-left: 0.25rem; padding-right: 0.25rem; } #drawpad .dtools button { width: 30px; height: 40px; } #drawpad .dtools .sep { margin: 0 2px; } }
+#drawpad .dpal { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 3; display: grid; gap: 0.5rem; max-width: calc(100% - 16px); padding: 0.65rem 0.75rem; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+#drawpad .drow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+#drawpad .drow span { width: 3.3rem; font-size: 0.78rem; color: var(--soft); }
+#drawpad .dsw { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--sw); border: 1.5px solid var(--line); color: var(--faint); }
+#drawpad .dsw.on { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent); }
+#drawpad .dopt { padding: 0.25rem 0.6rem; border-radius: 8px; border: 1px solid var(--line); font-size: 0.9rem; }
+#drawpad .dopt.on { background: var(--accent-bg); border-color: var(--accent); }
+
+/* The board's Add menu (and others) with icons. */
+.boardmenu button { display: flex; align-items: center; gap: 0.6rem; }
+.boardmenu button svg { width: 18px; height: 18px; color: var(--soft); }
+.boardbar .addbtn { font-weight: 700; color: var(--accent-ink); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

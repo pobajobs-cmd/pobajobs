@@ -13,7 +13,9 @@
 //   strings:            data.links = [{to, label}], listed under "Strings" on each item
 //   "put inside":       data.parent, the same tree the lists show. What's inside a card is listed on it.
 
-import { sanitize, firstPhoto, escHtml as esc } from './editor.js';
+import { sanitize, escHtml as esc } from './editor.js';
+import { clipOf, clipFaceHTML, iframeHTML, clipDivHTML } from './media.js';
+import { cleanDrawing, drawingSVG, drawDivHTML } from './draw.js';
 
 const CARD_W = 220, GAP = 28, PAD = 24, HEAD = 46;
 const SECTION_W = 2 * PAD + 2 * CARD_W + GAP, SECTION_H = 320;
@@ -44,14 +46,12 @@ export function createBoard(host, api) {
           <defs><marker id="bt-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrowhead"/></marker></defs>
           <g class="lines"></g>
         </svg>
+        <div class="media"></div>
       </div>
     </div>
     <div class="boardbar">
-      <button data-b="add-note" title="New note here">+ Note</button>
-      <button data-b="add-task" title="New to-do here">+ To-do</button>
-      <button data-b="add-section" title="New section: a labelled area you drop cards into">+ Section</button>
+      <button data-b="add" class="addbtn" title="Add a note, to-do, section, YouTube clip or drawing">+ Add</button>
       <button data-b="tie" title="Tap one card, then another, to connect them">String</button>
-      <button data-b="place" title="Bring in something from another project or the Inbox">Pin<span class="long"> existing</span></button>
       <span class="sep"></span>
       <button data-b="tidy" title="Lay everything out neatly again">Tidy</button>
       <span class="sep"></span>
@@ -70,7 +70,9 @@ export function createBoard(host, api) {
   const pop = host.querySelector('.stringpop');
   const menuEl = host.querySelector('.boardmenu');
   const hint = host.querySelector('.boardhint');
+  const mediaEl = host.querySelector('.media');
   cork.style.setProperty('--cork-tex', `url(${corkTexture()})`);
+  let playing = null;               // {id, el, clip}: the clip playing on its card (one at a time)
 
   let key = null;                 // the project whose board this is
   let view = { x: 40, y: 40, z: 1 };
@@ -199,7 +201,7 @@ export function createBoard(host, api) {
 
   function render() {
     if (busy) { pendingRender = true; return; }
-    if (!key || !cork.clientWidth) return;     // hidden (a phone showing an item): drawn when it's back
+    if (!key || !cork.clientWidth) { stopPlay(); return; }     // hidden (a phone showing an item): drawn when it's back
     const I = api.index();
     const proj = I.byId.get(key);
     if (!proj) return;
@@ -219,6 +221,7 @@ export function createBoard(host, api) {
     for (const el of [...framesEl.children].sort((a, b) => area(b.dataset.frame) - area(a.dataset.frame))) framesEl.append(el);
     for (const el of framesEl.children) placeEl(el);
     for (const el of cardsEl.children) placeEl(el);
+    placeMedia();
     for (const img of cardsEl.querySelectorAll('img[data-thumb]')) api.store.fileUrl(img.dataset.thumb).then(u => { if (u) img.src = u; else img.remove(); });
     const hasLinks = [...cards, ...frames].some(r => (r.data.links || []).length);
     const tieBtn = host.querySelector('[data-b=tie]');
@@ -248,7 +251,7 @@ export function createBoard(host, api) {
 
   function cardHTML(r, I, t, sel) {
     const d = r.data, type = d.type || 'note';
-    const photo = firstPhoto(d.body);
+    const { html: body, media, more } = cardBody(d.body);
     const chips = [];
     const prog = type === 'project' ? api.progress(r.id) : null;
     if (type === 'project') {
@@ -256,16 +259,23 @@ export function createBoard(host, api) {
       if (d.start || d.due) chips.push(`<span class="chip ${!d.done && d.due && d.due < t ? 'late' : ''}">${d.start ? api.fmtDay(d.start) : '…'} → ${d.due ? api.fmtDay(d.due) : '…'}</span>`);
     } else if (d.due && type === 'task') chips.push(`<span class="chip ${!d.done && d.due < t ? 'late' : d.due === t ? 'now' : ''}">${api.fmtDay(d.due)}</span>`);
     if (guests.has(r.id)) { const p = I.project(r); chips.push(`<span class="chip guest">From ${esc(p ? short(api.titleOf(p)) : 'Inbox')}</span>`); }
-    const body = bodyHTML(d.body);
-    const showTitle = type !== 'note' || (d.title || '').trim() || !body;
+    // (a clip already shows its video's name, so a note named after it doesn't repeat it)
+    const sameAsClip = media?.kind === 'clip' && (d.title || '').trim() === (media.clip.title || '').trim();
+    const showTitle = type !== 'note' || ((d.title || '').trim() && !sameAsClip) || (!body && !media);
     const kids = type === 'project' ? [] : (I.kids.get(r.id) || []);
     const n = hash(r.id);
+    // The note's first photo, clip or drawing is the card's picture.
+    const pic = !media ? ''
+      : media.kind === 'photo' ? `<img class="polaroid" data-thumb="${media.id}" alt="">`
+      : media.kind === 'clip' ? `<div class="pclip">${clipFaceHTML(media.clip, { big: true })}</div>`
+      : `<div class="pdraw">${drawingSVG(media.d)}</div>`;
     return `
-      <div class="pcard t-${type} ${d.color ? 'c-' + d.color : ''} ${d.done ? 'is-done' : ''} ${sel === r.id ? 'on' : ''} ${tieFrom === r.id ? 'tiefrom' : ''}" data-card="${r.id}" style="--tilt:${((n % 7) - 3) * 0.6}deg;--pin:${PINS[n % PINS.length]}">
+      <div class="pcard t-${type} ${d.color ? 'c-' + d.color : ''} ${d.done ? 'is-done' : ''} ${sel === r.id ? 'on' : ''} ${tieFrom === r.id ? 'tiefrom' : ''} ${playing?.id === r.id ? 'playing' : ''}" data-card="${r.id}" style="--tilt:${((n % 7) - 3) * 0.6}deg;--pin:${PINS[n % PINS.length]}">
         <span class="pin" data-pin="${r.id}" title="Drag onto another card to connect"></span>
-        ${photo ? `<img class="polaroid" data-thumb="${photo}" alt="">` : ''}
+        ${pic}
         ${showTitle ? `<div class="ptitle">${type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="Done"></button>` : ''}<span>${esc(api.titleOf(r))}</span></div>` : ''}
         ${body ? `<div class="pbody">${body}</div>` : ''}
+        ${more ? `<p class="pmore">${esc(more)}</p>` : ''}
         ${kids.length ? kidsHTML(kids) : ''}
         ${prog && prog.total ? `<span class="pbar"><i style="width:${Math.round(100 * prog.done / prog.total)}%"></i></span>` : ''}
         ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
@@ -455,7 +465,7 @@ export function createBoard(host, api) {
     pop.hidden = true; menuEl.hidden = true;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) { startPinch(); return; }
-    if (e.target.closest('[data-tick], [data-ci], [data-openboard]')) return;   // their own tap
+    if (e.target.closest('[data-tick], [data-ci], [data-openboard], [data-play], [data-big], [data-mclose], [data-mbig]')) return;   // their own tap
     const link = e.target.closest('[data-link]');
     // Strings end on pins, so a string's tap area can lie over a pin: the pin wins (or no card
     // that already has a string could start another one).
@@ -510,6 +520,7 @@ export function createBoard(host, api) {
       if (!g.moved && Math.abs(dx) + Math.abs(dy) < 4 / view.z) return;
       if (!g.moved) { g.moved = true; g.el?.classList.add('lifted'); }
       for (const [id, s] of g.starts) { pos.set(id, { ...s, x: Math.round(s.x + dx), y: Math.round(s.y + dy) }); const el = elOf(id); if (el) placeEl(el); }
+      placeMedia();
       // Show which section a card will land in.
       for (const fr of framesEl.querySelectorAll('.drop')) fr.classList.remove('drop');
       if (!isFrame(g.id) && g.id !== key) { const into = frameAt(centre(g.id)); if (into) framesEl.querySelector(`[data-frame="${into}"]`)?.classList.add('drop'); }
@@ -580,13 +591,48 @@ export function createBoard(host, api) {
   cork.addEventListener('pointerup', end);
   cork.addEventListener('pointercancel', end);
 
-  // Taps that belong to something on a card: a checklist box, "Open its board".
+  // Taps that belong to something on a card: a checklist box, "Open its board", a clip's buttons.
   cork.addEventListener('click', e => {
     const box = e.target.closest('[data-ci]');
     if (box) { toggleCheck(box.closest('[data-card]').dataset.card, +box.dataset.ci); return; }
     const ob = e.target.closest('[data-openboard]');
-    if (ob) api.openBoard(ob.dataset.openboard);
+    if (ob) { api.openBoard(ob.dataset.openboard); return; }
+    const card = e.target.closest('[data-card]')?.dataset.card;
+    if (e.target.closest('[data-play]') && card) { startPlay(card); return; }
+    if (e.target.closest('[data-big]') && card) { const m = cardBody(api.store.get(card)?.data.body).media; if (m?.clip) { stopPlay(); api.bigVideo(m.clip); } return; }
+    if (e.target.closest('[data-mclose]')) { stopPlay(); return; }
+    if (e.target.closest('[data-mbig]') && playing) { const c = playing.clip; stopPlay(); api.bigVideo(c); }
   });
+
+  // ---------- A clip playing on its card ----------
+  // The player sits in its own layer over the card (the cards are redrawn whenever anything
+  // changes, which would restart a video inside one), lined up with the card's picture.
+  function startPlay(id) {
+    const m = cardBody(api.store.get(id)?.data.body).media;
+    if (m?.kind !== 'clip') return;
+    stopPlay();
+    const el = document.createElement('div');
+    el.className = 'mplay';
+    el.innerHTML = iframeHTML(m.clip) + `
+      <button type="button" class="mclose" data-mclose aria-label="Stop the video">✕</button>
+      <button type="button" class="mbig" data-mbig aria-label="Watch bigger" title="Watch bigger"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>`;
+    mediaEl.append(el);
+    playing = { id, el, clip: m.clip };
+    elOf(id)?.classList.add('playing');
+    placeMedia();
+  }
+  function stopPlay() {
+    if (!playing) return;
+    playing.el.remove();
+    elOf(playing.id)?.classList.remove('playing');
+    playing = null;
+  }
+  function placeMedia() {
+    if (!playing) return;
+    const card = elOf(playing.id), box = card?.querySelector('.pclip'), p = pos.get(playing.id);
+    if (!box || !p) { stopPlay(); return; }
+    Object.assign(playing.el.style, { left: p.x + box.offsetLeft + 'px', top: p.y + box.offsetTop + 'px', width: box.offsetWidth + 'px', height: box.offsetHeight + 'px' });
+  }
 
   function startPinch() {
     if (gesture?.kind === 'move' && gesture.moved) settle(gesture);
@@ -743,13 +789,14 @@ export function createBoard(host, api) {
     await api.store.update(id, { body: doc.body.innerHTML });
   }
 
-  function menu(cx, cy, opts) {
+  // A small menu where you tapped (or, with above, just above that point: for the toolbar).
+  function menu(cx, cy, opts, above = false) {
     menuActions = opts;
-    menuEl.innerHTML = opts.map((o, i) => `<button data-m="${i}" class="${o.danger ? 'danger' : ''}">${esc(o.label)}</button>`).join('') + '<button data-m="x" class="cancel">Cancel</button>';
+    menuEl.innerHTML = opts.map((o, i) => `<button data-m="${i}" class="${o.danger ? 'danger' : ''}">${o.icon || ''}<span>${esc(o.label)}</span></button>`).join('') + '<button data-m="x" class="cancel"><span>Cancel</span></button>';
     menuEl.hidden = false;
     const b = host.getBoundingClientRect();
     menuEl.style.left = clamp(cx - b.left - 20, 8, b.width - menuEl.offsetWidth - 8) + 'px';
-    menuEl.style.top = clamp(cy - b.top + 10, 8, b.height - menuEl.offsetHeight - 8) + 'px';
+    menuEl.style.top = clamp(above ? cy - b.top - menuEl.offsetHeight - 10 : cy - b.top + 10, 8, b.height - menuEl.offsetHeight - 8) + 'px';
   }
   menuEl.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]');
@@ -808,6 +855,30 @@ export function createBoard(host, api) {
     return { x: x0, y: maxY + 80 };
   }
 
+  function placeExisting() {
+    const I = api.index();
+    api.placePicker(key, [key, ...I.descendants(key).map(r => r.id), ...cards.map(r => r.id)], async id => {
+      const c = viewCentre();
+      const r = api.store.get(id);
+      await api.store.update(id, { cork: { ...(r.data.cork || {}), [key]: { x: Math.round(c.x - CARD_W / 2), y: Math.round(c.y) } } });
+    });
+  }
+
+  // A clip or a drawing on the board is a note holding it (so it's in the lists too).
+  // (These cards are big, so they go in the nearest empty space rather than on top of others.)
+  async function addClip() {
+    const at = freeSpot(CARD_W, 160, viewCentre());
+    const c = await api.pickClip(null);
+    if (!c || c === 'remove') return;
+    await api.newItem('note', key, { title: c.title || 'YouTube clip', body: clipDivHTML(c), cork: { [key]: at } });
+  }
+  async function addDrawing() {
+    const at = freeSpot(CARD_W, 200, viewCentre());
+    const dr = await api.draw(null, 'New drawing');
+    if (!dr || dr === 'remove' || !dr.s.length) return;
+    await api.newItem('note', key, { title: 'Drawing', body: drawDivHTML(dr), cork: { [key]: at } });
+  }
+
   async function addSection() {
     const at = freeSpot(SECTION_W, SECTION_H, viewCentre());
     const id = await api.newItem('section', key, { title: 'New section', cork: { [key]: { ...at, w: SECTION_W, h: SECTION_H } } });
@@ -822,18 +893,22 @@ export function createBoard(host, api) {
     if (a === 'in') { zoomAt(w, h, 1.25); saveView(); }
     else if (a === 'out') { zoomAt(w, h, 0.8); saveView(); }
     else if (a === 'fit') fit();
-    else if (a === 'add-note') addAt('note');
-    else if (a === 'add-task') addAt('task');
-    else if (a === 'add-section') addSection();
+    else if (a === 'add') {
+      if (!menuEl.hidden) { menuEl.hidden = true; return; }
+      if (tying) setTying(false);
+      const r = b.getBoundingClientRect();
+      const ic = p => `<svg viewBox="0 0 24 24">${p}</svg>`;
+      menu(r.left + 20, r.top, [
+        { label: 'Note', icon: ic('<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h6M9 16h6"/>'), fn: () => addAt('note') },
+        { label: 'To-do', icon: ic('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/>'), fn: () => addAt('task') },
+        { label: 'Section', icon: ic('<path d="M4 9V6a1 1 0 0 1 1-1h3M16 5h3a1 1 0 0 1 1 1v3M20 15v3a1 1 0 0 1-1 1h-3M8 19H5a1 1 0 0 1-1-1v-3"/>'), fn: () => addSection() },
+        { label: 'YouTube clip', icon: ic('<rect x="2.5" y="5.5" width="19" height="13" rx="3.5"/><path d="M10 9v6l5-3z"/>'), fn: () => addClip() },
+        { label: 'Drawing', icon: ic('<rect x="3" y="4" width="7" height="5" rx="1"/><circle cx="17" cy="17" r="3.5"/><path d="M6.5 9v4.5a3 3 0 0 0 3 3H13"/>'), fn: () => addDrawing() },
+        { label: 'Something already in Brain Tree', icon: ic('<path d="M9 3h6l-1 6 4 4H6l4-4z"/><path d="M12 13v8"/>'), fn: () => placeExisting() },
+      ], true);
+    }
     else if (a === 'tie') setTying(!tying);
-    else if (a === 'place') {
-      const I = api.index();
-      api.placePicker(key, [key, ...I.descendants(key).map(r => r.id), ...cards.map(r => r.id)], async id => {
-        const c = viewCentre();
-        const r = api.store.get(id);
-        await api.store.update(id, { cork: { ...(r.data.cork || {}), [key]: { x: Math.round(c.x - CARD_W / 2), y: Math.round(c.y) } } });
-      });
-    } else if (a === 'tidy') {
+    else if (a === 'tidy') {
       // Cards brought in from elsewhere keep their spot (that's what keeps them here); the rest are laid out again.
       const I = api.index();
       const slot = r => (r.id === key ? 'banner' : key);
@@ -854,6 +929,7 @@ export function createBoard(host, api) {
         key = boardKey;
         heights.clear();
         tying = false; tieFrom = null; host.classList.remove('tying');
+        stopPlay();
         const saved = readLocal('bt-view:' + key, null);
         if (saved) { view = saved; needsFit = false; } else needsFit = true;
         applyView();
@@ -867,16 +943,24 @@ export function createBoard(host, api) {
 
 // ---------- Note bodies on cards ----------
 
-// The note as it reads on a card: text, lists and checklists (tickable), links as plain text,
-// photos left out (the first one is the card's picture). Remembered, since boards redraw often.
+// The note as it reads on a card: text, lists and checklists (tickable), links as plain text.
+// Its first photo, clip or drawing ("media") becomes the card's picture; any others are counted.
+// Remembered, since boards redraw often.
 const bodyCache = new Map();
-function bodyHTML(html) {
-  if (!html) return '';
+function cardBody(html) {
+  if (!html) return { html: '', media: null, more: '' };
   if (bodyCache.has(html)) return bodyCache.get(html);
   const doc = new DOMParser().parseFromString('<body>' + sanitize(html) + '</body>', 'text/html');
   const b = doc.body;
-  const photos = b.querySelectorAll('img').length;
-  for (const img of b.querySelectorAll('img')) img.remove();
+  let media = null;
+  const extra = { photo: 0, clip: 0, draw: 0 };
+  for (const el of b.querySelectorAll('img[data-file], div[data-yt], div[data-draw]')) {
+    const m = el.tagName === 'IMG' ? { kind: 'photo', id: el.getAttribute('data-file') }
+      : el.hasAttribute('data-yt') ? { kind: 'clip', clip: clipOf(el) }
+      : { kind: 'draw', d: cleanDrawing(el.getAttribute('data-draw')) };
+    if (!media && (m.id || m.clip || m.d)) media = m; else extra[m.kind]++;
+  }
+  for (const el of b.querySelectorAll('img, div[data-yt], div[data-draw]')) el.remove();
   for (const el of b.querySelectorAll('p, div')) if (!el.textContent.trim() && !el.querySelector('ul, ol, hr')) el.remove();
   for (const h of b.querySelectorAll('h1, h2, h3')) { const p = doc.createElement('p'); p.className = 'ph'; p.append(...h.childNodes); h.replaceWith(p); }
   for (const a of b.querySelectorAll('a')) { const s = doc.createElement('span'); s.className = 'plink'; s.append(...a.childNodes); a.replaceWith(s); }
@@ -887,11 +971,13 @@ function bodyHTML(html) {
     li.append(box, text);
     if (li.getAttribute('data-checked') === 'true') li.className = 'on';
   });
-  let out = b.textContent.trim() || b.querySelector('li') ? b.innerHTML.trim() : '';
-  if (photos > 1) out += `<p class="pmore">+ ${photos - 1} more photo${photos === 2 ? '' : 's'}</p>`;
+  const out = b.textContent.trim() || b.querySelector('li') ? b.innerHTML.trim() : '';
+  const words = { photo: ['photo', 'photos'], clip: ['clip', 'clips'], draw: ['drawing', 'drawings'] };
+  const more = Object.entries(extra).filter(([, n]) => n).map(([k, n]) => `${n} ${words[k][n === 1 ? 0 : 1]}`).join(', ');
+  const res = { html: out, media, more: more ? `+ ${more} more inside` : '' };
   if (bodyCache.size > 400) bodyCache.clear();
-  bodyCache.set(html, out);
-  return out;
+  bodyCache.set(html, res);
+  return res;
 }
 
 // ---------- Helpers ----------

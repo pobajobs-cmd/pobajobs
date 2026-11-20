@@ -224,6 +224,8 @@ async function api(path, opts = {}) {
 }
 
 export const serverStats = () => api('/stats');
+// A YouTube video's title and channel (needs signal and a sign-in; null otherwise).
+export const videoInfo = id => (meta.token ? api('/video?id=' + encodeURIComponent(id), { timeout: 8000 }).catch(() => null) : Promise.resolve(null));
 
 // ---------- Sync ----------
 

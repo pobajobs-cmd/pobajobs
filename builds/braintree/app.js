@@ -4,11 +4,13 @@
 // group inside a project: a heading in the project's list, a labelled frame on its board.
 
 import * as store from './store.js';
-import { createEditor, textOf, firstPhoto, escHtml as esc } from './editor.js';
+import { createEditor, textOf, firstPhoto, mediaSummary, escHtml as esc } from './editor.js';
 import { createBoard, COLOURS } from './board.js';
+import { parseYouTube, parseTime, fmtTime, thumbUrl, watchUrl, iframeHTML, rangeText } from './media.js';
+import { openDrawing } from './draw.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.4.1';
+const VERSION = '0.5.0';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -120,7 +122,7 @@ function progress(id) {
   return { total: tasks.length, done: tasks.filter(r => r.data.done).length };
 }
 
-const titleOf = r => (r.data.title || '').trim() || (r.data.type === 'note' ? textOf(r.data.body).slice(0, 60) : '') || 'Untitled';
+const titleOf = r => (r.data.title || '').trim() || (r.data.type === 'note' ? textOf(r.data.body).slice(0, 60) || mediaSummary(r.data.body).replace(/^▶ /, '') : '') || 'Untitled';
 const isOpen = r => (r.data.type === 'task' || r.data.type === 'project') && !r.data.done;
 const byDueThenOrder = (a, b) => (a.data.due || '9999').localeCompare(b.data.due || '9999') || (a.data.order || 0) - (b.data.order || 0);
 const byPinnedUpdated = (a, b) => (b.data.pinned ? 1 : 0) - (a.data.pinned ? 1 : 0) || (b.data.updated || '').localeCompare(a.data.updated || '');
@@ -200,6 +202,9 @@ const boardApi = {
   newItem: (type, parent, extra) => newItem(type, parent ?? null, extra),
   placePicker: (key, exclude, onPick) => pickItem({ title: 'Bring onto this board', exclude: new Set(exclude), only: r => r.data.type !== 'section', onPick }),
   style: () => theme.current(store).look,
+  pickClip: c => clipModal(c),
+  draw: (d, title) => openDrawing({ drawing: d, title }),
+  bigVideo: c => videoModal(c),
 };
 
 function renderNav() {
@@ -406,7 +411,7 @@ function rowHTML(r, { trash = false, inProject = false } = {}) {
   if (r.conflict) chips.push(`<span class="chip late">${ICON.warn}Conflict</span>`);
   if (r.dirty && store.status.state !== 'signedout') chips.push('<span class="dot-pending" title="Not synced yet"></span>');
   const photo = firstPhoto(d.body);
-  const snippet = type === 'note' ? textOf(d.body).slice(0, 120) : '';
+  const snippet = type === 'note' ? textOf(d.body).slice(0, 120) || mediaSummary(d.body) : '';
   const lead = type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="${d.done ? 'Mark not done' : 'Mark done'}"></button>`
     : `<span class="ic t-${type}">${typeIcon(type)}</span>`;
   return `
@@ -508,6 +513,9 @@ function buildDetail(host, r) {
     addPhoto: file => store.addPhoto(file),
     onError: msg => toast(msg),
     onImage: src => { $('#lightbox img').src = src; $('#lightbox').hidden = false; },
+    onClip: c => clipModal(c),
+    onDraw: dr => openDrawing({ drawing: dr, title: (I.byId.get(r.id) && titleOf(I.byId.get(r.id))) || 'Drawing' }),
+    videoInfo: id => store.videoInfo(id),
   });
   editor.setHTML(r.data.body || '');
   // Brand new: straight into naming it (a placeholder name like "New section" is selected, ready to type over).
@@ -898,13 +906,84 @@ function newMenu(anchorParent) {
 
 // ---------- Modal, toast, login ----------
 
-function modal(html, setup) {
+let onModalClose = null;   // told when the open modal goes away, however it's closed
+function modal(html, setup, cls = '') {
+  const was = onModalClose; onModalClose = null; was?.();
   const m = $('#modal');
-  m.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  m.innerHTML = `<div class="sheet ${cls}" role="dialog" aria-modal="true">${html}</div>`;
   m.hidden = false;
   setup?.(m.firstElementChild);
 }
-function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; }
+function closeModal() {
+  $('#modal').hidden = true; $('#modal').innerHTML = '';
+  const f = onModalClose; onModalClose = null; f?.();
+}
+
+// Add or change a YouTube clip: the link, then where it starts and ends. Resolves with the clip,
+// 'remove', or null if you back out.
+function clipModal(existing) {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = v => { if (!settled) { settled = true; resolve(v); } };
+    const c0 = existing || null;
+    modal(`
+      <h2>${c0 ? 'Change the clip' : 'Add a YouTube clip'}</h2>
+      <label class="field">YouTube link<input class="curl" type="url" inputmode="url" placeholder="Paste a youtube.com or youtu.be link" value="${c0 ? esc(watchUrl(c0)) : ''}" autocomplete="off"></label>
+      <div class="cprev" hidden><img alt=""><span></span></div>
+      <div class="ctimes">
+        <label class="field">Start<input class="cstart" inputmode="decimal" placeholder="0:00" value="${c0?.start ? fmtTime(c0.start) : ''}" autocomplete="off"></label>
+        <label class="field">End<input class="cend" inputmode="decimal" placeholder="the end" value="${c0?.end ? fmtTime(c0.end) : ''}" autocomplete="off"></label>
+      </div>
+      <p class="hint">Times like 1:30 (or 1.30 on a phone keypad). Leave them empty for the whole video.</p>
+      <p class="cerr" role="alert"></p>
+      <div class="mbtns">${c0 ? '<button class="danger" data-c="remove">Remove</button><span class="grow"></span>' : ''}<button data-close>Cancel</button><button class="primary" data-c="ok">${c0 ? 'Save' : 'Add clip'}</button></div>`, el => {
+      const url = el.querySelector('.curl'), st = el.querySelector('.cstart'), en = el.querySelector('.cend'), err = el.querySelector('.cerr'), prev = el.querySelector('.cprev');
+      let title = c0?.title || '', shownId = c0?.id || null, lookup = null;
+      const preview = () => {
+        const c = parseYouTube(url.value);
+        prev.hidden = !c;
+        if (!c) return;
+        prev.querySelector('img').src = thumbUrl(c.id);
+        if (c.id !== shownId) {   // a new video: start where its link says, and look up its name
+          shownId = c.id; title = '';
+          if (c.start != null && !st.value) st.value = fmtTime(c.start);
+        }
+        prev.querySelector('span').textContent = title || 'Looking up its name…';
+        if (!title) lookup = store.videoInfo(c.id).then(info => {
+          if (shownId !== c.id) return;
+          title = info?.title || '';
+          prev.querySelector('span').textContent = title || 'YouTube video';
+        });
+      };
+      url.addEventListener('input', preview);
+      preview();
+      if (!c0 && wide.matches) setTimeout(() => url.focus(), 30);
+      el.addEventListener('click', async e => {
+        const b = e.target.closest('[data-c]');
+        if (!b) return;
+        if (b.dataset.c === 'remove') { finish('remove'); closeModal(); return; }
+        const c = parseYouTube(url.value);
+        if (!c) { err.textContent = 'That doesn’t look like a YouTube link.'; return; }
+        const s = parseTime(st.value), e2 = parseTime(en.value);
+        if (Number.isNaN(s) || Number.isNaN(e2)) { err.textContent = 'Write times like 1:30, 1.30 or 90 (seconds).'; return; }
+        if (s != null && e2 != null && e2 <= s) { err.textContent = 'The end needs to be after the start.'; return; }
+        if (lookup && !title) { b.disabled = true; await Promise.race([lookup, new Promise(r => setTimeout(r, 3000))]); }
+        finish({ id: c.id, start: s || null, end: e2 || null, title: title || '' });
+        closeModal();
+      });
+    });
+    onModalClose = () => finish(null);
+  });
+}
+
+// A clip, big.
+function videoModal(c) {
+  const range = rangeText(c);
+  modal(`
+    <div class="vbig">${iframeHTML(c)}</div>
+    <div class="vmeta"><b>${esc(c.title || 'YouTube video')}</b>${range ? `<span>${esc(range)}</span>` : ''}</div>
+    <div class="mbtns"><a class="link" href="${esc(watchUrl(c))}" target="_blank" rel="noopener noreferrer">Open in YouTube ↗</a><span class="grow"></span><button data-close>Close</button></div>`, null, 'wide');
+}
 
 function toast(msg, actionLabel, action) {
   const t = document.createElement('div');
