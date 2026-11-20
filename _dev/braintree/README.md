@@ -49,7 +49,7 @@ Notes show their text and checklists on the card, and the checklist boxes can be
 
 **Drawings** (0.5, `draw.js`): boxes, circles, diamonds, text, arrows that stay joined to shapes, and a pen, in a full-screen editor with undo, colours and pinch-zoom. Add one from the note toolbar or **+ Add → Drawing** on a board. Saved in the note as `<div data-draw='{"v":1,"s":[…]}'>` and shown as SVG on light paper, on the note and on its card.
 
-**Example project** (0.5.1, `example.js`): Settings → Getting started → *Add an example project* (also offered when there are no projects). It makes "Example: Make a short video" out of ordinary items: dated to-dos, a to-do with steps, a checklist note, three sections, a sub-project, labelled strings, a YouTube clip and a drawing. Delete it like any project.
+**Example project** (0.5.1, `example.js`): Settings → Getting started → *Add an example project* (also offered when there are no projects). It makes "Example: Make a short video" out of ordinary items: dated to-dos, a to-do with steps, a checklist note, three sections, a sub-project, labelled strings, a YouTube clip and a drawing. Delete it like any project. (Rebuilt in 0.7.1 to show everything, and kept up to date with each new feature: see 0.7.1 below.)
 
 Tying strings: drag a card's pin (or edge dot) onto another card, or tap **String** in the toolbar, then tap one card and then the other (it stays on for more; tap the empty board to stop). Pins grow when you zoom out so they stay finger-sized.
 
@@ -101,6 +101,16 @@ The sidebar shows how many to-dos in each project are due today (red if any are 
 **Files and links** (`attach.js`): the paperclip in the note toolbar, or **+ Add → File / Link** on a board. A file is `<div data-doc="id" data-name data-size data-mime data-parts>`: kept whole on the device, uploaded in pieces of 1.8 MB (`<id>-p0`, `-p1`…, as `application/octet-stream`; the Worker serves non-photos as downloads only), up to 25 MB a file. Another device fetches the pieces and joins them (`store.docBlob`). A link is `<div data-weblink="https://…" data-title>`, shown with what it is (Google Doc, OneDrive, Dropbox…). On a card the file or link is a tile; tapping it opens it. Opening a file: a new tab on a computer; the share sheet on a phone.
 
 **Print and export** (`export.js`; the share icon at the top of a list or a board, or "Print or export…" in a project's or section's hold menu). A list: **PDF** (A4, two columns, made here with no library: Helvetica, so emoji are left out), **Print** (`#printout`, two columns), **Excel (CSV)**, **Text** (copied). A board: **PDF** (one A4 page), **PNG**, **SVG**, **Print**. The board picture is copied from the board itself (`board.exportSVG()`: flat for a moment, every box, line of text and picture copied into SVG, strings on top), so every look comes out as it shows; shadows, glow and pseudo-element decorations (tape, title bars) aren't copied. Files go to the share sheet on a phone, a download on a computer.
+
+## 0.7.1
+
+**String button.** It says "String" on every look, with the same prompts (in 0.7 it was renamed Trace, Pipe, Neon, Join… to suit the look, and looked missing). What's said when a string is tied or cut still suits the look. On every look except Corkboard, the round dot on a card's edge is the card's pin: drag it onto another card.
+
+**Branches (T junctions).** A string can carry more cards where its label sits: `data.links[i].also = [id, …]` on the item the string starts from. Make one by dragging a string's label onto a card, by tapping a string and choosing **Branch** then a card (String mode ends again after that one), or in String mode by tapping a card and then a label (either order). A string with branches but no label gets a knot at the junction, which works like a label. Tap a branch to open its card or take it off. In an item's "Strings" list, every card on the same string is listed, branch rows marked "branch"; × on a branch row takes that branch off. Duplicating keeps branches between copied things, editing a label keeps them, and sync merges them (`mergeLinks`: branches either device added, less any either took off; the label from the device that changed it).
+
+**Locked projects on a board** show only their name and "Locked" (0.7.0 showed a locked project's notes on its card). A locked project's row in a list has a lock icon.
+
+**Example project** rebuilt to show everything (see `example.js`; its header lists what's in it). **Keep it up to date: every new feature gets an example there and a line in the project's notes.** It now has a pinned to-do with a PDF attached (made with `listPDF`), a photo note drawn on a canvas and shown Large, a spreadsheet with a formula, a link tile, a branch off "read from", and a locked sub-project (password `tree`). `addExample(store, { makeLock })`.
 
 ## Free tier
 
