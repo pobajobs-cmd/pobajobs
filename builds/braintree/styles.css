@@ -113,6 +113,20 @@ a { color: inherit; text-decoration: none; }
 .group.late > .gname { color: var(--string); }
 .empty { color: var(--faint); text-align: center; padding: 2.5rem 1.5rem; margin: 0; }
 
+/* Sections in a project's list: a heading with what's in it underneath (a frame on the board). */
+.group.sec { margin-top: 0.5rem; }
+.sechead { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.3rem 0.4rem 0.6rem; margin-bottom: 0.15rem; border-bottom: 2px solid var(--line); border-radius: 8px 8px 0 0; cursor: pointer; outline: none; }
+.sechead:hover { background: var(--hover); }
+.sechead:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.sechead.on { background: var(--sel); }
+.group.sec[class*=" c-"] .sechead { border-bottom-color: color-mix(in srgb, var(--sticky) 65%, var(--ink) 35%); }
+.sechead .sname { flex: 1; min-width: 0; font-weight: 700; font-size: 1.02rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sechead .scount { color: var(--soft); font-size: 0.8rem; }
+.sechead .secadd { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--accent-ink); }
+.sechead .secadd:hover { background: var(--accent-bg); }
+.sechead .secadd svg { width: 18px; height: 18px; }
+.secempty { color: var(--faint); font-size: 0.88rem; padding: 0.45rem 0.6rem; margin: 0; }
+
 .row { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.6rem; border-radius: 10px; cursor: pointer; position: relative; outline: none; }
 .row:hover { background: var(--hover); }
 .row:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
@@ -126,7 +140,8 @@ a { color: inherit; text-decoration: none; }
 .row .sub { color: var(--soft); font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .sub b { color: var(--ink); font-weight: 500; margin-right: 0.3rem; }
 .row .ic { display: grid; padding-top: 1px; color: var(--accent); }
-.row .ic.t-project { color: var(--proj); }
+.row .ic.t-project, .row .ic.t-section { color: var(--proj); }
+.row.t-section .title { font-weight: 600; }
 .row .thumb { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--hover); }
 .pinmark svg { width: 13px; height: 13px; color: var(--accent); margin-right: 0.3rem; vertical-align: -1px; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.15rem; }
@@ -320,6 +335,14 @@ a { color: inherit; text-decoration: none; }
 .picksearch:focus { box-shadow: 0 0 0 2px var(--accent); }
 .pick span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick em { color: var(--faint); font-size: 0.8rem; font-style: normal; white-space: nowrap; }
+.picks .subpicks { display: grid; gap: 0.15rem; }
+.picks .subpicks:empty { display: none; }
+.pick.sec { font-size: 0.92rem; }
+.lookpick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; margin-bottom: 0.3rem; }
+@media (max-width: 480px) { .lookpick { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.lookpick button { display: grid; gap: 0.35rem; justify-items: center; padding: 0.4rem; border-radius: 10px; border: 1.5px solid var(--line); font-size: 0.85rem; }
+.lookpick button.on { border-color: var(--accent); background: var(--accent-bg); }
+.lookpick svg { width: 100%; height: auto; aspect-ratio: 120 / 48; border-radius: 6px; display: block; stroke: none; }
 
 /* ---------- Strings list in an item ---------- */
 
@@ -333,16 +356,24 @@ a { color: inherit; text-decoration: none; }
 .lrow .untie:hover { background: var(--hover); color: var(--string); }
 .lrow .untie svg { width: 16px; height: 16px; }
 
-/* ---------- Corkboard ---------- */
+/* ---------- Boards ----------
+   One per project. Four looks (data-look on <html>), each with its own background, cards,
+   section frames, banner and strings: corkboard, whiteboard, blueprint, notebook.
+   --wire is the string colour (theme.js sets it for the look, or your own pick). */
 
 :root {
-  --cork: #C79D69; --cork-fleck: rgba(95, 58, 22, 0.38); --cork-blot: rgba(120, 78, 36, 0.16);
+  --cork: #C79D69;
   --paper-note: #FFF3BF; --paper-task: #FFFFFF; --paper-proj: #F2DCAA; --paper-ink: #2B2620; --paper-soft: #6B6157;
-  --twine: #7E6040;
+  --wire: var(--string);
+  --marker: 'Marker Felt', 'Chalkboard SE', 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive;
+  --hand: 'Noteworthy', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive;
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --typewriter: 'American Typewriter', 'Courier Prime', 'Courier New', ui-monospace, monospace;
+  --bp-line: rgba(225, 240, 255, 0.85);
 }
 :root[data-mode="dark"] {
-  --cork: #5A4429; --cork-fleck: rgba(20, 10, 0, 0.45); --cork-blot: rgba(0, 0, 0, 0.14);
-  --paper-note: #E8DCA2; --paper-task: #E9E6E0; --paper-proj: #D9C392; --twine: #C9A982;
+  --cork: #5A4429;
+  --paper-note: #E8DCA2; --paper-task: #E9E6E0; --paper-proj: #D9C392;
 }
 #board { display: none; position: relative; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; padding-top: env(safe-area-inset-top); }
 .closer { display: none !important; }
@@ -366,32 +397,43 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 
 .cork { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; outline: none; user-select: none; -webkit-user-select: none; background-color: var(--cork); }
 .cork:active { cursor: grabbing; }
-:root[data-board="cork"] .cork, :root:not([data-board]) .cork {
-  background-image: var(--cork-tex, none);
-}
-:root[data-board="grid"] .cork {
+:root[data-look="corkboard"] .cork, :root:not([data-look]) .cork { background-image: var(--cork-tex, none); }
+:root[data-look="whiteboard"] .cork { background-color: #F7F7F4; background-image: linear-gradient(transparent, transparent), radial-gradient(circle, rgba(0, 0, 0, 0.12) 1.1px, transparent 1.6px); }
+:root[data-look="whiteboard"][data-mode="dark"] .cork { background-color: #222529; background-image: linear-gradient(transparent, transparent), radial-gradient(circle, rgba(255, 255, 255, 0.10) 1.1px, transparent 1.6px); }
+:root[data-look="blueprint"] .cork {
   background-color: #1D4E74;
   background-image: linear-gradient(rgba(200, 225, 245, 0.22) 1px, transparent 1px), linear-gradient(rgba(200, 225, 245, 0.10) 1px, transparent 1px),
     linear-gradient(90deg, rgba(200, 225, 245, 0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(200, 225, 245, 0.10) 1px, transparent 1px);
 }
-:root[data-board="grid"][data-mode="dark"] .cork { background-color: #102C44; }
-:root[data-board="grid"] { --twine: #CFE3F2; }
-:root[data-board="dots"] .cork { background-color: var(--bg); background-image: linear-gradient(transparent, transparent), radial-gradient(circle, color-mix(in srgb, var(--ink) 22%, transparent) 1.3px, transparent 1.8px); }
-:root[data-board="plain"] .cork { background-color: var(--side); background-image: none; }
+:root[data-look="blueprint"][data-mode="dark"] .cork { background-color: #102C44; }
+:root[data-look="notebook"] .cork { background-color: #FBF9F3; background-image: linear-gradient(transparent, transparent), radial-gradient(circle, rgba(60, 50, 30, 0.26) 1.3px, transparent 1.8px); }
+:root[data-look="notebook"][data-mode="dark"] .cork { background-color: #1F1E1B; background-image: linear-gradient(transparent, transparent), radial-gradient(circle, rgba(255, 245, 220, 0.16) 1.3px, transparent 1.8px); }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .cards { position: relative; z-index: 1; }
-.strings { position: absolute; left: 0; top: 0; z-index: 2; overflow: visible; pointer-events: none; }
-.strings .redstring { fill: none; stroke: var(--string); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.35)); }
-.strings .redstring.hit { stroke: transparent; stroke-width: 14; filter: none; pointer-events: stroke; cursor: pointer; }
-.strings .redstring.live { stroke-dasharray: 7 7; opacity: 0.85; }
-.strings .twine { fill: none; stroke: var(--twine); stroke-width: 1.8; stroke-dasharray: 2 5; stroke-linecap: round; opacity: 0.75; }
-.strings .pinhead { fill: var(--string); stroke: rgba(0, 0, 0, 0.35); stroke-width: 1.2; filter: drop-shadow(0 2px 1.5px rgba(0, 0, 0, 0.4)); }
-.strings .pinhead.t-project { fill: var(--proj); }
-.strings .pinhead.t-task { fill: var(--accent); }
+
+/* Strings. Every kind has an invisible wide twin underneath (.hit) that catches taps. */
+.strings { position: absolute; left: 0; top: 0; z-index: 2; overflow: visible; pointer-events: none; stroke: none; }
+.strings .wire { fill: none; stroke: var(--wire); stroke-linecap: round; stroke-linejoin: round; }
+.strings .wire.hit { stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+.strings .wool { stroke-width: 3.2; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.35)); }
+.strings .twist { stroke: rgba(255, 255, 255, 0.32); stroke-width: 1.1; stroke-dasharray: 2.5 3.5; }
+.strings .marker { stroke-width: 3.6; opacity: 0.92; }
+.strings .pen { stroke-width: 1.8; }
+.strings .rule { stroke-width: 1.6; stroke-linecap: square; stroke-linejoin: miter; }
+.strings .wire-dot, .strings .arrowhead { fill: var(--wire); }
+.strings .live { stroke-dasharray: 7 7; opacity: 0.85; }
+.strings .pinhead { stroke: rgba(0, 0, 0, 0.35); stroke-width: 1.2; filter: drop-shadow(0 2px 1.5px rgba(0, 0, 0, 0.4)); }
 .strings .pinshine { fill: rgba(255, 255, 255, 0.7); }
 .strings .slabel { pointer-events: all; cursor: pointer; }
-.strings .slabel rect { fill: var(--card); stroke: var(--string); stroke-width: 1.5; }
-.strings .slabel text { fill: var(--ink); font: 600 12px var(--font); }
+.strings .slabel rect { fill: #FBF8F1; stroke: var(--wire); stroke-width: 1.5; }
+.strings .slabel text { fill: #2B2620; font: 600 12px var(--font); }
+:root[data-look="whiteboard"] .strings .slabel rect { fill: var(--card); stroke-width: 2; }
+:root[data-look="whiteboard"] .strings .slabel text { fill: var(--ink); font-family: var(--marker); font-weight: 400; font-size: 13px; }
+:root[data-look="blueprint"] .strings .slabel rect { fill: #1D4E74; }
+:root[data-look="blueprint"][data-mode="dark"] .strings .slabel rect { fill: #102C44; }
+:root[data-look="blueprint"] .strings .slabel text { fill: #F2F8FF; font-family: var(--mono); font-size: 11px; text-transform: uppercase; }
+:root[data-look="notebook"] .strings .slabel rect { fill: #FFFEFA; stroke-width: 1; }
+:root[data-look="notebook"] .strings .slabel text { fill: #1F3B8C; font-family: var(--hand); font-size: 13px; }
 
 .pcard { --ink: var(--paper-ink); --soft: var(--paper-soft); --hover: rgba(0, 0, 0, 0.06); --faint: #9A9085;
   position: absolute; width: 220px; padding: 20px 14px 13px; border-radius: 3px; color: var(--paper-ink); background: var(--paper-note);
@@ -400,23 +442,80 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .pcard.t-task { background: var(--paper-task); border-top: 4px solid rgba(200, 55, 45, 0.45); padding-top: 16px; }
 .pcard.t-project { background: var(--paper-proj); padding-top: 22px; }
 .pcard.t-project::before { content: ""; position: absolute; left: 12px; top: -10px; width: 70px; height: 12px; border-radius: 4px 4px 0 0; background: var(--paper-proj); }
-.pcard.root { width: 240px; box-shadow: 0 0 0 3px var(--proj), 0 10px 22px rgba(0, 0, 0, 0.22); }
-.pcard.on { box-shadow: 0 0 0 3px var(--accent), 0 10px 22px rgba(0, 0, 0, 0.22); }
+.pcard.on { outline: 3px solid var(--accent); outline-offset: 2px; }
 .pcard.lifted { transform: rotate(0deg) scale(1.04); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35); z-index: 5; cursor: grabbing; transition: none; }
-.pcard.target { box-shadow: 0 0 0 3px var(--string), 0 10px 22px rgba(0, 0, 0, 0.22); }
+.pcard.target { outline: 3px solid var(--wire); outline-offset: 2px; }
 .pcard.is-done { opacity: 0.6; }
 .pcard.is-done .ptitle span { text-decoration: line-through; }
 .pcard .pin { position: absolute; top: -10px; left: 50%; width: 40px; height: 36px; margin-left: -20px; cursor: crosshair; z-index: 3; touch-action: none; }
 .pcard .polaroid { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #DDD; border: 6px solid #FFF; border-bottom-width: 16px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); margin: 0 0 10px; pointer-events: none; }
 .pcard .ptitle { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 700; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
 .pcard .ptitle .tick { margin-top: 0; border-color: #8A8075; }
-.pcard .ptext { margin: 0.4rem 0 0; font-size: 0.85rem; line-height: 1.4; color: var(--paper-soft); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .pcard .chips { margin-top: 0.55rem; }
 .pcard .chip { background: rgba(0, 0, 0, 0.07); color: var(--paper-soft); }
 .pcard .chip.late { background: rgba(200, 55, 45, 0.15); color: #A3291F; }
 .pcard .chip.now { background: rgba(201, 138, 0, 0.18); color: #7A5200; }
+.pcard .chip.guest { font-style: italic; }
 .pcard .pbar { display: block; height: 5px; margin-top: 0.55rem; border-radius: 3px; background: rgba(0, 0, 0, 0.1); overflow: hidden; }
 .pcard .pbar i { display: block; height: 100%; background: #2F8A4E; }
+.pcard .openboard { display: inline-block; margin-top: 0.55rem; font-size: 0.84rem; font-weight: 700; color: var(--proj); cursor: pointer; }
+.pcard .openboard:hover { text-decoration: underline; }
+
+/* The note itself, as it reads on the card (long ones fade out; open the card for the rest). */
+.pcard .pbody { margin-top: 0.35rem; max-height: 250px; overflow: hidden; font-size: 0.86rem; line-height: 1.42; color: var(--paper-ink); overflow-wrap: anywhere; }
+.pcard .ptitle + .pbody { margin-top: 0.4rem; }
+.pcard .polaroid + .pbody { margin-top: 0; }
+.pcard .pbody.clip { -webkit-mask-image: linear-gradient(#000 72%, transparent); mask-image: linear-gradient(#000 72%, transparent); }
+.pcard .pbody > :last-child { margin-bottom: 0; }
+.pcard .pbody p { margin: 0 0 0.35em; }
+.pcard .pbody .ph { font-weight: 700; }
+.pcard .pbody ul, .pcard .pbody ol { margin: 0 0 0.35em; padding-left: 1.2em; }
+.pcard .pbody li { margin: 0.1em 0; }
+.pcard .pbody ul.checklist { list-style: none; padding-left: 0; }
+.pcard .pbody ul.checklist > li { display: flex; gap: 0.45em; align-items: flex-start; }
+.pcard .pbody .cbox { position: relative; flex-shrink: 0; width: 15px; height: 15px; margin-top: 0.15em; border-radius: 4px; border: 1.6px solid color-mix(in srgb, var(--paper-ink) 50%, transparent); cursor: pointer; }
+.pcard .pbody .cbox::before { content: ""; position: absolute; inset: -9px; }
+.pcard .pbody li.on > span { text-decoration: line-through; opacity: 0.55; }
+.pcard .pbody li.on .cbox { background: var(--paper-ink); border-color: var(--paper-ink); }
+.pcard .pbody li.on .cbox::after { content: ""; position: absolute; left: 3px; top: 3.5px; width: 6px; height: 3px; border: 1.8px solid var(--check, #FFF); border-top: 0; border-right: 0; transform: rotate(-45deg); }
+.pcard .pbody .plink { text-decoration: underline; text-underline-offset: 2px; }
+.pcard .pbody blockquote { margin: 0 0 0.35em; padding-left: 0.6em; border-left: 2px solid color-mix(in srgb, var(--paper-ink) 25%, transparent); }
+.pcard .pbody pre, .pcard .pbody code { font-family: var(--mono); font-size: 0.9em; white-space: pre-wrap; }
+.pcard .pbody hr { border: 0; border-top: 1px solid color-mix(in srgb, var(--paper-ink) 20%, transparent); margin: 0.5em 0; }
+.pcard .pbody .pmore { color: var(--paper-soft); font-size: 0.8rem; }
+
+/* What's inside a card (steps in a to-do, things in a note). */
+.pcard .pkids { list-style: none; margin: 0.55rem 0 0; padding: 0.45rem 0 0; border-top: 1px dashed color-mix(in srgb, var(--paper-ink) 28%, transparent); display: grid; gap: 0.25rem; font-size: 0.85rem; }
+.pcard .pkids li { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.pcard .pkids li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcard .pkids .tick { width: 16px; height: 16px; margin: 0; border-width: 1.5px; border-color: color-mix(in srgb, var(--paper-ink) 50%, transparent); }
+.pcard .pkids .tick.done::after { width: 6px; height: 3.5px; border-width: 1.6px; }
+.pcard .pkids li.done span { text-decoration: line-through; opacity: 0.55; }
+.pcard .pkids .kdot { width: 16px; height: 16px; flex-shrink: 0; display: grid; place-items: center; }
+.pcard .pkids .kdot::before { content: ""; width: 9px; height: 11px; border-radius: 2px; border: 1.5px solid color-mix(in srgb, var(--paper-ink) 55%, transparent); }
+.pcard .pkids .kdot.t-project::before { width: 11px; height: 9px; border-color: var(--proj); }
+.pcard .pkids .kmore { color: var(--paper-soft); font-size: 0.8rem; padding-left: 1.5rem; }
+
+/* The banner: the project's name across the top of its board. */
+.pbanner { position: absolute; z-index: 1; display: grid; justify-items: center; gap: 0.15rem; padding: 0.7rem 2.2rem; cursor: grab; white-space: nowrap; text-align: center; }
+.pbanner .btitle { font-size: 2.1rem; font-weight: 800; line-height: 1.15; max-width: 880px; overflow: hidden; text-overflow: ellipsis; }
+.pbanner .bsub { font-size: 0.85rem; font-weight: 600; opacity: 0.75; }
+.pbanner .bcap { display: none; }
+.pbanner.on { outline: 3px solid var(--accent); outline-offset: 6px; }
+.pbanner.lifted { cursor: grabbing; }
+.pbanner.is-done .btitle { text-decoration: line-through; }
+:root[data-look="corkboard"] .pbanner { background: #FBF8F1; color: #2B2620; transform: rotate(-1deg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 10px 22px rgba(0, 0, 0, 0.28); font-family: var(--typewriter); }
+:root[data-look="corkboard"] .pbanner .btitle { text-transform: uppercase; letter-spacing: 0.08em; }
+:root[data-look="corkboard"] .pbanner::before, :root[data-look="corkboard"] .pbanner::after { content: ""; position: absolute; top: -9px; width: 66px; height: 24px; background: rgba(236, 226, 190, 0.78); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+:root[data-look="corkboard"] .pbanner::before { left: -20px; transform: rotate(-28deg); }
+:root[data-look="corkboard"] .pbanner::after { right: -20px; transform: rotate(25deg); }
+:root[data-look="whiteboard"] .pbanner { color: var(--wire); font-family: var(--marker); }
+:root[data-look="whiteboard"] .pbanner .btitle { font-weight: 400; font-size: 2.5rem; border-bottom: 4px solid color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 0 0 40% 8% / 0 0 6px 4px; padding: 0 0.3em 0.05em; }
+:root[data-look="blueprint"] .pbanner { color: #F2F8FF; font-family: var(--mono); justify-items: start; text-align: left; padding: 0.55rem 1.1rem 0.6rem; border: 4px double var(--bp-line); background: rgba(255, 255, 255, 0.04); }
+:root[data-look="blueprint"] .pbanner .bcap { display: block; font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.7; }
+:root[data-look="blueprint"] .pbanner .btitle { font-size: 1.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+:root[data-look="notebook"] .pbanner { color: var(--ink); font-family: var(--hand); }
+:root[data-look="notebook"] .pbanner .btitle { font-weight: 700; font-size: 2.3rem; padding: 0 0.25em; background: linear-gradient(transparent 52%, color-mix(in srgb, var(--accent) 42%, transparent) 52%, color-mix(in srgb, var(--accent) 42%, transparent) 90%, transparent 90%); }
 
 /* Sticky colours: one set of paper tones, a little dimmer at night. */
 :root {
@@ -435,44 +534,92 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .swatchrow .sw { width: 26px; height: 26px; border-radius: 50%; background: var(--sticky); border: 1.5px solid var(--line); display: grid; place-items: center; color: var(--faint); font-size: 0.9rem; line-height: 1; }
 .swatchrow .sw.none { background: transparent; }
 .swatchrow .sw.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
-.swatchrow .frametoggle { margin-left: 0.4rem; color: var(--proj); background: var(--proj-bg); }
 
-/* Sections: frames on the board. Only the label bar and the corner handle catch the pointer,
-   so you can still drag the board around through the middle of one. */
+/* Sections: labelled frames. Only the label and the corner handle catch the pointer, so you can
+   still drag the board around through the middle of one. */
 .frames { position: relative; z-index: 0; }
 .frame:not([class*=" c-"]) { --sticky: var(--st-blue); }
-.frame { position: absolute; border-radius: 14px; pointer-events: none;
-  background: color-mix(in srgb, var(--sticky) 38%, transparent); border: 2px solid color-mix(in srgb, var(--sticky) 80%, #000 12%); }
-:root[data-boardstyle="corkboard"] .frame { background: color-mix(in srgb, var(--sticky) 30%, transparent); border-style: dashed; }
-.frame.on { border-color: var(--accent); border-style: solid; }
-.frame.drop { border-color: var(--accent); border-style: solid; background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.fhead { position: absolute; left: 0; right: 0; top: 0; height: 46px; display: flex; align-items: center; gap: 0.6rem; padding: 0 3rem 0 1rem; pointer-events: auto; cursor: grab;
-  border-radius: 12px 12px 0 0; background: color-mix(in srgb, var(--sticky) 75%, transparent); color: var(--paper-ink); font-weight: 700; font-size: 1.05rem; user-select: none; }
-.fhead .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fhead .fcount { font-size: 0.8rem; font-weight: 600; color: var(--paper-soft); }
-.fhead .fpin { position: absolute; right: 8px; top: 7px; left: auto; width: 32px; height: 32px; margin: 0; cursor: crosshair; border-radius: 50%; }
-:root[data-boardstyle="whiteboard"] .fhead .fpin { background: var(--card); border: 2px solid var(--accent); width: 18px; height: 18px; top: 14px; right: 14px; }
+.frame { position: absolute; pointer-events: none; border-radius: 14px;
+  background: color-mix(in srgb, var(--sticky) 30%, transparent); border: 2px solid color-mix(in srgb, var(--sticky) 80%, #000 12%); }
+.frame.on { border-color: var(--accent) !important; }
+.frame.drop { border-color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.fhead { position: absolute; left: 0; top: 0; max-width: 100%; height: 44px; display: flex; align-items: center; gap: 0.55rem; padding: 0 2.7rem 0 1rem; pointer-events: auto; cursor: grab;
+  color: var(--paper-ink); font-weight: 700; font-size: 1.05rem; user-select: none; white-space: nowrap; }
+.fhead .fname { overflow: hidden; text-overflow: ellipsis; }
+.fhead .fcount { font-size: 0.78rem; font-weight: 600; opacity: 0.6; }
+.fhead .fpin { position: absolute; right: 6px; top: 50%; left: auto; width: 32px; height: 32px; margin: -16px 0 0; cursor: crosshair; border-radius: 50%; }
 .fsize { position: absolute; right: -4px; bottom: -4px; width: 26px; height: 26px; pointer-events: auto; cursor: nwse-resize; touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, color-mix(in srgb, var(--sticky) 80%, #000 25%) 50%); border-radius: 0 0 12px 0; }
+  background: linear-gradient(135deg, transparent 50%, color-mix(in srgb, var(--sticky) 70%, #000 30%) 50%); border-radius: 0 0 12px 0; }
 
-/* Whiteboard style: flat stickies, no pins, curved arrows. */
-:root[data-boardstyle="whiteboard"] .pcard { transform: none; border-radius: 10px; padding: 16px 14px 13px; border: 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 16px rgba(0, 0, 0, 0.10); }
-:root[data-boardstyle="whiteboard"] .pcard.t-note:not([class*=" c-"]) { background: var(--st-yellow); }
-:root[data-boardstyle="whiteboard"] .pcard.t-task:not([class*=" c-"]) { background: var(--st-white); }
-:root[data-boardstyle="whiteboard"] .pcard.t-task { border-top: 0; box-shadow: inset 4px 0 0 rgba(200, 55, 45, 0.5), 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 16px rgba(0, 0, 0, 0.10); }
-:root[data-boardstyle="whiteboard"] .pcard.t-project:not([class*=" c-"]) { background: var(--st-blue); }
-:root[data-boardstyle="whiteboard"] .pcard.t-project::before { display: none; }
-:root[data-boardstyle="whiteboard"] .pcard.lifted { transform: scale(1.03); }
-:root[data-boardstyle="whiteboard"] .pcard .pin { top: 50%; left: auto; right: -11px; width: 20px; height: 20px; margin: -10px 0 0; border-radius: 50%;
+/* Corkboard: a ribbon border, the name typed on a paper label taped over the top edge. */
+:root[data-look="corkboard"] .frame:not([class*=" c-"]) { --sticky: #F1E3BE; }
+:root[data-look="corkboard"] .frame { border: 3px solid color-mix(in srgb, var(--sticky) 55%, #4A3216 45%); border-radius: 4px; background: color-mix(in srgb, var(--sticky) 20%, transparent); }
+:root[data-look="corkboard"] .fhead { top: -21px; left: 18px; height: 40px; background: #FBF8F1; color: #2B2620; font-family: var(--typewriter); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.06em;
+  border-radius: 2px; transform: rotate(-1.2deg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 12px rgba(0, 0, 0, 0.2); }
+:root[data-look="corkboard"] .fhead::before { content: ""; position: absolute; left: -14px; top: -7px; width: 44px; height: 18px; background: rgba(236, 226, 190, 0.8); transform: rotate(-32deg); }
+:root[data-look="corkboard"] .fhead { border-left: 6px solid color-mix(in srgb, var(--sticky) 75%, #4A3216 25%); }
+
+/* Whiteboard: a marker outline drawn by hand, the name on a sticky-coloured tab. */
+:root[data-look="whiteboard"] .frame { border: 2.5px solid color-mix(in srgb, var(--wire) 70%, transparent); border-radius: 30px 12px 26px 14px / 14px 28px 12px 32px; background: color-mix(in srgb, var(--sticky) 22%, transparent); }
+:root[data-look="whiteboard"] .fhead { top: 10px; left: 12px; height: 36px; border-radius: 8px; background: var(--sticky); color: #23262B; font-family: var(--marker); font-weight: 400; font-size: 1.15rem; }
+
+/* Blueprint: a dashed boundary with a boxed, stencilled label. */
+:root[data-look="blueprint"] .frame { border: 1.5px dashed var(--bp-line); border-radius: 0; background: rgba(255, 255, 255, 0.03); }
+:root[data-look="blueprint"] .fhead { top: -1.5px; left: -1.5px; height: 34px; border: 1.5px solid var(--bp-line); background: #1D4E74; color: #F2F8FF; font-family: var(--mono); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; }
+:root[data-look="blueprint"][data-mode="dark"] .fhead { background: #102C44; }
+:root[data-look="blueprint"] .fhead::before { content: ""; width: 10px; height: 10px; flex-shrink: 0; background: var(--sticky); }
+:root[data-look="blueprint"] .fsize { background: linear-gradient(135deg, transparent 50%, var(--bp-line) 50%); border-radius: 0; }
+
+/* Notebook: a pen box drawn round the cards, the name written above with a highlighter. */
+:root[data-look="notebook"] .frame { border: 1.8px solid color-mix(in srgb, var(--ink) 50%, transparent); border-radius: 22px 8px 20px 10px / 10px 22px 8px 24px; background: color-mix(in srgb, var(--sticky) 16%, transparent); }
+:root[data-look="notebook"] .fhead { top: -40px; left: 10px; height: 40px; color: var(--ink); font-family: var(--hand); font-size: 1.3rem; }
+:root[data-look="notebook"] .fhead .fname { padding: 0 0.2em; background: linear-gradient(transparent 50%, color-mix(in srgb, var(--sticky) 90%, transparent) 50%, color-mix(in srgb, var(--sticky) 90%, transparent) 88%, transparent 88%); }
+
+/* Connecting: on the corkboard you drag a card's pin; on the others, the dot on its edge. */
+:root:not([data-look="corkboard"]) .pcard .pin { top: 50%; left: auto; right: -11px; width: 20px; height: 20px; margin: -10px 0 0; border-radius: 50%;
   background: var(--card); border: 2px solid var(--accent); opacity: 0; transition: opacity 0.15s; }
-:root[data-boardstyle="whiteboard"] .pcard:hover .pin, :root[data-boardstyle="whiteboard"] .pcard.on .pin { opacity: 1; }
-@media (pointer: coarse) { :root[data-boardstyle="whiteboard"] .pcard .pin { opacity: 0.85; } }
-.strings .arrowline { stroke: color-mix(in srgb, var(--ink) 70%, transparent); stroke-width: 2.5; filter: none; }
-.strings .arrowhead { fill: color-mix(in srgb, var(--ink) 70%, transparent); }
-:root[data-boardstyle="whiteboard"] .strings .twine { stroke: color-mix(in srgb, var(--ink) 35%, transparent); stroke-dasharray: 5 6; }
-:root[data-boardstyle="whiteboard"] .strings .slabel rect { stroke: color-mix(in srgb, var(--ink) 40%, transparent); }
-.strings .twine.hit, :root[data-boardstyle] .strings .twine.hit { stroke: transparent; stroke-width: 14; stroke-dasharray: none; opacity: 1; pointer-events: stroke; cursor: pointer; }
+:root:not([data-look="corkboard"]) .pcard:hover .pin, :root:not([data-look="corkboard"]) .pcard.on .pin { opacity: 1; }
+@media (pointer: coarse) { :root:not([data-look="corkboard"]) .pcard .pin { opacity: 0.85; } }
+:root:not([data-look="corkboard"]) .fhead .fpin { width: 18px; height: 18px; margin-top: -9px; right: 10px; background: var(--card); border: 2px solid var(--accent); }
+
+/* Whiteboard cards: flat sticky notes. */
+:root[data-look="whiteboard"] .pcard { transform: none; border-radius: 10px; padding: 16px 14px 13px; border: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 16px rgba(0, 0, 0, 0.10); }
+:root[data-look="whiteboard"] .pcard.t-note:not([class*=" c-"]) { background: var(--st-yellow); }
+:root[data-look="whiteboard"] .pcard.t-task:not([class*=" c-"]) { background: var(--st-white); }
+:root[data-look="whiteboard"] .pcard.t-task { border-top: 0; box-shadow: inset 4px 0 0 rgba(200, 55, 45, 0.5), 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 16px rgba(0, 0, 0, 0.10); }
+:root[data-look="whiteboard"] .pcard.t-project:not([class*=" c-"]) { background: var(--st-blue); }
+:root[data-look="whiteboard"] .pcard.t-project::before { display: none; }
+:root[data-look="whiteboard"] .pcard.lifted { transform: scale(1.03); }
+
+/* Blueprint cards: outlined boxes, labels in capitals. */
+:root[data-look="blueprint"] .pcard { --paper-ink: #F2F8FF; --paper-soft: rgba(235, 245, 255, 0.72); --faint: rgba(235, 245, 255, 0.5); --hover: rgba(255, 255, 255, 0.08); --check: #1D4E74; --proj: #9FD0FF;
+  transform: none; border-radius: 2px; padding: 14px 14px 12px; background: rgba(255, 255, 255, 0.05); border: 1.5px solid var(--bp-line); box-shadow: none; color: var(--paper-ink); }
+:root[data-look="blueprint"] .pcard[class*=" c-"] { background: rgba(255, 255, 255, 0.05); box-shadow: inset 5px 0 0 var(--sticky); padding-left: 18px; }
+:root[data-look="blueprint"] .pcard.t-task { border-top: 1.5px solid var(--bp-line); padding-top: 14px; }
+:root[data-look="blueprint"] .pcard.t-project { border: 4px double var(--bp-line); }
+:root[data-look="blueprint"] .pcard.t-project::before { display: none; }
+:root[data-look="blueprint"] .pcard .ptitle { font-family: var(--mono); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.04em; }
+:root[data-look="blueprint"] .pcard .ptitle .tick { border-color: rgba(235, 245, 255, 0.75); }
+:root[data-look="blueprint"] .pcard .chip { background: rgba(255, 255, 255, 0.1); color: var(--paper-soft); }
+:root[data-look="blueprint"] .pcard .chip.late { background: rgba(255, 120, 100, 0.2); color: #FFB4A8; }
+:root[data-look="blueprint"] .pcard .chip.now { background: rgba(255, 200, 80, 0.2); color: #FFD98A; }
+:root[data-look="blueprint"] .pcard .polaroid { border: 1px solid var(--bp-line); box-shadow: none; }
+:root[data-look="blueprint"] .pcard .pbar { background: rgba(255, 255, 255, 0.15); }
+:root[data-look="blueprint"] .pcard .pbar i { background: #9FE3B4; }
+:root[data-look="blueprint"] .pcard.lifted { transform: scale(1.03); box-shadow: 0 0 0 1px var(--bp-line), 0 12px 30px rgba(0, 0, 0, 0.35); }
+
+/* Notebook cards: paper slips with faint rules, held on with a strip of tape. */
+:root[data-look="notebook"] .pcard { --tape: #E9C46A; --rules: repeating-linear-gradient(transparent 0 21px, rgba(70, 110, 190, 0.14) 21px 22px);
+  border-radius: 2px; padding: 22px 14px 13px; border: 0; background-color: #FFFEFA; background-image: var(--rules); background-position: 0 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 6px 14px rgba(0, 0, 0, 0.10); }
+:root[data-look="notebook"][data-mode="dark"] .pcard { background-color: #ECE8DD; }
+:root[data-look="notebook"] .pcard[class*=" c-"] { background-color: var(--sticky); background-image: var(--rules); }
+:root[data-look="notebook"] .pcard.t-task { --tape: #8FB8DE; border-top: 0; }
+:root[data-look="notebook"] .pcard.t-project { --tape: #E59A8E; }
+:root[data-look="notebook"] .pcard.t-project::before { display: none; }
+:root[data-look="notebook"] .pcard::after { content: ""; position: absolute; top: -10px; left: 50%; width: 86px; height: 22px; margin-left: -43px; transform: rotate(calc(var(--tilt, 0deg) * -2.5));
+  background: color-mix(in srgb, var(--tape) 72%, transparent); box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08); pointer-events: none; }
 
 .boardmenu { position: absolute; z-index: 8; display: grid; gap: 2px; min-width: 220px; max-width: 300px; padding: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .boardmenu button { text-align: left; padding: 0.55rem 0.7rem; border-radius: 8px; font-size: 0.92rem; }

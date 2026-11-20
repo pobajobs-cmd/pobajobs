@@ -1,5 +1,5 @@
 // Appearance: colour themes, light/dark, main and string colour, text style and size,
-// corkboard background. Saved as a hidden item ("pref-appearance") so it follows you to every
+// board look. Saved as a hidden item ("pref-appearance") so it follows you to every
 // device, and cached in localStorage so the page paints in the right colours before it loads.
 
 export const THEMES = [
@@ -30,16 +30,32 @@ export const FONTS = {
   mono: { name: 'Mono', stack: "ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace" },
 };
 export const SIZES = { small: 15, normal: 16, large: 18 };
-export const BOARDS = { cork: 'Cork', grid: 'Blueprint grid', dots: 'Dotted paper', plain: 'Plain' };
-export const BOARD_STYLES = { corkboard: 'Corkboard', whiteboard: 'Whiteboard' };
-export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', board: 'cork', boardStyle: 'corkboard' };
+// Each board look brings its own background, cards and strings (see board.js).
+export const LOOKS = {
+  corkboard: { name: 'Corkboard', wire: () => null },                  // the theme's string colour
+  whiteboard: { name: 'Whiteboard', wire: dark => (dark ? '#E9ECF1' : '#2B3038') },
+  blueprint: { name: 'Blueprint', wire: () => '#F2F8FF' },
+  notebook: { name: 'Notebook', wire: dark => (dark ? '#A9BCFF' : '#1F3B8C') },
+};
+export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard' };
 
 export const PREF_ID = 'pref-appearance';
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 
 export function current(store) {
   const rec = store.get(PREF_ID);
-  return { ...DEFAULTS, ...(rec && !rec.deleted ? rec.data.appearance : null) };
+  const saved = rec && !rec.deleted ? rec.data.appearance : null;
+  const p = { ...DEFAULTS, ...saved };
+  // Before 0.4 the board had a style and a background; pick the look closest to what was set.
+  if (saved && !saved.look) p.look = saved.board === 'grid' ? 'blueprint' : saved.boardStyle === 'whiteboard' ? 'whiteboard' : saved.board === 'dots' ? 'notebook' : 'corkboard';
+  if (!(p.look in LOOKS)) p.look = 'corkboard';
+  return p;
+}
+
+// The colour of the strings and lines on the board right now.
+export function wireColour(p, dark) {
+  const theme = THEMES.find(t => t.id === p.theme) || THEMES[0];
+  return p.string || LOOKS[p.look]?.wire(dark) || (dark ? theme.dark : theme.light).string;
 }
 
 export function apply(prefs) {
@@ -48,10 +64,11 @@ export function apply(prefs) {
   const dark = p.mode === 'dark' || (p.mode === 'auto' && darkQuery.matches);
   const c = { ...(dark ? theme.dark : theme.light) };
   if (p.accent) { c.accent = p.accent; c.on = readableOn(p.accent); }
-  if (p.string) c.string = p.string;
+  const look = p.look in LOOKS ? p.look : 'corkboard';
   const vars = {
     '--bg': c.bg, '--side': c.side, '--card': c.card, '--ink': c.ink, '--soft': c.soft,
     '--accent': c.accent, '--on-accent': c.on, '--string': c.string, '--proj': c.proj, '--ok': c.ok,
+    '--wire': wireColour({ ...p, look }, dark),
     '--font': (FONTS[p.font] || FONTS.system).stack,
   };
   const root = document.documentElement;
@@ -59,10 +76,9 @@ export function apply(prefs) {
   root.style.fontSize = (SIZES[p.size] || 16) + 'px';
   root.style.colorScheme = dark ? 'dark' : 'light';
   root.dataset.mode = dark ? 'dark' : 'light';
-  root.dataset.board = p.board in BOARDS ? p.board : 'cork';
-  root.dataset.boardstyle = p.boardStyle in BOARD_STYLES ? p.boardStyle : 'corkboard';
+  root.dataset.look = look;
   for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.content = c.bg;
-  try { localStorage.setItem('bt-look', JSON.stringify({ vars, size: SIZES[p.size] || 16, dark, board: root.dataset.board, boardStyle: root.dataset.boardstyle })); } catch (e) {}
+  try { localStorage.setItem('bt-look', JSON.stringify({ vars, size: SIZES[p.size] || 16, dark, look })); } catch (e) {}
 }
 
 // Follow the phone's light/dark switch while in "auto".
@@ -72,6 +88,7 @@ export function watch(getPrefs) {
 
 export async function save(store, prefs) {
   const next = { ...DEFAULTS, ...prefs };
+  delete next.board; delete next.boardStyle;   // replaced by "look" in 0.4
   apply(next);
   if (store.get(PREF_ID) && !store.get(PREF_ID).deleted) await store.update(PREF_ID, { appearance: next });
   else await store.createWithId(PREF_ID, { type: 'pref', appearance: next });
