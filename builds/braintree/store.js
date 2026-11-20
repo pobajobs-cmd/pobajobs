@@ -190,6 +190,15 @@ export async function login(password) {
   sync();
 }
 
+// Is this the Brain Tree sign-in password? (Asks the server; nothing is kept. Used to take the lock
+// off a project whose own password has been forgotten.)
+export async function checkPassword(password) {
+  const res = await fetch(API + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error || 'Couldn’t check it (' + res.status + ').');
+  return true;
+}
+
 export async function logout(eraseLocal) {
   meta.token = null;
   await saveMeta('token');
@@ -407,10 +416,54 @@ async function shrink(file, max = 2000) {
   throw new Error('That photo is too big even after shrinking.');
 }
 
+// ---------- Files (any kind: PDFs, documents, sheets…) ----------
+// Kept whole on this device; online, in pieces of under 2 MB (the most one database row holds),
+// named <id>-p0, <id>-p1… Another device fetches the pieces and puts them back together.
+
+const PART = 1_800_000;
+export const MAX_DOC = 25 * 1048576;
+
+export async function addDoc(file) {
+  if (file.size > MAX_DOC) throw new Error(`“${file.name}” is too big (the most is 25 MB).`);
+  if (!file.size) throw new Error(`“${file.name}” is empty.`);
+  const id = newId(), mime = file.type || 'application/octet-stream';
+  const parts = Math.ceil(file.size / PART);
+  const blob = new Blob([file], { type: mime });
+  await tx('files', 'readwrite', s => s.put({ id, blob, mime, uploaded: false, doc: true, parts, sent: 0 }));
+  fileUrls.set(id, URL.createObjectURL(blob));
+  scheduleSync(300);
+  return { id, name: file.name || 'File', size: file.size, mime, parts };
+}
+
+// A file as a Blob: from this device, or fetched (piece by piece) and kept. null if it can't be had.
+export async function docBlob(d) {
+  const rec = await (await tx('files', 'readonly', s => reqP(s.get(d.id))));
+  if (rec) return rec.blob;
+  if (!meta.token || !navigator.onLine) return null;
+  try {
+    const pieces = [];
+    for (let i = 0; i < (d.parts || 1); i++) {
+      const res = await api('/files/' + encodeURIComponent(d.id + '-p' + i), { raw: true, timeout: 120_000 });
+      pieces.push(await res.blob());
+    }
+    const blob = new Blob(pieces, { type: d.mime || 'application/octet-stream' });
+    await tx('files', 'readwrite', s => s.put({ id: d.id, blob, mime: blob.type, uploaded: true, doc: true, parts: d.parts }));
+    return blob;
+  } catch (e) { return null; }
+}
+
 async function uploadFiles() {
   const pending = await tx('files', 'readonly', s => reqP(s.getAll()));
   for (const f of (await pending).filter(f => !f.uploaded)) {
-    await api('/files?id=' + encodeURIComponent(f.id), { method: 'POST', body: f.blob, headers: { 'Content-Type': f.mime || 'image/jpeg' }, timeout: 120_000 });
+    if (f.doc) {
+      // Piece by piece; if the signal drops, it carries on from the next piece.
+      for (let i = f.sent || 0; i < f.parts; i++) {
+        const piece = f.blob.slice(i * PART, (i + 1) * PART, 'application/octet-stream');
+        await api('/files?id=' + encodeURIComponent(f.id + '-p' + i), { method: 'POST', body: piece, headers: { 'Content-Type': 'application/octet-stream' }, timeout: 180_000 });
+        f.sent = i + 1;
+        await tx('files', 'readwrite', s => s.put(f));
+      }
+    } else await api('/files?id=' + encodeURIComponent(f.id), { method: 'POST', body: f.blob, headers: { 'Content-Type': f.mime || 'image/jpeg' }, timeout: 120_000 });
     f.uploaded = true;
     await tx('files', 'readwrite', s => s.put(f));
   }

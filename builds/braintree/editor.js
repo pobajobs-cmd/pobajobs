@@ -3,16 +3,25 @@
 //   photos    <img data-file="id">, the picture comes from this device's store when shown
 //   clips     <div data-yt="VIDEO_ID" data-start data-end data-title></div>  (see media.js)
 //   drawings  <div data-draw='{…}'></div>  (see draw.js)
-// Clips and drawings are saved empty; what you see inside them is filled in when shown.
+//   sheets    <div data-sheet='{…}'></div>  (see sheet.js)
+//   files     <div data-doc="id" data-name data-size data-mime data-parts></div>  (any kind of file, see store.addDoc)
+//   links     <div data-weblink="https://…" data-title></div>  (a document or page elsewhere, shown as a tile)
+// These are saved empty; what you see inside them is filled in when shown.
 
 import { parseYouTube, clipOf, writeClip, clipFaceHTML, iframeHTML, isVideoId } from './media.js';
 import { cleanDrawing, drawingSVG } from './draw.js';
+import { cleanSheet, sheetTableHTML } from './sheet.js';
+import { docInfo, linkInfo, docTileHTML, linkTileHTML, writeDoc, writeLink } from './attach.js';
 
 const ALLOWED = {
-  P: [], DIV: ['data-yt', 'data-start', 'data-end', 'data-title', 'data-draw'], BR: [], STRONG: [], B: [], EM: [], I: [], U: [], S: [], STRIKE: [],
+  P: [], DIV: ['data-yt', 'data-start', 'data-end', 'data-title', 'data-draw', 'data-sheet', 'data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts', 'data-weblink'], BR: [], STRONG: [], B: [], EM: [], I: [], U: [], S: [], STRIKE: [],
   H1: [], H2: [], H3: [], UL: ['class'], OL: [], LI: ['data-checked'], BLOCKQUOTE: [], PRE: [], CODE: [], HR: [],
   A: ['href'], IMG: ['data-file', 'src', 'alt'],
 };
+// Blocks that hold something other than text, and the attributes each keeps.
+const EMBEDS = ['data-yt', 'data-draw', 'data-sheet', 'data-doc', 'data-weblink'];
+const KEEP = { 'data-yt': ['data-yt', 'data-start', 'data-end', 'data-title'], 'data-draw': ['data-draw'], 'data-sheet': ['data-sheet'], 'data-doc': ['data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts'], 'data-weblink': ['data-weblink', 'data-title'] };
+const EMBED_ATTRS = ['data-yt', 'data-start', 'data-end', 'data-title', 'data-draw', 'data-sheet', 'data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts', 'data-weblink'];
 const DROP = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'TEMPLATE', 'SVG', 'MATH', 'NOSCRIPT', 'FORM', 'INPUT', 'BUTTON', 'SELECT', 'TEXTAREA', 'HEAD', 'TITLE', 'META', 'LINK']);
 
 export function sanitize(html) {
@@ -42,9 +51,23 @@ function clean(node) {
     }
     if (tag === 'UL' && child.getAttribute('class') !== 'checklist') child.removeAttribute('class');
     if (tag === 'LI' && child.getAttribute('data-checked') !== 'true') child.removeAttribute('data-checked');
-    if (tag === 'DIV' && (child.hasAttribute('data-yt') || child.hasAttribute('data-draw'))) {
-      // A clip or drawing: check what it holds, and keep it empty (its insides are only for show).
-      if (child.hasAttribute('data-yt')) {
+    if (tag === 'DIV' && EMBEDS.some(a => child.hasAttribute(a))) {
+      // A clip, drawing, sheet, file or link: check what it holds, and keep it empty (its insides are only for show).
+      const kind = EMBEDS.find(a => child.hasAttribute(a));
+      for (const a of EMBED_ATTRS) if (!(KEEP[kind] || []).includes(a)) child.removeAttribute(a);
+      if (kind === 'data-sheet') {
+        const sh = cleanSheet(child.getAttribute('data-sheet'));
+        if (!sh) { child.remove(); continue; }
+        child.setAttribute('data-sheet', JSON.stringify(sh));
+      } else if (kind === 'data-doc') {
+        if (!/^[A-Za-z0-9_-]{8,64}$/.test(child.getAttribute('data-doc'))) { child.remove(); continue; }
+        child.setAttribute('data-name', (child.getAttribute('data-name') || 'File').slice(0, 200));
+        for (const a of ['data-size', 'data-parts']) if (!/^\d{1,9}$/.test(child.getAttribute(a) || '')) child.removeAttribute(a);
+        if (!/^[\w.+-]{1,60}\/[\w.+-]{1,80}$/.test(child.getAttribute('data-mime') || '')) child.setAttribute('data-mime', 'application/octet-stream');
+      } else if (kind === 'data-weblink') {
+        if (!/^https?:\/\/\S{3,2000}$/i.test(child.getAttribute('data-weblink') || '')) { child.remove(); continue; }
+        if (child.hasAttribute('data-title')) child.setAttribute('data-title', child.getAttribute('data-title').slice(0, 200));
+      } else if (kind === 'data-yt') {
         if (!isVideoId(child.getAttribute('data-yt'))) { child.remove(); continue; }
         for (const a of ['data-start', 'data-end']) if (!/^\d{1,6}$/.test(child.getAttribute(a) || '')) child.removeAttribute(a);
         if (child.hasAttribute('data-title')) child.setAttribute('data-title', child.getAttribute('data-title').slice(0, 200));
@@ -57,7 +80,7 @@ function clean(node) {
       child.replaceChildren();
       continue;
     }
-    for (const a of ['data-yt', 'data-start', 'data-end', 'data-title', 'data-draw']) child.removeAttribute(a);
+    for (const a of EMBED_ATTRS) child.removeAttribute(a);
     clean(child);
   }
 }
@@ -80,6 +103,11 @@ export function mediaSummary(html) {
   const clip = /<div[^>]*data-yt="[^"]+"[^>]*>/.exec(html);
   if (clip) { const t = /data-title="([^"]*)"/.exec(clip[0]); return '▶ ' + (t ? decode(t[1]) : 'YouTube clip'); }
   if (/data-draw=/.test(html)) return 'Drawing';
+  if (/data-sheet=/.test(html)) return 'Spreadsheet';
+  const doc = /<div[^>]*data-doc="[^"]+"[^>]*>/.exec(html);
+  if (doc) { const n = /data-name="([^"]*)"/.exec(doc[0]); return 'File: ' + (n ? decode(n[1]) : 'file'); }
+  const wl = /<div[^>]*data-weblink="([^"]+)"[^>]*>/.exec(html);
+  if (wl) { const t = /data-title="([^"]*)"/.exec(wl[0]); return 'Link: ' + (t && t[1] ? decode(t[1]) : decode(wl[1]).replace(/^https?:\/\/(www\.)?/, '').split('/')[0]); }
   if (/data-file=/.test(html)) return 'Photo';
   return '';
 }
@@ -97,15 +125,19 @@ const ICONS = {
   photo: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>',
   clip: '<svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="3.5"/><path d="M10 9v6l5-3z"/></svg>',
   draw: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="5" rx="1"/><circle cx="17" cy="17" r="3.5"/><path d="M6.5 9v4.5a3 3 0 0 0 3 3H13"/><path d="M15 4l5 5"/></svg>',
+  sheet: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M3 15h18M9 4v16M15 4v16"/></svg>',
+  attach: '<svg viewBox="0 0 24 24"><path d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.6 1.6 0 0 1-2.3-2.3L15 7.3"/></svg>',
 };
 
 // One page-wide listener; only the open editor (there's one at a time) is told.
-let onSelection = null;
+let onSelection = null, closePops = null;
 document.addEventListener('selectionchange', () => onSelection?.());
+document.addEventListener('pointerdown', e => closePops?.(e), true);
 
-// onClip(clip?) and onDraw(drawing?) ask for a new or changed clip / drawing (null = cancelled,
-// 'remove' = take it out); videoInfo(id) looks up a video's title.
-export function createEditor(host, { onChange, resolveFile, addPhoto, onError, onImage, onClip, onDraw, videoInfo }) {
+// onClip(clip?), onDraw(drawing?), onSheet(sheet?) and onLink(link?) ask for a new or changed one (null =
+// cancelled, 'remove' = take it out); videoInfo(id) looks up a video's title. addDoc(file) keeps a file and
+// says what it is; openDoc(info) / saveDoc(info) open or save a copy of one.
+export function createEditor(host, { onChange, resolveFile, addPhoto, onError, onImage, onClip, onDraw, videoInfo, onSheet, onLink, addDoc, openDoc, saveDoc }) {
   host.innerHTML = `
     <div class="tools" role="toolbar" aria-label="Formatting">
       <button type="button" data-cmd="h" title="Heading">${ICONS.h}</button>
@@ -121,13 +153,18 @@ export function createEditor(host, { onChange, resolveFile, addPhoto, onError, o
       <button type="button" data-cmd="photo" title="Add photo">${ICONS.photo}</button>
       <button type="button" data-cmd="clip" title="Add a YouTube clip">${ICONS.clip}</button>
       <button type="button" data-cmd="draw" title="Add a drawing">${ICONS.draw}</button>
+      <button type="button" data-cmd="sheet" title="Add a spreadsheet">${ICONS.sheet}</button>
+      <button type="button" data-cmd="attach" title="Attach a file, or link to a document">${ICONS.attach}</button>
       <input type="file" accept="image/*" multiple hidden>
+      <input type="file" class="anyfile" multiple hidden>
     </div>
     <div class="body" contenteditable="true" spellcheck="true" data-placeholder="Write anything: notes, links, photos, clips, drawings, checklists…"></div>
-    <div class="linkpop" hidden><a target="_blank" rel="noopener noreferrer">Open link ↗</a></div>`;
+    <div class="linkpop" hidden><a target="_blank" rel="noopener noreferrer">Open link ↗</a></div>
+    <div class="blockpop" hidden></div>`;
   const tools = host.querySelector('.tools');
   const body = host.querySelector('.body');
-  const fileInput = host.querySelector('input[type=file]');
+  const fileInput = host.querySelector('input[type=file]:not(.anyfile)'), anyFile = host.querySelector('input.anyfile');
+  const blockpop = host.querySelector('.blockpop');
   const linkpop = host.querySelector('.linkpop');
   let saved = null, timer = null, loading = false;
 
@@ -158,6 +195,8 @@ export function createEditor(host, { onChange, resolveFile, addPhoto, onError, o
     if (cmd === 'photo') { fileInput.click(); return; }
     if (cmd === 'clip') { addClip(); return; }
     if (cmd === 'draw') { addDrawing(); return; }
+    if (cmd === 'sheet') { addSheet(); return; }
+    if (cmd === 'attach') { showPop(btn, [['file', 'A file from this device'], ['link', 'A link to a document or web page']], a => (a === 'file' ? anyFile.click() : addLink2())); return; }
     restore();
     if (cmd === 'h') document.execCommand('formatBlock', false, currentBlock()?.tagName === 'H2' ? 'p' : 'h2');
     else if (cmd === 'bold') document.execCommand('bold');
@@ -212,6 +251,22 @@ export function createEditor(host, { onChange, resolveFile, addPhoto, onError, o
   }
   body.addEventListener('keyup', updateTools);
   body.addEventListener('mouseup', updateTools);
+
+  // Any kind of file: photos go in as photos, everything else as a file tile.
+  anyFile.addEventListener('change', async () => {
+    const files = [...anyFile.files];
+    anyFile.value = '';
+    for (const f of files) {
+      if (/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { await insertPhoto(f); continue; }
+      try {
+        const d = await addDoc(f);
+        const div = document.createElement('div');
+        writeDoc(div, d);
+        insertBlock(div);
+        flush();
+      } catch (e) { onError(e.message || String(e)); }
+    }
+  });
 
   fileInput.addEventListener('change', async () => {
     const files = [...fileInput.files];
@@ -289,6 +344,48 @@ export function createEditor(host, { onChange, resolveFile, addPhoto, onError, o
     changed(); flush();
   }
 
+  async function addSheet() {
+    const sh = onSheet && await onSheet(null);
+    if (!sh || sh === 'remove') return;
+    const div = document.createElement('div');
+    div.setAttribute('data-sheet', JSON.stringify(sh));
+    insertBlock(div);
+    flush();
+  }
+  async function editSheet(div) {
+    const sh = onSheet && await onSheet(cleanSheet(div.getAttribute('data-sheet')));
+    if (!sh) return;
+    if (sh === 'remove') div.remove();
+    else { div.setAttribute('data-sheet', JSON.stringify(sh)); div.replaceChildren(); hydrate(); }
+    changed(); flush();
+  }
+  async function addLink2() {
+    const l = onLink && await onLink(null);
+    if (!l || l === 'remove') return;
+    const div = document.createElement('div');
+    writeLink(div, l);
+    insertBlock(div);
+    flush();
+  }
+  async function editLink(div) {
+    const l = onLink && await onLink(linkInfo(div));
+    if (!l) return;
+    if (l === 'remove') div.remove();
+    else { writeLink(div, l); div.replaceChildren(); hydrate(); }
+    changed(); flush();
+  }
+
+  // A small menu by a toolbar button or a block: [[key, label], …].
+  function showPop(anchor, opts, onPick) {
+    blockpop.innerHTML = opts.map(([k, label, cls]) => `<button type="button" data-p="${k}" class="${cls || ''}">${escHtml(label)}</button>`).join('');
+    blockpop.hidden = false;
+    const r = anchor.getBoundingClientRect(), hr = host.getBoundingClientRect();
+    blockpop.style.left = Math.max(0, Math.min(r.left - hr.left, hr.width - 230)) + 'px';
+    blockpop.style.top = (r.bottom - hr.top + 6) + 'px';
+    blockpop.onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; blockpop.hidden = true; onPick(b.dataset.p); };
+  }
+  closePops = e => { if (!blockpop.hidden && !blockpop.contains(e.target) && !e.target.closest?.('[data-cmd=attach]')) blockpop.hidden = true; };
+
   // Typing into an empty note starts a proper paragraph (not loose text).
   body.addEventListener('focus', () => {
     if (body.childNodes.length) return;
@@ -317,6 +414,32 @@ export function createEditor(host, { onChange, resolveFile, addPhoto, onError, o
     // A drawing: open it to change it.
     const drawEl = e.target.closest('div[data-draw]');
     if (drawEl && body.contains(drawEl)) { e.preventDefault(); editDrawing(drawEl); return; }
+    // A spreadsheet: open it to change it.
+    const sheetEl = e.target.closest('div[data-sheet]');
+    if (sheetEl && body.contains(sheetEl)) { e.preventDefault(); editSheet(sheetEl); return; }
+    // A file: open it, save a copy, or take it out. A link: open it, change it, or take it out.
+    const docEl = e.target.closest('div[data-doc]');
+    if (docEl && body.contains(docEl)) {
+      e.preventDefault();
+      const d = docInfo(docEl);
+      showPop(docEl, [['open', 'Open'], ['save', 'Save a copy'], ['remove', 'Take it out of the note', 'danger']], a => {
+        if (a === 'open') openDoc?.(d);
+        else if (a === 'save') saveDoc?.(d);
+        else { docEl.remove(); changed(); flush(); }
+      });
+      return;
+    }
+    const linkEl = e.target.closest('div[data-weblink]');
+    if (linkEl && body.contains(linkEl)) {
+      e.preventDefault();
+      const l = linkInfo(linkEl);
+      showPop(linkEl, [['open', 'Open ↗'], ['edit', 'Change'], ['remove', 'Take it out of the note', 'danger']], a => {
+        if (a === 'open') window.open(l.url, '_blank', 'noopener,noreferrer');
+        else if (a === 'edit') editLink(linkEl);
+        else { linkEl.remove(); changed(); flush(); }
+      });
+      return;
+    }
     const li = e.target.closest('ul.checklist > li');
     if (li && body.contains(li) && e.clientX - li.getBoundingClientRect().left < 30) {
       e.preventDefault();
@@ -379,9 +502,12 @@ export function createEditor(host, { onChange, resolveFile, addPhoto, onError, o
   });
 
   function hydrate() {
-    for (const el of body.querySelectorAll('div[data-yt], div[data-draw]')) {
+    for (const el of body.querySelectorAll('div[data-yt], div[data-draw], div[data-sheet], div[data-doc], div[data-weblink]')) {
       el.contentEditable = 'false';
       if (el.firstChild) continue;
+      if (el.hasAttribute('data-sheet')) { el.className = 'sheetblock'; el.innerHTML = sheetTableHTML(el.getAttribute('data-sheet'), { maxRows: 40 }) + '<span class="dedit">Edit spreadsheet</span>'; continue; }
+      if (el.hasAttribute('data-doc')) { el.className = 'tile docblock'; el.innerHTML = docTileHTML(docInfo(el)); continue; }
+      if (el.hasAttribute('data-weblink')) { el.className = 'tile linkblock'; el.innerHTML = linkTileHTML(linkInfo(el)); continue; }
       if (el.hasAttribute('data-yt')) { const c = clipOf(el); el.className = 'clip'; if (c) el.innerHTML = clipFaceHTML(c, { edit: true }); }
       else { const dr = cleanDrawing(el.getAttribute('data-draw')); el.className = 'drawblock'; if (dr) el.innerHTML = drawingSVG(dr) + '<span class="dedit">Edit drawing</span>'; }
     }

@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
 <script>/* Paint in the saved look straight away (theme.js keeps this copy up to date). */
-try { var l = JSON.parse(localStorage.getItem('bt-look')); if (l) { var r = document.documentElement; for (var k in l.vars) r.style.setProperty(k, l.vars[k]); r.style.fontSize = l.size + 'px'; r.style.colorScheme = l.dark ? 'dark' : 'light'; r.dataset.mode = l.dark ? 'dark' : 'light'; r.dataset.look = l.look || 'corkboard'; } } catch (e) {}</script>
+try { var l = JSON.parse(localStorage.getItem('bt-look')); if (l) { var r = document.documentElement; for (var k in l.vars) r.style.setProperty(k, l.vars[k]); r.style.fontSize = l.size + 'px'; r.style.colorScheme = l.dark ? 'dark' : 'light'; r.dataset.mode = l.dark ? 'dark' : 'light'; r.dataset.look = l.look || 'corkboard'; if (l.theme) r.dataset.theme = l.theme; if (l.flat) r.setAttribute('data-flat', ''); } } catch (e) {}</script>
 </head>
 <body data-pane="nav">
 <div id="app">
@@ -42,6 +42,7 @@ try { var l = JSON.parse(localStorage.getItem('bt-look')); if (l) { var r = docu
       <button id="listBack" class="back" data-act="back-nav"></button>
       <h2 id="listTitle"></h2>
       <button id="boardBtn" class="boardlink" data-act="open-board" title="This project's board (corkboard)" hidden></button>
+      <button id="exportBtn" class="iconbtn" data-act="export-list" aria-label="Print or export this list" title="Print or export" hidden></button>
       <button id="newBtn" class="iconbtn accent" data-act="new" aria-label="New"></button>
     </header>
     <div class="listscroll">

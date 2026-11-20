@@ -21,6 +21,22 @@ export const THEMES = [
   { id: 'dusk', name: 'Dusk',
     light: { bg: '#F6F3FA', side: '#ECE6F4', card: '#FFFFFF', ink: '#221B2E', soft: '#675C78', accent: '#7A4FD0', string: '#D9466F', on: '#FFFFFF', proj: '#3E7CC9', ok: '#2F8A4E' },
     dark: { bg: '#19151F', side: '#131018', card: '#241E2C', ink: '#ECE6F5', soft: '#ABA0BC', accent: '#A98BF0', string: '#F06A90', on: '#160F22', proj: '#7FB0F0', ok: '#5CC283' } },
+  // 0.7: each of these has a board look to match (offered when you pick one).
+  { id: 'circuit', name: 'Circuit board', look: 'circuit',
+    light: { bg: '#EEF4EF', side: '#E1EBE3', card: '#FFFFFF', ink: '#10261B', soft: '#4E6A5A', accent: '#B8862B', string: '#C0392B', on: '#1A1305', proj: '#1F7A55', ok: '#2F8A4E' },
+    dark: { bg: '#0C1F16', side: '#08170F', card: '#12291E', ink: '#E3F0E7', soft: '#93B3A0', accent: '#E0B252', string: '#FF7A5C', on: '#1A1305', proj: '#6FD3A5', ok: '#5CC283' } },
+  { id: 'city', name: 'City', look: 'city',
+    light: { bg: '#F2F2F0', side: '#E7E7E4', card: '#FFFFFF', ink: '#1B1D22', soft: '#5F636B', accent: '#0060A8', string: '#E2382F', on: '#FFFFFF', proj: '#00843D', ok: '#2F8A4E' },
+    dark: { bg: '#14171D', side: '#0F1116', card: '#1D2129', ink: '#E9EBEF', soft: '#9AA1AD', accent: '#4DA3FF', string: '#FF6B5A', on: '#0A1420', proj: '#3DD68C', ok: '#5CC283' } },
+  { id: 'neon', name: 'Neon', look: 'neon',
+    light: { bg: '#FBF7FF', side: '#F2EAFB', card: '#FFFFFF', ink: '#1C1030', soft: '#6A5C80', accent: '#E0108A', string: '#0094B3', on: '#FFFFFF', proj: '#7B2FF7', ok: '#16A36A' },
+    dark: { bg: '#0B0A12', side: '#07060C', card: '#151225', ink: '#F3EEFF', soft: '#A79CC2', accent: '#FF3EA5', string: '#22E3FF', on: '#1A0010', proj: '#B98CFF', ok: '#39FF9A' } },
+  { id: 'minimal', name: 'Minimal', look: 'minimal', flat: true,
+    light: { bg: '#FFFFFF', side: '#FAFAFA', card: '#FFFFFF', ink: '#18181B', soft: '#71717A', accent: '#18181B', string: '#EF4444', on: '#FFFFFF', proj: '#52525B', ok: '#16A34A' },
+    dark: { bg: '#09090B', side: '#0E0E11', card: '#141417', ink: '#FAFAFA', soft: '#A1A1AA', accent: '#FAFAFA', string: '#F87171', on: '#09090B', proj: '#D4D4D8', ok: '#4ADE80' } },
+  { id: 'hacker', name: 'Hacker', look: 'hacker', font: 'mono',
+    light: { bg: '#F1F7F1', side: '#E5EFE5', card: '#FFFFFF', ink: '#0B2410', soft: '#4A6B50', accent: '#11823B', string: '#C0392B', on: '#FFFFFF', proj: '#1F6F8B', ok: '#11823B' },
+    dark: { bg: '#050805', side: '#020402', card: '#0B120B', ink: '#B8FFC8', soft: '#5FAF72', accent: '#33FF66', string: '#FF5F57', on: '#021006', proj: '#5CD6FF', ok: '#33FF66' } },
 ];
 
 export const FONTS = {
@@ -36,6 +52,14 @@ export const LOOKS = {
   whiteboard: { name: 'Whiteboard', wire: dark => (dark ? '#E9ECF1' : '#2B3038') },
   blueprint: { name: 'Blueprint', wire: () => '#F2F8FF' },
   notebook: { name: 'Notebook', wire: dark => (dark ? '#A9BCFF' : '#1F3B8C') },
+  // 0.7
+  circuit: { name: 'Circuit board', wire: () => '#E0B252' },        // copper traces
+  city: { name: 'City map', wire: () => null, lines: true },        // transit lines, one colour each
+  neon: { name: 'Neon', wire: () => null, lines: true },            // glowing tubes, one colour each
+  minimal: { name: 'Minimal', wire: dark => (dark ? '#8E8E96' : '#A1A1AA') },
+  hacker: { name: 'Hacker', wire: () => '#33FF66' },
+  chalkboard: { name: 'Chalkboard', wire: () => '#F4F1E6' },
+  space: { name: 'Space', wire: () => '#C9D8FF' },                  // constellations
 };
 export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard' };
 
@@ -77,8 +101,10 @@ export function apply(prefs) {
   root.style.colorScheme = dark ? 'dark' : 'light';
   root.dataset.mode = dark ? 'dark' : 'light';
   root.dataset.look = look;
+  root.dataset.theme = theme.id;
+  root.toggleAttribute('data-flat', !!theme.flat);
   for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.content = c.bg;
-  try { localStorage.setItem('bt-look', JSON.stringify({ vars, size: SIZES[p.size] || 16, dark, look })); } catch (e) {}
+  try { localStorage.setItem('bt-look', JSON.stringify({ vars, size: SIZES[p.size] || 16, dark, look, theme: theme.id, flat: !!theme.flat })); } catch (e) {}
 }
 
 // Follow the phone's light/dark switch while in "auto".

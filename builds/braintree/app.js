@@ -10,9 +10,12 @@ import { parseYouTube, parseTime, fmtTime, thumbUrl, watchUrl, iframeHTML, range
 import { openDrawing } from './draw.js';
 import { addExample, EXAMPLE_TITLE } from './example.js';
 import { createGestures } from './gestures.js';
+import { openSheet, sheetRows, cleanSheet } from './sheet.js';
+import { linkService } from './attach.js';
+import * as ex from './export.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -48,8 +51,21 @@ const ICON = {
   copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
   repeat: '<svg viewBox="0 0 24 24"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg>',
   open: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>',
+  rename: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+  lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  unlock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>',
+  share: '<svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
 };
-const typeIcon = t => (t === 'project' ? ICON.folder : t === 'section' ? ICON.section : t === 'task' ? ICON.check : ICON.note);
+// The small icons on a note's row for what it holds.
+const ROWIC = {
+  photo: ICON.photo,
+  clip: '<svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="3.5"/><path d="M10 9v6l5-3z"/></svg>',
+  draw: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="5" rx="1"/><circle cx="17" cy="17" r="3.5"/><path d="M6.5 9v4.5a3 3 0 0 0 3 3H13"/></svg>',
+  sheet: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M3 15h18M9 4v16M15 4v16"/></svg>',
+  doc: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+  link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+};
+const typeIcon = t =>(t === 'project' ? ICON.folder : t === 'section' ? ICON.section : t === 'task' ? ICON.check : ICON.note);
 
 // ---------- State ----------
 
@@ -83,6 +99,9 @@ const addMonths = (s, n) => {
 // The next given weekday (0 = Sunday) after s.
 const nextDow = (s, dow) => { let d = addDays(s, 1); while (parseYmd(d).getDay() !== dow) d = addDays(d, 1); return d; };
 const shortDate = s => parseYmd(s).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+
+// Card sizes on a board, from the open item (the handle on a card's corner sets any size in between).
+const CARD_SIZES = [[0.75, 'Small'], [1, 'Normal'], [1.5, 'Large'], [2.25, 'Huge']];
 
 // Repeating to-dos: ticking one moves it on to its next date (and unticks its steps).
 const REPEATS = { day: 'Every day', weekday: 'Every weekday', week: 'Every week', fortnight: 'Every 2 weeks', month: 'Every month', year: 'Every year' };
@@ -159,9 +178,27 @@ function fmtWhen(iso) {
 
 // ---------- Index ----------
 
+// Locked projects (data.lock): what's inside one is left out of everything (lists, boards,
+// search, counts) until it's unlocked on this device. A privacy screen, not encryption: the
+// data itself syncs as normal.
+const unlocked = new Set();
+const isLocked = p => !!p?.data.lock && !unlocked.has(p.id);
+
 function buildIndex() {
   const byId = new Map(), kids = new Map(), trashed = [];
   for (const r of store.all()) if (!r.deleted && r.data.type !== 'pref') byId.set(r.id, r);
+  // The locked project each thing is hidden inside, if any.
+  const lockMemo = new Map();
+  const lockOf = (r, depth = 0) => {
+    if (lockMemo.has(r.id)) return lockMemo.get(r.id);
+    const p = r.data.parent && byId.get(r.data.parent);
+    const out = !p || depth > 60 || p.id === r.id ? null : p.data.type === 'project' && isLocked(p) ? p.id : lockOf(p, depth + 1);
+    lockMemo.set(r.id, out);
+    return out;
+  };
+  const hiddenIn = new Map();
+  for (const r of byId.values()) { const l = lockOf(r); if (l) hiddenIn.set(r.id, l); }
+  for (const id of hiddenIn.keys()) byId.delete(id);
   const aliveMemo = new Map();
   const alive = (r, depth = 0) => {
     if (aliveMemo.has(r.id)) return aliveMemo.get(r.id);
@@ -186,7 +223,7 @@ function buildIndex() {
   const ancestors = r => { const out = []; let p = parentOf(r); while (p && out.length < 60 && !out.includes(p)) { out.unshift(p); p = parentOf(p); } return out; };
   const project = r => { let p = parentOf(r), n = 0; while (p && n++ < 60) { if (p.data.type === 'project') return p; p = parentOf(p); } return null; };
   const live = [...byId.values()].filter(r => alive(r));
-  return { byId, kids, trashed, alive: r => byId.has(r.id) && alive(r), parentOf, descendants, ancestors, project, live };
+  return { byId, kids, trashed, alive: r => byId.has(r.id) && alive(r), parentOf, descendants, ancestors, project, live, hiddenIn };
 }
 
 function progress(id) {
@@ -203,7 +240,9 @@ const shorten = (s, n) => (s.length <= n ? s : s.slice(0, n).replace(/\s+\S*$/, 
 const bySectionOrder = (a, b) => (a.data.order || 0) - (b.data.order || 0) || (a.data.created || '').localeCompare(b.data.created || '');
 // Inside a project things stay where you put them (drag them, or "Move to top"); pinned notes first.
 const byOrder = bySectionOrder;
-const byPinnedOrder = (a, b) => (b.data.pinned ? 1 : 0) - (a.data.pinned ? 1 : 0) || byOrder(a, b);
+// Pinned things stay at the top of their list (projects: at the top of the sidebar).
+const pinFirst = cmp => (a, b) => (b.data.pinned ? 1 : 0) - (a.data.pinned ? 1 : 0) || cmp(a, b);
+const byPinnedOrder = pinFirst(byOrder);
 const isTodo = r => isOpen(r) && r.data.type === 'task';
 // Where a project sits in the sidebar: under the nearest unfinished project above it.
 const navUnder = p => { const up = I.project(p); return up && !up.data.done ? up.id : ''; };
@@ -249,6 +288,10 @@ function queueRender() {
 
 function render() {
   I = buildIndex();
+  // Somewhere inside a locked project: go to the project (its list asks for the password).
+  const hid = id => id && I.hiddenIn.get(id);
+  if (hid(route.project) || (route.view === 'board' && hid(route.board))) { go({ project: hid(route.project) || hid(route.board), view: null, board: null, item: null }, true); return; }
+  if (route.view === 'board' && route.board && isLocked(I.byId.get(route.board))) { go({ project: route.board, view: null, board: null, item: null }, true); return; }
   if (route.project && !I.byId.has(route.project)) { go({ project: null, view: 'today', item: null }, true); return; }
   if (route.view === 'board') {
     // Boards belong to projects (there's no overall one any more); anything else opens its project's.
@@ -285,9 +328,13 @@ const boardApi = {
   newItem: (type, parent, extra) => newItem(type, parent ?? null, extra),
   placePicker: (key, exclude, onPick) => pickItem({ title: 'Bring onto this board', exclude: new Set(exclude), only: r => r.data.type !== 'section', onPick }),
   style: () => theme.current(store).look,
+  ownWire: () => !!theme.current(store).string,   // your own string colour (instead of the look's)
   pickClip: c => clipModal(c),
   draw: (d, title) => openDrawing({ drawing: d, title }),
   bigVideo: c => videoModal(c),
+  sheet: (s, title) => openSheet({ sheet: s, title, saveFile: deliver }),
+  pickLink: l => linkModal(l),
+  openDoc: d => openDoc(d),
 };
 
 function renderNav() {
@@ -303,21 +350,24 @@ function renderNav() {
       ${counts[s.id] ? `<span class="count ${s.id === 'today' && I.live.some(r => isOpen(r) && r.data.due && r.data.due < t) ? 'late' : ''}">${counts[s.id]}</span>` : ''}
     </a>`).join('');
 
-  // Project tree: projects nest under the nearest project above them.
+  // Project tree: projects nest under the nearest project above them; pinned ones first.
   const projects = I.live.filter(r => r.data.type === 'project' && !r.data.done);
   const under = new Map();
   for (const p of projects) { const k = navUnder(p); if (!under.has(k)) under.set(k, []); under.get(k).push(p); }
-  const branch = (key, depth) => (under.get(key) || []).sort(byOrder).map(p => {
-    const subs = under.has(p.id);
-    const { total, done } = progress(p.id);
+  const branch = (key, depth) => (under.get(key) || []).sort(byPinnedOrder).map(p => {
+    const locked = isLocked(p);
+    const subs = under.has(p.id) && !locked;
+    const { total, done } = locked ? { total: 0, done: 0 } : progress(p.id);
     const shut = collapsed.has(p.id);
     // To-dos due today (or late) anywhere in it, so a glance at the sidebar shows where today's work is.
-    const due = I.descendants(p.id).filter(r => isTodo(r) && r.data.due && r.data.due <= t);
+    const due = locked ? [] : I.descendants(p.id).filter(r => isTodo(r) && r.data.due && r.data.due <= t);
     const late = due.some(r => r.data.due < t);
     return `
       <div class="navrow proj ${(route.project === p.id || (route.view === 'board' && route.board === p.id)) && !search ? 'on' : ''}" data-project="${p.id}" data-under="${key}" data-depth="${depth}" style="--depth:${depth}">
         <button class="caret ${subs ? '' : 'none'} ${shut ? '' : 'open'}" data-toggle="${p.id}" aria-label="Show or hide sub-projects">${subs ? ICON.caret : ''}</button>
         <span class="ic">${ICON.folder}</span><span class="name">${esc(titleOf(p))}</span>
+        ${p.data.pinned ? `<span class="pinmark" title="Pinned">${ICON.pin}</span>` : ''}
+        ${locked ? `<span class="lockmark" title="Locked">${ICON.lock}</span>` : p.data.lock ? `<span class="lockmark open" title="Unlocked for now">${ICON.unlock}</span>` : ''}
         ${due.length ? `<span class="duebadge ${late ? 'late' : ''}" title="${due.length} to-do${due.length === 1 ? '' : 's'} due today${late ? ' or late' : ''}">${due.length}</span>` : ''}
         ${total ? `<span class="count">${done}/${total}</span>` : ''}
       </div>${subs && !shut ? branch(p.id, depth + 1) : ''}`;
@@ -330,7 +380,7 @@ function renderNav() {
     // Until there's one, an easy way to see what's possible (it's in Settings too).
     + (tree && !hasExample ? `<button class="navrow small example" data-act="example"><span class="ic">${ICON.plus}</span><span class="name">Add the example project</span></button>` : '');
 
-  const conflicts = store.conflicts().length;
+  const conflicts = store.conflicts().filter(r => !I.hiddenIn.has(r.id)).length;
   $('#lower').innerHTML = `
     ${conflicts ? `<a href="#/conflicts" class="navrow warn ${route.view === 'conflicts' ? 'on' : ''}"><span class="ic">${ICON.warn}</span><span class="name">Conflicts</span><span class="count late">${conflicts}</span></a>` : ''}
     <a href="#/trash" class="navrow ${route.view === 'trash' ? 'on' : ''}"><span class="ic">${ICON.trash}</span><span class="name">Recently deleted</span>${I.trashed.length ? `<span class="count">${I.trashed.length}</span>` : ''}</a>`;
@@ -355,8 +405,8 @@ function renderSyncBar() {
 function todayGroups(pool) {
   const t = today(), open = pool.filter(r => isOpen(r));
   return [
-    { name: 'Overdue', items: open.filter(r => r.data.due && r.data.due < t).sort(byDueThenOrder), late: true },
-    { name: 'Today', items: open.filter(r => r.data.due === t || (r.data.start === t && !r.data.due)).sort(byDueThenOrder) },
+    { name: 'Overdue', items: open.filter(r => r.data.due && r.data.due < t).sort(pinFirst(byDueThenOrder)), late: true },
+    { name: 'Today', items: open.filter(r => r.data.due === t || (r.data.start === t && !r.data.due)).sort(pinFirst(byDueThenOrder)) },
     { name: 'Done today', items: pool.filter(r => r.data.type === 'task' && r.data.done && (r.data.doneAt || '').startsWith(t)), done: true },
   ];
 }
@@ -386,18 +436,28 @@ function renderList() {
     const hits = I.live.filter(r => (titleOf(r) + ' ' + textOf(r.data.body)).toLowerCase().includes(q)).sort(byPinnedUpdated);
     groups = [{ name: hits.length ? `${hits.length} found` : 'Nothing found', items: hits }];
     canAdd = false;
+  } else if (route.project && isLocked(I.byId.get(route.project))) {
+    // Locked: just the way in. (Left alone while it's showing, so a redraw doesn't wipe what you've typed.)
+    const p = I.byId.get(route.project);
+    $('#listTitle').textContent = titleOf(p);
+    $('#boardBtn').hidden = true; $('#exportBtn').hidden = true; $('#quickAdd').hidden = true;
+    if ($('#listHead .lockpanel')?.dataset.unlock !== p.id) { $('#listHead').innerHTML = lockPanelHTML(p); $('#listBody').innerHTML = ''; }
+    return;
   } else if (route.project) {
     const p = I.byId.get(route.project);
     title = titleOf(p);
     const kids = I.kids.get(p.id) || [];
     const { total, done } = progress(p.id);
-    const span = p.data.start || p.data.due ? `<span class="chip">${ICON.cal}${p.data.start ? fmtDay(p.data.start) : '…'} → ${p.data.due ? fmtDay(p.data.due) : '…'}</span>` : '';
-    head = `
-      <button class="projcard" data-open="${p.id}">
-        <span class="row1">${span}${total ? `<span class="chip">${done} of ${total} done</span>` : ''}${p.data.done ? '<span class="chip ok">Finished</span>' : ''}</span>
-        ${total ? `<span class="bar"><i style="width:${Math.round(100 * done / total)}%"></i></span>` : ''}
-        <span class="row2">${textOf(p.data.body) ? esc(shorten(textOf(p.data.body), 140)) : 'Project notes, links and photos'}<b>Open ›</b></span>
-      </button>`;
+    // One slim line: how far along, when it ends, and the way into the project's own notes.
+    const end = p.data.due ? `ends ${fmtDay(p.data.due)}` : p.data.start ? `starts ${fmtDay(p.data.start)}` : '';
+    head = `<div class="projline">
+      <button class="projsum" data-open="${p.id}" title="The project's own notes, dates and settings">
+        ${total ? `<span class="n">${done}/${total}</span><span class="bar"><i style="width:${Math.round(100 * done / total)}%"></i></span>` : '<span class="grow"></span>'}
+        ${end ? `<span class="${!p.data.done && p.data.due && p.data.due < t ? 'late' : ''}">${esc(end)}</span>` : ''}
+        ${p.data.done ? '<span class="ok">Finished</span>' : ''}
+        <b>${textOf(p.data.body) ? 'Notes' : 'Details'} ›</b>
+      </button>
+      ${p.data.lock ? `<button class="lockbtn" data-act="lock-now" data-id="${p.id}" title="Lock it again now">${ICON.lock}<span>Lock</span></button>` : ''}</div>`;
     // Everything in it, or just what's due today / coming up (from anywhere inside, sections and sub-projects too).
     const tab = projTab(p.id), pool = I.descendants(p.id);
     const nToday = pool.filter(r => isOpen(r) && ((r.data.due && r.data.due <= t) || (r.data.start === t && !r.data.due))).length;
@@ -416,14 +476,15 @@ function renderList() {
       const sections = kids.filter(r => r.data.type === 'section').sort(bySectionOrder);
       const inSections = sections.flatMap(s => I.kids.get(s.id) || []);
       const openOf = list => [
-        ...list.filter(r => r.data.type === 'task' && !r.data.done).sort(byOrder),
-        ...list.filter(r => r.data.type === 'project').sort(byOrder),
+        ...list.filter(r => r.data.type === 'task' && !r.data.done).sort(byPinnedOrder),
+        ...list.filter(r => r.data.type === 'project').sort(byPinnedOrder),
         ...list.filter(r => r.data.type === 'note').sort(byPinnedOrder),
       ];
+      // (the loose ones without headings: to-dos, then sub-projects, then notes)
       groups = [
-        { name: 'To-dos', items: kids.filter(r => r.data.type === 'task' && !r.data.done).sort(byOrder), drop: p.id, kind: 'task' },
-        { name: 'Sub-projects', items: kids.filter(r => r.data.type === 'project').sort(byOrder), drop: p.id, kind: 'project' },
-        { name: 'Notes', items: kids.filter(r => r.data.type === 'note').sort(byPinnedOrder), drop: p.id, kind: 'note' },
+        { name: 'To-dos', bare: true, items: kids.filter(r => r.data.type === 'task' && !r.data.done).sort(byPinnedOrder), drop: p.id, kind: 'task' },
+        { name: 'Sub-projects', bare: true, items: kids.filter(r => r.data.type === 'project').sort(byPinnedOrder), drop: p.id, kind: 'project' },
+        { name: 'Notes', bare: true, items: kids.filter(r => r.data.type === 'note').sort(byPinnedOrder), drop: p.id, kind: 'note' },
         ...sections.map(s => ({ name: titleOf(s), section: s, items: openOf(I.kids.get(s.id) || []) })),
         { name: 'Done', items: [...kids, ...inSections].filter(r => r.data.type === 'task' && r.data.done).sort((a, b) => (b.data.doneAt || '').localeCompare(a.data.doneAt || '')), done: true },
       ];
@@ -440,7 +501,7 @@ function renderList() {
     } else if (v === 'inbox') {
       const loose = I.live.filter(r => !I.parentOf(r) && r.data.type !== 'project');
       groups = [
-        { name: 'To-dos', items: loose.filter(r => r.data.type === 'task' && !r.data.done).sort(byDueThenOrder) },
+        { name: 'To-dos', items: loose.filter(r => r.data.type === 'task' && !r.data.done).sort(pinFirst(byDueThenOrder)) },
         { name: 'Notes', items: loose.filter(r => r.data.type === 'note').sort(byPinnedUpdated) },
         { name: 'Done', items: loose.filter(r => r.data.type === 'task' && r.data.done).sort((a, b) => (b.data.doneAt || '').localeCompare(a.data.doneAt || '')), done: true },
       ];
@@ -448,7 +509,7 @@ function renderList() {
       const open = I.live.filter(r => r.data.type === 'task' && !r.data.done);
       const map = new Map();
       for (const r of open) { const p = I.project(r); const k = p ? titleOf(p) : ' No project'; if (!map.has(k)) map.set(k, []); map.get(k).push(r); }
-      groups = [...map].sort((a, b) => a[0].localeCompare(b[0])).map(([name, items]) => ({ name: name.trim(), items: items.sort(byDueThenOrder) }));
+      groups = [...map].sort((a, b) => a[0].localeCompare(b[0])).map(([name, items]) => ({ name: name.trim(), items: items.sort(pinFirst(byDueThenOrder)) }));
     } else if (v === 'notes') {
       addHint = 'New note title';
       groups = [{ name: '', items: I.live.filter(r => r.data.type === 'note').sort(byPinnedUpdated) }];
@@ -462,13 +523,14 @@ function renderList() {
     } else if (v === 'conflicts') {
       canAdd = false;
       head = '<p class="hint">These were changed on two devices before they could sync. Open one to compare and pick which to keep.</p>';
-      groups = [{ name: '', items: store.conflicts().filter(r => !r.deleted || r.conflict) }];
+      groups = [{ name: '', items: store.conflicts().filter(r => (!r.deleted || r.conflict) && !I.hiddenIn.has(r.id)) }];
     }
   }
 
   $('#listTitle').textContent = title;
   $('#listHead').innerHTML = head;
   $('#boardBtn').hidden = !route.project || !!search;
+  $('#exportBtn').hidden = !!search || (!route.project && ['trash', 'conflicts'].includes(route.view));
   const qa = $('#quickAdd');
   qa.hidden = !canAdd;
   qa.querySelector('input').placeholder = addHint;
@@ -486,11 +548,13 @@ function renderList() {
     if (!g.items.length) return g.empty ? `<p class="empty">${esc(g.empty)}</p>` : '';
     const doneKey = key + ':' + g.name;
     if (g.done) {
+      // A quiet line at the bottom: "3 done · Show".
       const isOpenSec = openDone.has(doneKey);
-      return `<div class="group done"><button class="gname toggle" data-done="${esc(doneKey)}">${esc(g.name)} (${g.items.length}) <span>${isOpenSec ? 'Hide' : 'Show'}</span></button>
+      return `<div class="group done"><button class="foot toggle" data-done="${esc(doneKey)}">${g.items.length} ${g.name === 'Done today' ? 'done today' : 'done'} · <span>${isOpenSec ? 'Hide' : 'Show'}</span></button>
         ${isOpenSec ? g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project, where: g.where })).join('') : ''}</div>`;
     }
-    return `<div class="group ${g.late ? 'late' : ''}" ${g.drop ? `data-drop="${g.drop}" data-kind="${g.kind}"` : ''}>${g.name ? `<div class="gname">${esc(g.name)}</div>` : ''}${g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project, where: g.where })).join('')}</div>`;
+    const band = g.name && !g.bare ? `<div class="gname band ${g.late ? 'late' : ''}"><span>${esc(g.name)}</span><small>${g.items.length}</small></div>` : '';
+    return `<div class="group ${g.late ? 'late' : ''} ${g.bare ? 'bare' : ''}" ${g.drop ? `data-drop="${g.drop}" data-kind="${g.kind}"` : ''}>${band}${g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project, where: g.where })).join('')}</div>`;
   }).join('');
   const nothing = !groups.some(g => g.items.length);
   $('#listBody').innerHTML = html || (nothing ? `<p class="empty">${emptyText()}</p>` : '');
@@ -511,42 +575,59 @@ function emptyText() {
   }[route.view] || '';
 }
 
+// What a note holds besides text, for the little icon on its row.
+function noteKind(body = '') {
+  if (/data-sheet=/.test(body)) return ['sheet', 'Spreadsheet'];
+  if (/data-yt=/.test(body)) return ['clip', 'YouTube clip'];
+  if (/data-draw=/.test(body)) return ['draw', 'Drawing'];
+  if (/data-doc=/.test(body)) return ['doc', 'File'];
+  if (/data-weblink=/.test(body)) return ['link', 'Link'];
+  if (/data-file=/.test(body)) return ['photo', 'Photo'];
+  return null;
+}
+// A note's checklist, ticked of total ("2/5"), or ''.
+function checkCount(body = '') {
+  const lists = body.match(/<ul class="checklist">[\s\S]*?<\/ul>/g);
+  if (!lists) return '';
+  const all = lists.join('');
+  const n = (all.match(/<li\b/g) || []).length, done = (all.match(/data-checked="true"/g) || []).length;
+  return n ? `${done}/${n}` : '';
+}
+
+// One line per row (list style B, "Compact"): tick or icon, the title with a few grey extras
+// after it (steps done, where it lives), one small icon, and the date in a column on the right.
 function rowHTML(r, { trash = false, inProject = false, where = false } = {}) {
   const d = r.data, t = today();
   const type = d.type || 'note';
   const sel = route.item === r.id ? 'on' : '';
+  const bits = [];
+  const kids = I.kids.get(r.id) || [];
+  if (type === 'project') { const { total, done } = progress(r.id); if (total) bits.push(`${done}/${total}`); }
+  else if (kids.length) { const tasks = kids.filter(k => k.data.type === 'task'); bits.push(tasks.length ? `${tasks.filter(k => k.data.done).length}/${tasks.length}` : `${kids.length} inside`); }
+  else if (type === 'note') { const c = checkCount(d.body); if (c) bits.push(c); }
   const proj = !inProject && I.project(r);
-  const chips = [];
-  const rep = d.repeat && type === 'task' ? `<span class="repmark" title="${esc(REPEATS[d.repeat] || 'Repeats')}">${ICON.repeat}</span>` : '';
-  if (type === 'project' && (d.start || d.due)) chips.push(`<span class="chip ${!d.done && d.due && d.due < t ? 'late' : ''}">${ICON.cal}${d.start ? fmtDay(d.start) : '…'} → ${d.due ? fmtDay(d.due) : '…'}</span>`);
-  else if (d.due && type !== 'note') chips.push(`<span class="chip ${!d.done && d.due < t ? 'late' : d.due === t ? 'now' : ''}">${ICON.cal}${fmtDay(d.due)}${rep}</span>`);
-  else if (d.start && d.start > t && type !== 'note') chips.push(`<span class="chip">Starts ${fmtDay(d.start)}${rep}</span>`);
-  else if (rep) chips.push(`<span class="chip">${rep}${esc(REPEATS[d.repeat] || 'Repeats')}</span>`);
-  if (type === 'project') { const { total, done } = progress(r.id); if (total) chips.push(`<span class="chip">${done}/${total}</span>`); }
-  if (proj) { const sec = I.parentOf(r)?.data.type === 'section' ? I.parentOf(r) : null; chips.push(`<span class="chip proj">${ICON.folder}${esc(titleOf(proj))}${sec ? ' › ' + esc(titleOf(sec)) : ''}</span>`); }
+  if (proj) { const sec = I.parentOf(r)?.data.type === 'section' ? I.parentOf(r) : null; bits.push(`· ${titleOf(proj)}${sec ? ' › ' + titleOf(sec) : ''}`); }
   // In a project's Today / Upcoming: which section or sub-project it's in, if not loose in the project.
-  if (where && route.project) {
-    const par = I.parentOf(r);
-    if (par && par.id !== route.project) chips.push(`<span class="chip proj">${par.data.type === 'section' ? ICON.section : par.data.type === 'project' ? ICON.folder : ICON.check}${esc(titleOf(par))}</span>`);
-  }
-  const kidCount = (I.kids.get(r.id) || []).length;
-  if (kidCount && type !== 'project') chips.push(`<span class="chip">${kidCount} inside</span>`);
-  if (r.conflict) chips.push(`<span class="chip late">${ICON.warn}Conflict</span>`);
-  if (r.dirty && store.status.state !== 'signedout') chips.push('<span class="dot-pending" title="Not synced yet"></span>');
-  const photo = firstPhoto(d.body);
-  const snippet = type === 'note' ? textOf(d.body).slice(0, 120) || mediaSummary(d.body) : '';
+  if (where && route.project) { const par = I.parentOf(r); if (par && par.id !== route.project) bits.push('· ' + titleOf(par)); }
+  // One small icon: a conflict, a repeat, or what a note holds.
+  const kind = type === 'note' && noteKind(d.body);
+  const ic = r.conflict ? `<span class="meta late" title="Conflict: changed on two devices">${ICON.warn}</span>`
+    : d.repeat && type === 'task' ? `<span class="meta" title="${esc(REPEATS[d.repeat] || 'Repeats')}">${ICON.repeat}</span>`
+    : kind ? `<span class="meta" title="${kind[1]}">${ROWIC[kind[0]]}</span>` : '';
+  // The date column: when it's due (or starts); a note shows when it was last changed.
+  let when = '', wcls = '';
+  if (type === 'task' && d.done) when = d.doneAt ? fmtDay(d.doneAt.slice(0, 10)) : '';
+  else if ((type === 'task' || type === 'project') && d.due) { when = fmtDay(d.due); wcls = !d.done && d.due < t ? 'late' : d.due === t ? 'now' : ''; }
+  else if ((type === 'task' || type === 'project') && d.start && d.start > t) when = 'from ' + fmtDay(d.start);
+  else if (type === 'note' && !inProject) { when = fmtDay(ymd(new Date(d.updated || d.created || Date.now()))); wcls = 'soft'; }
   const lead = type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="${d.done ? 'Mark not done' : 'Mark done'}"></button>`
     : `<span class="ic t-${type}">${typeIcon(type)}</span>`;
   return `
     <div class="row ${sel} t-${type} ${d.done ? 'is-done' : ''} ${d.color ? 'c-' + d.color : ''}" data-open="${r.id}" role="button" tabindex="0">
       ${trash ? `<span class="ic">${typeIcon(type)}</span>` : lead}
-      <span class="main">
-        <span class="title">${d.pinned ? `<span class="pinmark">${ICON.pin}</span>` : ''}${esc(titleOf(r))}</span>
-        ${type === 'note' ? `<span class="sub"><b>${esc(fmtDay(ymd(new Date(d.updated || d.created || Date.now()))))}</b> ${esc(snippet || 'No text')}</span>` : ''}
-        ${chips.length ? `<span class="chips">${chips.join('')}</span>` : ''}
-      </span>
-      ${photo ? `<img class="thumb" data-thumb="${photo}" alt="">` : ''}
-      ${trash ? `<span class="trashacts"><button data-restore="${r.id}">Restore</button><button class="danger" data-purge="${r.id}">Delete</button></span>` : ''}
+      <span class="title">${d.pinned ? `<span class="pinmark" title="Pinned">${ICON.pin}</span>` : ''}${esc(titleOf(r))}${bits.length ? ` <small>${esc(bits.join(' '))}</small>` : ''}</span>
+      ${ic}${r.dirty && store.status.state !== 'signedout' ? '<span class="dot-pending" title="Not synced yet"></span>' : ''}
+      ${trash ? `<span class="trashacts"><button data-restore="${r.id}">Restore</button><button class="danger" data-purge="${r.id}">Delete</button></span>` : `<span class="when ${wcls}">${esc(when)}</span>`}
     </div>`;
 }
 
@@ -562,6 +643,15 @@ function renderDetail() {
   const host = $('#detail');
   let id = route.item;
   if (!id && route.project && wide.matches) id = route.project;
+  // Inside a locked project (or the locked project's own page): the way in, unless its list is showing it already.
+  const lockId = id && (I.hiddenIn.get(id) || (isLocked(I.byId.get(id)) ? id : null));
+  if (lockId) {
+    if (editingId) { saveEditing(); editingId = null; }
+    const p = I.byId.get(lockId);
+    if (route.project === lockId && wide.matches) host.innerHTML = `<div class="blank">${ICON.lock}<p>Locked.</p></div>`;
+    else if (host.querySelector('.lockpanel')?.dataset.unlock !== lockId) host.innerHTML = `<div class="scroll lockwrap">${lockPanelHTML(p)}${!wide.matches ? '<button class="link" data-act="back">Back</button>' : ''}</div>`;
+    return;
+  }
   const r = id && I.byId.get(id);
   if (!r) {
     if (editingId) { saveEditing(); editingId = null; }
@@ -584,7 +674,7 @@ function buildDetail(host, r) {
       <nav class="crumbs"></nav>
       <div class="acts">
         <button data-act="board" class="boardbtn" title="Open the board">${ICON.board}</button>
-        <button data-act="pin" title="Pin to top">${ICON.pin}</button>
+        <button data-act="pin" title="Pin to the top">${ICON.pin}</button>
         <button data-act="move" title="Move into a project">${ICON.move}</button>
         <button data-act="trash" title="Delete">${ICON.trash}</button>
         <button data-act="back" class="closer" title="Close">${ICON.close}</button>
@@ -607,6 +697,7 @@ function buildDetail(host, r) {
         <button class="sw none" data-colour-pick="" title="No colour">×</button>
         ${COLOURS.map(c => `<button class="sw c-${c}" data-colour-pick="${c}" title="${c[0].toUpperCase() + c.slice(1)}"></button>`).join('')}
       </div>
+      <div class="boardsize" hidden><span>Size on the board</span><div class="seg">${CARD_SIZES.map(([s, label]) => `<button data-cardsize="${s}">${label}</button>`).join('')}</div></div>
       <section class="inside top"></section>
       <div class="editor"></div>
       <section class="inside bottom"></section>
@@ -645,6 +736,11 @@ function buildDetail(host, r) {
     onClip: c => clipModal(c),
     onDraw: dr => openDrawing({ drawing: dr, title: (I.byId.get(r.id) && titleOf(I.byId.get(r.id))) || 'Drawing' }),
     videoInfo: id => store.videoInfo(id),
+    onSheet: sh => openSheet({ sheet: sh, title: (I.byId.get(r.id) && titleOf(I.byId.get(r.id))) || 'Spreadsheet', saveFile: deliver }),
+    onLink: l => linkModal(l),
+    addDoc: file => store.addDoc(file),
+    openDoc: d => openDoc(d),
+    saveDoc: d => saveDoc(d),
   });
   editor.setHTML(r.data.body || '');
   // Brand new: straight into naming it (a placeholder name like "New section" is selected, ready to type over).
@@ -706,6 +802,14 @@ function updateDetail(r) {
   bb.hidden = !bp || (route.view === 'board' && route.board === bp.id);
   bb.title = type === 'project' ? 'Open this project’s board' : bp ? `Open “${titleOf(bp)}” board` : '';
   for (const b of host.querySelectorAll('[data-colour-pick]')) b.classList.toggle('on', (d.color || '') === b.dataset.colourPick);
+  // Opened from a board: how big its card is there (also the handle on the card's corner).
+  const bs = $('.boardsize', host), onBoard = route.view === 'board' && route.board && route.board !== r.id && type !== 'section';
+  bs.hidden = !onBoard;
+  if (onBoard) {
+    const cur = +d.cork?.[route.board]?.s || 1;
+    const near = CARD_SIZES.reduce((a, b) => (Math.abs(b[0] - cur) < Math.abs(a[0] - cur) ? b : a))[0];
+    for (const b of bs.querySelectorAll('[data-cardsize]')) b.classList.toggle('on', +b.dataset.cardsize === near);
+  }
 
   // Strings: links this item has to others, and others to it.
   const outgoing = (d.links || []).map(l => ({ id: l.to, label: l.label, from: r.id, to: l.to }));
@@ -730,7 +834,7 @@ function updateDetail(r) {
   const top = $('.inside.top', host), bottom = $('.inside.bottom', host);
   const target = group ? top : bottom;
   (group ? bottom : top).innerHTML = '';
-  const openTasks = kids.filter(k => k.data.type === 'task' && !k.data.done).sort(byOrder);
+  const openTasks = kids.filter(k => k.data.type === 'task' && !k.data.done).sort(byPinnedOrder);
   const rank = k => ({ project: 0, section: 1 }[k.data.type] ?? 2);
   const others = kids.filter(k => k.data.type !== 'task').sort((a, b) => rank(a) - rank(b) || (a.data.type === 'section' ? bySectionOrder(a, b) : byPinnedUpdated(a, b)));
   const done = kids.filter(k => k.data.type === 'task' && k.data.done);
@@ -743,7 +847,7 @@ function updateDetail(r) {
       <form class="quick" data-parent="${r.id}"><span class="tick ghost"></span><input placeholder="Add a to-do" enterkeyhint="done"></form>
       ${openTasks.map(k => rowHTML(k, { inProject: true })).join('')}
       ${others.map(k => rowHTML(k, { inProject: true })).join('')}
-      ${done.length ? `<button class="gname toggle" data-done="${doneKey}">Done (${done.length}) <span>${openDone.has(doneKey) ? 'Hide' : 'Show'}</span></button>${openDone.has(doneKey) ? done.map(k => rowHTML(k, { inProject: true })).join('') : ''}` : ''}`;
+      ${done.length ? `<button class="foot toggle" data-done="${doneKey}">${done.length} done · <span>${openDone.has(doneKey) ? 'Hide' : 'Show'}</span></button>${openDone.has(doneKey) ? done.map(k => rowHTML(k, { inProject: true })).join('') : ''}` : ''}`;
     hydrateThumbs(target);
   } else {
     target.innerHTML = `<button class="addinside" data-act="add-inside">+ Add steps or notes inside this ${TYPE_NAMES[type].toLowerCase()}</button>`;
@@ -810,9 +914,9 @@ async function setDue(id, due) {
 function siblingsOf(r) {
   if (r.data.type === 'project') {
     const k = navUnder(r);
-    return I.live.filter(p => p.data.type === 'project' && !p.data.done && navUnder(p) === k).sort(byOrder);
+    return I.live.filter(p => p.data.type === 'project' && !p.data.done && navUnder(p) === k).sort(byPinnedOrder);
   }
-  return (I.kids.get(I.parentOf(r)?.id || '') || []).filter(k => k.data.type === r.data.type && !k.data.done).sort(byOrder);
+  return (I.kids.get(I.parentOf(r)?.id || '') || []).filter(k => k.data.type === r.data.type && !k.data.done).sort(byPinnedOrder);
 }
 // Only where the order is yours to set: projects and sections, and what's inside a project.
 const canTop = r => {
@@ -911,8 +1015,9 @@ function rowActions(el) {
   if (!r || !I.alive(r) || (!route.project && !search && ['trash', 'conflicts'].includes(route.view) && el.closest('#listBody'))) return null;
   const t = r.data.type;
   const more = { id: 'more', label: 'More', icon: ICON.dots, tone: 'grey' };
+  if (isLocked(r)) return { lead: [{ id: 'pin', label: r.data.pinned ? 'Unpin' : 'Pin', icon: ICON.pin, tone: 'accent' }, more], trail: [] };
   const lead = t === 'task' ? [{ id: 'done', label: r.data.done ? 'Undo' : 'Done', icon: ICON.check, tone: 'green' }, { id: 'when', label: 'Date', icon: ICON.cal, tone: 'accent' }, more]
-    : t === 'project' ? [{ id: 'board', label: 'Board', icon: ICON.board, tone: 'blue' }, more]
+    : t === 'project' ? [{ id: 'board', label: 'Board', icon: ICON.board, tone: 'blue' }, { id: 'pin', label: r.data.pinned ? 'Unpin' : 'Pin', icon: ICON.pin, tone: 'accent' }, more]
     : t === 'note' ? [{ id: 'pin', label: r.data.pinned ? 'Unpin' : 'Pin', icon: ICON.pin, tone: 'accent' }, more]
     : [more];
   return { lead, trail: [{ id: 'delete', label: 'Delete', icon: ICON.trash, tone: 'red' }] };
@@ -925,7 +1030,7 @@ function rowAction(el, act) {
   else if (act === 'when') whenSheet(id);
   else if (act === 'more') itemMenu(id);
   else if (act === 'board') go({ view: 'board', board: r.data.type === 'project' ? id : I.project(r)?.id, project: null, item: null });
-  else if (act === 'pin') store.update(id, { pinned: r.data.pinned ? undefined : true });
+  else if (act === 'pin') togglePin(id);
   else if (act === 'delete') trashItem(id);
 }
 
@@ -959,16 +1064,184 @@ function whenSheet(id) {
     <div class="mbtns"><button data-close>Cancel</button></div>`, el => wireDates(el, id), 'menu');
 }
 
+// Rename without opening it (from the hold menu).
+function renameSheet(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  const what = { project: 'project', section: 'section', note: 'note', task: 'to-do' }[r.data.type] || 'item';
+  modal(`
+    <h2>Rename ${what}</h2>
+    <form class="renameform">
+      <label class="field">Name<input class="rname" value="${esc(r.data.title || '')}" placeholder="${esc(titleOf(r))}" maxlength="200" autocomplete="off" enterkeyhint="done"></label>
+      <div class="mbtns"><button type="button" data-close>Cancel</button><button class="primary">Save</button></div>
+    </form>`, el => {
+    const input = el.querySelector('.rname');
+    // Straight away, while the tap that asked for it still counts (an iPhone only shows the keyboard then).
+    input.focus(); input.select();
+    el.querySelector('form').addEventListener('submit', e => {
+      e.preventDefault();
+      const title = input.value.trim();
+      closeModal();
+      if ((title || r.data.type === 'note') && title !== (r.data.title || '')) store.update(id, { title });
+    });
+  });
+}
+
+// Pinned to-dos and notes stay at the top of their list; pinned projects at the top of the sidebar.
+const pinWhere = r => (r.data.type === 'project' ? 'the top of the sidebar' : 'the top of its list');
+function togglePin(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  const was = r.data.pinned, on = !was;
+  store.update(id, { pinned: on ? new Date().toISOString() : undefined });
+  toast(on ? `Pinned to ${pinWhere(r)}` : 'Unpinned', 'Undo', () => store.update(id, { pinned: was }));
+}
+
+// ---------- Locked projects ----------
+// The password itself is never kept: data.lock holds a salted PBKDF2 hash of it, so this device can
+// check what you type. Unlocking lasts until the app is closed, or left for 5 minutes, or "Lock".
+
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function lockHash(pw, salt, iter) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw.normalize('NFC')), 'PBKDF2', false, ['deriveBits']);
+  return b64(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' }, key, 256));
+}
+async function makeLock(pw) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iter = 210000;
+  return { v: 1, salt: b64(salt), iter, hash: await lockHash(pw, salt, iter), set: new Date().toISOString() };
+}
+async function lockMatches(lock, pw) {
+  try { return (await lockHash(pw, unb64(lock.salt), lock.iter || 210000)) === lock.hash; } catch (e) { return false; }
+}
+
+function lockPanelHTML(p) {
+  return `<form class="lockpanel" data-unlock="${p.id}" autocomplete="off">
+    <span class="lockic">${ICON.lock}</span>
+    <h3>“${esc(titleOf(p))}” is locked</h3>
+    <p>Type its password to open it on this device.</p>
+    <input type="password" class="lockpw" placeholder="Password" aria-label="Password" autocomplete="off" enterkeyhint="go">
+    <button class="primary">Unlock</button>
+    <p class="lockerr" role="alert"></p>
+    <button type="button" class="link" data-act="lock-forgot" data-id="${p.id}">Forgotten it?</button>
+  </form>`;
+}
+
+async function tryUnlock(form) {
+  const p = I.byId.get(form.dataset.unlock), input = form.querySelector('.lockpw'), err = form.querySelector('.lockerr'), btn = form.querySelector('.primary');
+  if (!p?.data.lock || !input.value) return;
+  btn.disabled = true; err.textContent = '';
+  const ok = await lockMatches(p.data.lock, input.value);
+  btn.disabled = false;
+  if (!ok) { err.textContent = 'That isn’t its password.'; input.select(); return; }
+  input.value = '';
+  unlocked.add(p.id);
+  render();
+}
+
+function lockNow(id) {
+  unlocked.delete(id);
+  render();
+}
+
+// Put a lock on (or change it): the password twice.
+function lockSheet(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  const had = !!r.data.lock;
+  modal(`
+    <h2>${had ? 'Change the password' : 'Lock with a password'}</h2>
+    <form class="lockform" autocomplete="off">
+      <label class="field">New password<input type="password" class="pw1" autocomplete="new-password" minlength="4" required></label>
+      <label class="field">Type it again<input type="password" class="pw2" autocomplete="new-password" required></label>
+      <p class="hint">Everything in “${esc(titleOf(r))}” is hidden on every device (lists, board, search, Today) until the password is typed, and locks again when you leave the app for a few minutes. It’s a privacy screen, not encryption: the project still syncs like everything else. If you forget it, your Brain Tree sign-in password takes the lock off.</p>
+      <p class="cerr" role="alert"></p>
+      <div class="mbtns"><button type="button" data-close>Cancel</button><button class="primary">${had ? 'Change it' : 'Lock it'}</button></div>
+    </form>`, el => {
+    const f = el.querySelector('form'), a = el.querySelector('.pw1'), b = el.querySelector('.pw2'), err = el.querySelector('.cerr');
+    a.focus();
+    f.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (a.value.length < 4) { err.textContent = 'Make it at least 4 characters.'; return; }
+      if (a.value !== b.value) { err.textContent = 'Those two don’t match.'; b.select(); return; }
+      f.querySelector('.primary').disabled = true;
+      const lock = await makeLock(a.value);
+      closeModal();
+      unlocked.add(id);   // you know it: it stays open here until you lock it or leave the app
+      await store.update(id, { lock });
+      toast(had ? 'Password changed.' : 'Locked. It stays open on this device until you tap Lock or leave the app.');
+    });
+  });
+}
+
+function removeLock(id) {
+  const r = I.byId.get(id);
+  if (!r?.data.lock || isLocked(r)) return;
+  const was = r.data.lock;
+  store.update(id, { lock: undefined });
+  toast('Lock taken off.', 'Undo', () => store.update(id, { lock: was }));
+}
+
+// Forgotten the project's password: the Brain Tree sign-in password (checked by the server) takes the lock off.
+function forgotSheet(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  modal(`
+    <h2>Forgotten the password?</h2>
+    <form class="lockform" autocomplete="off">
+      <p class="hint">Type your Brain Tree sign-in password (the one you use on a new device) to take the lock off “${esc(titleOf(r))}”. This needs signal.</p>
+      <label class="field">Brain Tree password<input type="password" class="pw1" autocomplete="current-password" required></label>
+      <p class="cerr" role="alert"></p>
+      <div class="mbtns"><button type="button" data-close>Cancel</button><button class="primary">Take the lock off</button></div>
+    </form>`, el => {
+    const f = el.querySelector('form'), a = el.querySelector('.pw1'), err = el.querySelector('.cerr');
+    a.focus();
+    f.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!navigator.onLine) { err.textContent = 'You’re offline. Try again when there’s signal.'; return; }
+      const btn = f.querySelector('.primary');
+      btn.disabled = true; err.textContent = '';
+      try { await store.checkPassword(a.value); } catch (x) { err.textContent = x.message; btn.disabled = false; return; }
+      closeModal();
+      await store.update(id, { lock: undefined });
+      toast('Lock taken off. You can lock it again with a new password from its menu.');
+    });
+  });
+}
+
+// Leave the app for 5 minutes and anything unlocked locks again.
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+  else if (unlocked.size && hiddenAt && Date.now() - hiddenAt > 5 * 60e3) { unlocked.clear(); render(); }
+});
+
 // Everything you can do to a thing, from holding it (or right-clicking, or swiping right and More).
 function itemMenu(id) {
   const r = I.byId.get(id);
   if (!r || !I.alive(r)) return;
   const d = r.data, type = d.type;
   const mi = (m, icon, label, cls = '') => `<button class="mi ${cls}" data-m="${m}">${icon}<span>${label}</span></button>`;
-  const items = [mi('open', ICON.open, type === 'section' ? 'Open (rename, colour)' : 'Open')];
+  if (isLocked(r)) {
+    // Locked: only the way in (and pinning, which shows nothing of what's inside).
+    modal(`
+      <div class="mhead"><span class="ic t-project">${ICON.lock}</span><b>${esc(titleOf(r))}</b></div>
+      <div class="mlist">${mi('open', ICON.unlock, 'Unlock…')}${mi('pin', ICON.pin, d.pinned ? 'Unpin' : `Pin to ${pinWhere(r)}`)}</div>
+      <div class="mbtns"><button data-close>Cancel</button></div>`, el => el.addEventListener('click', e => {
+      const b = e.target.closest('[data-m]');
+      if (!b) return;
+      closeModal();
+      if (b.dataset.m === 'open') { search = ''; $('#search').value = ''; go({ project: id, view: null, board: null, item: null }); setTimeout(() => $('.lockpw')?.focus(), 60); }
+      else togglePin(id);
+    }), 'menu');
+    return;
+  }
+  const items = [mi('open', ICON.open, 'Open'), mi('rename', ICON.rename, 'Rename')];
   if (type === 'task') items.push(mi('done', ICON.check, d.done ? 'Mark not done' : d.repeat ? 'Done (moves to its next date)' : 'Mark done'));
   if (type === 'project') items.push(mi('board', ICON.board, 'Open its board'), mi('add', ICON.plus, 'Add a to-do to it'), mi('done', ICON.check, d.done ? 'Reopen project' : 'Finish project'));
-  if (type === 'note') items.push(mi('pin', ICON.pin, d.pinned ? 'Unpin' : 'Pin to the top'));
+  if (type === 'project') items.push(...(d.lock ? [mi('locknow', ICON.lock, 'Lock it now'), mi('lockset', ICON.lock, 'Change its password…'), mi('unlockall', ICON.unlock, 'Take the lock off')] : [mi('lockset', ICON.lock, 'Lock with a password…')]));
+  if (type === 'project' || type === 'section') items.push(mi('export', ICON.share, 'Print or export…'));
+  if (type !== 'section') items.push(mi('pin', ICON.pin, d.pinned ? 'Unpin' : `Pin to ${pinWhere(r)}`));
   if (canTop(r)) items.push(mi('top', ICON.top, 'Move to the top'));
   if (type !== 'section') items.push(mi('move', ICON.move, 'Move to another project…'));
   if (type === 'task' && d.repeat) items.push(mi('norepeat', ICON.repeat, `Stop repeating (${(REPEATS[d.repeat] || '').toLowerCase()})`));
@@ -992,10 +1265,15 @@ function itemMenu(id) {
       const m = b.dataset.m;
       closeModal();
       if (m === 'open') type === 'project' && !route.project && route.view !== 'board' ? go({ project: id, view: null, item: null }) : openItem(id);
+      else if (m === 'rename') renameSheet(id);
       else if (m === 'done') toggleDone(id);
       else if (m === 'board') go({ view: 'board', board: id, project: null, item: null });
       else if (m === 'add') { search = ''; $('#search').value = ''; go({ project: id, view: null, item: null }); setTimeout(() => $('#quickAdd input')?.focus(), 60); }
-      else if (m === 'pin') store.update(id, { pinned: d.pinned ? undefined : true });
+      else if (m === 'pin') togglePin(id);
+      else if (m === 'locknow') lockNow(id);
+      else if (m === 'lockset') lockSheet(id);
+      else if (m === 'unlockall') removeLock(id);
+      else if (m === 'export') exportSheet({ project: type === 'project' ? id : I.project(r)?.id, section: type === 'section' ? id : null });
       else if (m === 'top') toTop(id);
       else if (m === 'move') movePicker(id);
       else if (m === 'norepeat') store.update(id, { repeat: undefined });
@@ -1205,6 +1483,23 @@ function lookPreview(id) {
     notebook: `<rect width="120" height="48" fill="#FBF9F3"/><path d="M6 6h.1M18 6h.1M30 6h.1M42 6h.1M54 6h.1M66 6h.1M78 6h.1M90 6h.1M102 6h.1M114 6h.1M6 42h.1M18 42h.1M30 42h.1M42 42h.1M54 42h.1M66 42h.1M78 42h.1M90 42h.1M102 42h.1M114 42h.1" stroke="rgba(60,50,30,.35)" stroke-width="2" stroke-linecap="round"/>
       <rect x="10" y="12" width="36" height="26" fill="#FFF" stroke="rgba(0,0,0,.08)"/><rect x="20" y="8" width="16" height="7" fill="rgba(233,196,106,.8)"/><rect x="74" y="12" width="36" height="26" fill="#FFF" stroke="rgba(0,0,0,.08)"/><rect x="84" y="8" width="16" height="7" fill="rgba(143,184,222,.8)"/>
       <path d="M46 26 C56 22 62 30 70 26" fill="none" stroke="#1F3B8C" stroke-width="1.3" stroke-linecap="round"/><path d="M66 23 L71 26 L66 29" fill="none" stroke="#1F3B8C" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>`,
+    circuit: `<rect width="120" height="48" fill="#0E3B27"/><path d="M0 8L40 48M60 0L108 48" stroke="rgba(224,178,82,.18)"/><rect x="10" y="10" width="34" height="26" rx="2" fill="#0A2C1D" stroke="#C9A24A" stroke-width="1.4"/><rect x="76" y="12" width="34" height="26" rx="2" fill="#0A2C1D" stroke="#C9A24A" stroke-width="1.4"/>
+      <path d="M44 23H54L62 31H76" fill="none" stroke="#E0B252" stroke-width="2.4"/><circle cx="44" cy="23" r="3" fill="#0A2C1D" stroke="#E0B252" stroke-width="1.8"/><circle cx="76" cy="31" r="3" fill="#0A2C1D" stroke="#E0B252" stroke-width="1.8"/>`,
+    city: `<rect width="120" height="48" fill="#E7E5DF"/><path d="M0 18H120M0 40H120M30 0V48M92 0V48" stroke="#FAF9F5" stroke-width="3"/><rect x="8" y="9" width="34" height="26" rx="3" fill="#fff"/><rect x="8" y="9" width="34" height="5" rx="2" fill="#0060A8"/>
+      <rect x="78" y="14" width="34" height="26" rx="3" fill="#fff"/><rect x="78" y="14" width="34" height="5" rx="2" fill="#E2382F"/><path d="M42 22H52L60 30H78" fill="none" stroke="#00843D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="42" cy="22" r="3.4" fill="#fff" stroke="#00843D" stroke-width="2"/><circle cx="78" cy="30" r="3.4" fill="#fff" stroke="#00843D" stroke-width="2"/>`,
+    neon: `<rect width="120" height="48" fill="#0D0B14"/><rect x="10" y="11" width="34" height="26" rx="6" fill="none" stroke="#FF3EA5" stroke-width="5" opacity=".3"/><rect x="10" y="11" width="34" height="26" rx="6" fill="#120E1E" stroke="#FF3EA5" stroke-width="1.6"/>
+      <rect x="76" y="11" width="34" height="26" rx="6" fill="none" stroke="#22E3FF" stroke-width="5" opacity=".3"/><rect x="76" y="11" width="34" height="26" rx="6" fill="#120E1E" stroke="#22E3FF" stroke-width="1.6"/>
+      <path d="M44 24C58 10 62 38 76 24" fill="none" stroke="#B98CFF" stroke-width="5" opacity=".3"/><path d="M44 24C58 10 62 38 76 24" fill="none" stroke="#B98CFF" stroke-width="1.8"/>`,
+    minimal: `<rect width="120" height="48" fill="#F1F1F2"/><rect x="10" y="12" width="36" height="24" rx="6" fill="#fff"/><rect x="74" y="12" width="36" height="24" rx="6" fill="#fff"/><path d="M47 24H70" stroke="#A1A1AA" stroke-width="1.3"/><path d="M68 21.5L72.5 24L68 26.5z" fill="#A1A1AA"/>`,
+    hacker: `<rect width="120" height="48" fill="#030603"/><rect x="8" y="9" width="38" height="30" fill="#050A05" stroke="#1E7A3A"/><rect x="8" y="9" width="38" height="6" fill="#0C1B0C"/><circle cx="11.5" cy="12" r="1.2" fill="#FF5F57"/><circle cx="15.5" cy="12" r="1.2" fill="#FEBC2E"/><circle cx="19.5" cy="12" r="1.2" fill="#28C840"/><path d="M12 23h12M12 29h18" stroke="#33FF66" stroke-width="1.6"/>
+      <rect x="74" y="9" width="38" height="30" fill="#050A05" stroke="#1E7A3A"/><rect x="74" y="9" width="38" height="6" fill="#0C1B0C"/><circle cx="77.5" cy="12" r="1.2" fill="#FF5F57"/><circle cx="81.5" cy="12" r="1.2" fill="#FEBC2E"/><circle cx="85.5" cy="12" r="1.2" fill="#28C840"/><path d="M78 23h16M78 29h10" stroke="#33FF66" stroke-width="1.6"/>
+      <path d="M46 24H60V30H72" fill="none" stroke="#33FF66" stroke-width="1.3" stroke-dasharray="3 2"/><path d="M70 27.5L74 30L70 32.5z" fill="#33FF66"/>`,
+    chalkboard: `<rect width="120" height="48" fill="#29402F"/><rect x="10" y="11" width="34" height="26" rx="6" fill="none" stroke="#F4F1E6" stroke-width="1.6" opacity=".85"/><rect x="76" y="11" width="34" height="26" rx="6" fill="none" stroke="#FFD0DD" stroke-width="1.6" opacity=".85"/>
+      <path d="M46 26 C56 20 62 30 72 25" fill="none" stroke="#F4F1E6" stroke-width="2" stroke-dasharray="10 2 1 2"/><path d="M67 21L72 25L66 28" fill="none" stroke="#F4F1E6" stroke-width="1.8" stroke-linecap="round"/>`,
+    space: `<rect width="120" height="48" fill="#060A1C"/><circle cx="20" cy="7" r=".8" fill="#fff"/><circle cx="58" cy="42" r=".8" fill="#fff"/><circle cx="102" cy="5" r="1" fill="#fff"/><circle cx="55" cy="9" r=".6" fill="#fff"/><circle cx="114" cy="44" r=".7" fill="#fff"/>
+      <rect x="8" y="14" width="36" height="24" rx="6" fill="#10163A" stroke="#7F95D8" stroke-width=".8"/><rect x="76" y="12" width="36" height="24" rx="6" fill="#10163A" stroke="#7F95D8" stroke-width=".8"/>
+      <path d="M44 24L76 22" stroke="#C9D8FF" stroke-width=".9"/><circle cx="44" cy="24" r="3.5" fill="rgba(200,215,255,.25)"/><circle cx="44" cy="24" r="1.7" fill="#fff"/><circle cx="76" cy="22" r="3.5" fill="rgba(200,215,255,.25)"/><circle cx="76" cy="22" r="1.7" fill="#fff"/>`,
   };
   return `<svg viewBox="0 0 120 48" aria-hidden="true">${looks[id] || ''}</svg>`;
 }
@@ -1220,7 +1515,7 @@ async function settingsModal() {
     <div class="settings">
       <h3>Appearance</h3>
       <div class="themepick">${theme.THEMES.map(t => `
-        <button data-theme="${t.id}" class="${p.theme === t.id ? 'on' : ''}" style="--a:${(dark ? t.dark : t.light).accent};--b:${(dark ? t.dark : t.light).bg};--c:${(dark ? t.dark : t.light).card};--s:${(dark ? t.dark : t.light).string}">
+        <button data-pick-theme="${t.id}" class="${p.theme === t.id ? 'on' : ''}" style="--a:${(dark ? t.dark : t.light).accent};--b:${(dark ? t.dark : t.light).bg};--c:${(dark ? t.dark : t.light).card};--s:${(dark ? t.dark : t.light).string}">
           <i><b></b><u></u></i><span>${t.name}</span></button>`).join('')}</div>
       <div class="setrow"><span>Light or dark</span>${seg('mode', { auto: 'Match phone', light: 'Light', dark: 'Dark' })}</div>
       <div class="setrow"><span>Main colour</span><span class="colour"><input type="color" data-colour="accent" value="${p.accent || (dark ? th.dark : th.light).accent}" aria-label="Main colour"><button data-reset="accent" class="link" ${p.accent ? '' : 'hidden'}>Use theme’s</button></span></div>
@@ -1269,9 +1564,19 @@ async function settingsModal() {
       input.addEventListener('change', () => setPref({ [input.dataset.colour]: input.value }, true));
     }
     el.addEventListener('click', e => {
-      // (data-pick-look, not data-look: <html> itself carries data-look, so closest() would always find it)
-      const t = e.target.closest('[data-theme]'), s = e.target.closest('[data-k]'), r = e.target.closest('[data-reset]'), l = e.target.closest('[data-pick-look]');
-      if (t) setPref({ theme: t.dataset.theme, accent: null }, true);
+      // (data-pick-look and data-pick-theme, not data-look/data-theme: <html> itself carries those,
+      // so closest() would always find it)
+      const t = e.target.closest('[data-pick-theme]'), s = e.target.closest('[data-k]'), r = e.target.closest('[data-reset]'), l = e.target.closest('[data-pick-look]');
+      if (t) {
+        // A theme with a feel of its own (Hacker's typewriter text) brings it; one with a board look
+        // to match offers it.
+        const th = theme.THEMES.find(x => x.id === t.dataset.pickTheme), cur = theme.current(store);
+        const prev = theme.THEMES.find(x => x.id === cur.theme);
+        // (leaving such a theme puts the usual text back, unless you'd picked another since)
+        const font = th?.font || (prev?.font && cur.font === prev.font ? 'system' : null);
+        setPref({ theme: t.dataset.pickTheme, accent: null, ...(font ? { font } : {}) }, true);
+        if (th?.look && theme.current(store).look !== th.look) toast(`Use the ${theme.LOOKS[th.look].name} board look too?`, 'Yes', () => setPref({ look: th.look, string: null }, $('#modal .settings') ? true : false));
+      }
       else if (l) setPref({ look: l.dataset.pickLook, string: null }, true);   // each look comes with its own string
       else if (s) setPref({ [s.dataset.k]: s.dataset.v }, true);
       else if (r) setPref({ [r.dataset.reset]: null }, true);
@@ -1315,6 +1620,204 @@ function downloadBackup() {
   a.download = `brain-tree-backup-${today()}.json`;
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+// ---------- Files, links, print and export ----------
+
+// Hands a file over (share sheet on a phone, download on a computer). If the phone wants a fresh
+// tap first (making the file took a moment), it offers a button for it.
+async function deliver(blob, name) {
+  const res = await ex.saveFile(blob, name);
+  if (res === 'needs-tap') toast(`Ready: ${name}`, 'Share', () => ex.saveFile(blob, name));
+  return res;
+}
+
+// A file in a note: open it (a new tab on a computer; on a phone, the share sheet's Quick Look,
+// Files, Books… ), or save a copy.
+async function openDoc(d) {
+  const phone = matchMedia('(pointer: coarse)').matches;
+  const viewable = /^(application\/pdf|image\/|text\/plain|audio\/|video\/)/.test(d.mime);
+  const w = !phone && viewable ? window.open('', '_blank') : null;   // now, while the tap still counts
+  const blob = await store.docBlob(d);
+  if (!blob) { w?.close(); toast('That file isn’t on this device yet, and there’s no signal to fetch it.'); return; }
+  if (w) { w.location.href = URL.createObjectURL(blob); return; }
+  deliver(blob, d.name);
+}
+async function saveDoc(d) {
+  const blob = await store.docBlob(d);
+  if (!blob) { toast('That file isn’t on this device yet, and there’s no signal to fetch it.'); return; }
+  deliver(blob, d.name);
+}
+
+// A link to a document or page: its address and (optionally) a name. Resolves with {url, title},
+// 'remove', or null.
+function linkModal(existing) {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = v => { if (!settled) { settled = true; resolve(v); } };
+    modal(`
+      <h2>${existing ? 'Change the link' : 'Link to a document or page'}</h2>
+      <label class="field">Address<input class="lurl" type="url" inputmode="url" placeholder="Paste a link: Google Docs, OneDrive, Dropbox, any page" value="${existing ? esc(existing.url) : ''}" autocomplete="off"></label>
+      <label class="field">Name (optional)<input class="ltitle" placeholder="What it is" value="${existing ? esc(existing.title || '') : ''}" maxlength="200" autocomplete="off"></label>
+      <p class="hint lkind"></p>
+      <p class="cerr" role="alert"></p>
+      <div class="mbtns">${existing ? '<button class="danger" data-l="remove">Remove</button><span class="grow"></span>' : ''}<button data-close>Cancel</button><button class="primary" data-l="ok">${existing ? 'Save' : 'Add link'}</button></div>`, el => {
+      const url = el.querySelector('.lurl'), title = el.querySelector('.ltitle'), kind = el.querySelector('.lkind'), err = el.querySelector('.cerr');
+      const fix = v => { v = v.trim(); return v && !/^https?:\/\//i.test(v) ? 'https://' + v : v; };
+      const show = () => { const u = fix(url.value); kind.textContent = /^https?:\/\/\S+\.\S+/.test(u) ? linkService(u).name : ''; };
+      url.addEventListener('input', show); show();
+      if (!existing) setTimeout(() => url.focus(), 30);
+      el.addEventListener('click', e => {
+        const b = e.target.closest('[data-l]');
+        if (!b) return;
+        if (b.dataset.l === 'remove') { finish('remove'); closeModal(); return; }
+        const u = fix(url.value);
+        if (!/^https?:\/\/[^\s/]+\.[^\s]+/i.test(u)) { err.textContent = 'That doesn’t look like a web address.'; return; }
+        finish({ url: u, title: title.value.trim() });
+        closeModal();
+      });
+    });
+    onModalClose = () => finish(null);
+  });
+}
+
+// What a note says, as lines for an export: paragraphs, headings, list and checklist lines,
+// spreadsheets as rows, and a line saying what any picture, clip, file or link is.
+function noteLines(body) {
+  if (!body) return [];
+  const doc = new DOMParser().parseFromString('<body>' + body + '</body>', 'text/html');
+  const out = [];
+  const txt = el => el.textContent.replace(/\s+/g, ' ').trim();
+  for (const el of doc.body.children) {
+    const tag = el.tagName;
+    if (el.matches('div[data-sheet]')) { const sh = cleanSheet(el.getAttribute('data-sheet')); if (sh) out.push({ t: 'rows', rows: sheetRows(sh), head: !!sh.h }); }
+    else if (el.matches('div[data-yt]')) out.push({ t: 'p', text: `YouTube: ${el.getAttribute('data-title') || 'clip'} (youtu.be/${el.getAttribute('data-yt')})` });
+    else if (el.matches('div[data-draw]')) out.push({ t: 'p', text: '(a drawing)' });
+    else if (el.matches('div[data-doc]')) out.push({ t: 'p', text: `File: ${el.getAttribute('data-name') || 'file'}` });
+    else if (el.matches('div[data-weblink]')) out.push({ t: 'p', text: `Link: ${el.getAttribute('data-title') ? el.getAttribute('data-title') + ' – ' : ''}${el.getAttribute('data-weblink')}` });
+    else if (tag === 'UL' || tag === 'OL') for (const li of el.querySelectorAll(':scope > li')) { const t = txt(li); if (t) out.push(el.classList.contains('checklist') ? { t: 'check', text: t, done: li.getAttribute('data-checked') === 'true' } : { t: 'li', text: t }); }
+    else if (/^H[1-3]$/.test(tag)) { const t = txt(el); if (t) out.push({ t: 'h', text: t }); }
+    else {
+      const t = txt(el);
+      if (t) out.push({ t: 'p', text: t });
+      else if (el.querySelector('img')) out.push({ t: 'p', text: '(a photo)' });
+    }
+  }
+  return out;
+}
+
+// What goes into a printed or exported list: the project (or a section, or one of the lists like
+// Today), grouped as on screen.
+function exportDoc(ctx, { text = true, done = false } = {}) {
+  const t = today();
+  const whereOf = r => { const p = I.project(r), par = I.parentOf(r); return p ? titleOf(p) + (par && par.data.type === 'section' ? ' › ' + titleOf(par) : '') : ''; };
+  const toItem = (r, where) => {
+    const d = r.data;
+    const it = { kind: d.type || 'note', title: titleOf(r), done: !!d.done, due: d.due || '', late: !d.done && !!d.due && d.due < t, where: where ? whereOf(r) : '' };
+    it.dueText = d.due ? fmtDay(d.due) : d.start && d.start > t ? 'from ' + fmtDay(d.start) : '';
+    if (d.type === 'project') { const { total, done: dn } = progress(r.id); if (total) it.dueText = `${dn}/${total}` + (it.dueText ? ' · ' + it.dueText : ''); }
+    else it.steps = (I.kids.get(r.id) || []).filter(k => k.data.type === 'task' && (done || !k.data.done)).map(k => ({ title: titleOf(k), done: !!k.data.done }));
+    if (text && d.type !== 'project') it.lines = noteLines(d.body);
+    return it;
+  };
+  const stamp = 'Printed ' + new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+  if (ctx.project || ctx.section) {
+    const p = I.byId.get(ctx.project);
+    const sec = ctx.section && I.byId.get(ctx.section);
+    const kids = I.kids.get((sec || p).id) || [];
+    const open = list => [
+      ...list.filter(r => r.data.type === 'task' && !r.data.done).sort(byPinnedOrder),
+      ...list.filter(r => r.data.type === 'project').sort(byPinnedOrder),
+      ...list.filter(r => r.data.type === 'note').sort(byPinnedOrder),
+    ];
+    const sections = sec ? [] : kids.filter(r => r.data.type === 'section').sort(bySectionOrder);
+    const groups = [{ name: '', items: open(kids).map(r => toItem(r)) }, ...sections.map(s => ({ name: titleOf(s), tone: 'section', items: open(I.kids.get(s.id) || []).map(r => toItem(r)) }))];
+    if (done) groups.push({ name: 'Done', items: [...kids, ...sections.flatMap(s => I.kids.get(s.id) || [])].filter(r => r.data.type === 'task' && r.data.done).map(r => toItem(r)) });
+    const { total, done: dn } = progress(p.id);
+    const sub = [p.data.start || p.data.due ? `${p.data.start ? fmtDay(p.data.start) : '…'} → ${p.data.due ? fmtDay(p.data.due) : '…'}` : '', total ? `${dn} of ${total} done` : '', stamp].filter(Boolean).join(' · ');
+    return { title: sec ? `${titleOf(p)} › ${titleOf(sec)}` : titleOf(p), sub, groups };
+  }
+  const v = ctx.view || 'today';
+  const title = (SMART.find(s => s.id === v) || {}).name || 'Brain Tree';
+  let groups = [];
+  if (v === 'today') groups = todayGroups(I.live).filter(g => done || !g.done);
+  else if (v === 'upcoming') groups = upcomingGroups(I.live);
+  else if (v === 'inbox') { const loose = I.live.filter(r => !I.parentOf(r) && r.data.type !== 'project'); groups = [{ name: 'To-dos', items: loose.filter(r => r.data.type === 'task' && !r.data.done).sort(pinFirst(byDueThenOrder)) }, { name: 'Notes', items: loose.filter(r => r.data.type === 'note').sort(byPinnedUpdated) }]; }
+  else if (v === 'todos') { const map = new Map(); for (const r of I.live.filter(x => x.data.type === 'task' && !x.data.done)) { const p = I.project(r), k = p ? titleOf(p) : ' No project'; if (!map.has(k)) map.set(k, []); map.get(k).push(r); } groups = [...map].sort((a, b) => a[0].localeCompare(b[0])).map(([name, items]) => ({ name: name.trim(), items: items.sort(pinFirst(byDueThenOrder)) })); }
+  else if (v === 'notes') groups = [{ name: '', items: I.live.filter(r => r.data.type === 'note').sort(byPinnedUpdated) }];
+  else if (v === 'done-projects') groups = [{ name: '', items: I.live.filter(r => r.data.type === 'project' && r.data.done) }];
+  const where = v !== 'todos';
+  return { title, sub: stamp, groups: groups.map(g => ({ name: g.name, tone: g.late ? 'late' : '', items: g.items.map(r => toItem(r, where)) })) };
+}
+
+// Print or export: a list (as PDF, a print, Excel CSV or text) and, for a project, its board.
+function exportSheet(ctx) {
+  const p = ctx.project && I.byId.get(ctx.project);
+  if (p && isLocked(p)) { toast('Unlock it first.'); return; }
+  const name = p ? titleOf(p) + (ctx.section && I.byId.get(ctx.section) ? ' › ' + titleOf(I.byId.get(ctx.section)) : '') : (SMART.find(s => s.id === (ctx.view || 'today')) || {}).name || 'Brain Tree';
+  modal(`
+    <div class="exportsheet">
+      <h2>Print or export</h2>
+      <p class="hint">“${esc(name)}”</p>
+      ${ctx.board ? '' : `<div class="egroup"><h3>The list</h3>
+        <div class="echecks"><label><input type="checkbox" data-o="text" checked> What notes say</label><label><input type="checkbox" data-o="done"> Done to-dos</label></div>
+        <div class="eopts">
+          <button data-e="pdf"><b>PDF</b><small>A4, two columns, few pages</small></button>
+          <button data-e="print"><b>Print</b><small>or save as PDF from there</small></button>
+          <button data-e="csv"><b>Excel (CSV)</b><small>a row for each thing</small></button>
+          <button data-e="text"><b>Text</b><small>copied, to paste anywhere</small></button>
+        </div></div>`}
+      ${p && !ctx.section ? `<div class="egroup"><h3>The board</h3>
+        <div class="eopts">
+          <button data-b="pdf"><b>PDF</b><small>the whole board on a page</small></button>
+          <button data-b="png"><b>Picture (PNG)</b><small>sharp, to send or keep</small></button>
+          <button data-b="svg"><b>SVG</b><small>scales to any size</small></button>
+          <button data-b="print"><b>Print</b><small>on one page</small></button>
+        </div></div>` : ''}
+      <div class="mbtns"><button data-close>Close</button></div>
+    </div>`, el => {
+    el.addEventListener('click', async e => {
+      const b = e.target.closest('[data-e], [data-b]');
+      if (!b) return;
+      const opt = k => el.querySelector(`[data-o="${k}"]`)?.checked;
+      const opts = { text: opt('text') !== false, done: !!opt('done') };
+      closeModal();
+      try {
+        if (b.dataset.e) {
+          const doc = exportDoc(ctx, opts);
+          if (b.dataset.e === 'pdf') await deliver(ex.listPDF(doc, { accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#C98A00' }), ex.fileName(doc.title, 'pdf'));
+          else if (b.dataset.e === 'print') ex.printHTML(ex.listPrintHTML(doc));
+          else if (b.dataset.e === 'csv') await deliver(new Blob([ex.listCSV(doc)], { type: 'text/csv' }), ex.fileName(doc.title, 'csv'));
+          else if (b.dataset.e === 'text') {
+            const txt = ex.listText(doc);
+            let copied = false;
+            try { await navigator.clipboard.writeText(txt); copied = true; } catch (err) {}
+            toast(copied ? 'Copied as text.' : 'Ready as text.', 'Save as a file', () => deliver(new Blob([txt], { type: 'text/plain' }), ex.fileName(doc.title, 'txt')));
+          }
+        } else await exportBoard(p.id, b.dataset.b);
+      } catch (err) { toast(err.message || String(err)); }
+    });
+  });
+}
+
+// The board as a PDF, picture, SVG or print. (It's drawn from the board itself, so it opens first.)
+async function exportBoard(pid, how) {
+  if (route.view !== 'board' || route.board !== pid) {
+    go({ view: 'board', board: pid, project: null, item: null });
+    await new Promise(r => setTimeout(r, 450));
+  }
+  if (!board || !document.querySelector('#board .cork')?.clientWidth) throw new Error('Open the board on this screen first.');
+  toast('Making the board picture…');
+  const { svg, w, h } = await board.exportSVG();
+  const title = titleOf(I.byId.get(pid));
+  if (how === 'svg') return deliver(new Blob([svg], { type: 'image/svg+xml' }), ex.fileName(title + ' board', 'svg'));
+  if (how === 'print') return ex.printHTML(`<p class="ptitle">${esc(title)}</p>${svg}`, { landscape: w > h });
+  // A picture as sharp as a phone can hold (canvases top out around 16 million pixels on an iPhone).
+  const scale = Math.min(how === 'png' ? 2 : 1.6, Math.sqrt(15e6 / (w * h)), 8000 / Math.max(w, h));
+  const canvas = await ex.svgToCanvas(svg, w, h, scale);
+  if (how === 'png') return deliver(await ex.canvasBlob(canvas, 'image/png'), ex.fileName(title + ' board', 'png'));
+  const jpeg = await ex.canvasBlob(canvas, 'image/jpeg', 0.9);
+  return deliver(await ex.imagePDF(jpeg, canvas.width, canvas.height, title), ex.fileName(title + ' board', 'pdf'));
 }
 
 function newMenu(anchorParent) {
@@ -1468,6 +1971,14 @@ document.addEventListener('click', async e => {
     return;
   }
   if ((x = el('[data-colour-pick]')) && editingId) { store.update(editingId, { color: x.dataset.colourPick || undefined }); return; }
+  if ((x = el('[data-cardsize]')) && editingId && route.board) {
+    const r = store.get(editingId), s = +x.dataset.cardsize, cork = { ...(r.data.cork || {}) };
+    const spot = { ...(cork[route.board] || {}) };
+    if (s === 1) delete spot.s; else spot.s = s;
+    if (Object.keys(spot).length) cork[route.board] = spot; else delete cork[route.board];
+    store.update(editingId, { cork: Object.keys(cork).length ? cork : undefined });
+    return;
+  }
   if ((x = el('[data-untie]'))) {
     e.stopPropagation();
     const [from, to] = x.dataset.untie.split('|');
@@ -1520,6 +2031,10 @@ document.addEventListener('click', async e => {
     else if (a === 'new') newMenu(route.project || undefined);
     else if (a === 'new-project') { const pid = await newItem('project', null); go({ project: pid, view: null, item: pid }); }
     else if (a === 'example') showExample();
+    else if (a === 'lock-now') lockNow(x.dataset.id);
+    else if (a === 'lock-forgot') forgotSheet(x.dataset.id);
+    else if (a === 'export-list') exportSheet({ project: route.project && !search ? route.project : null, view: route.project ? null : route.view || 'today' });
+    else if (a === 'export-board') exportSheet({ project: route.board, board: true });
     else if (a === 'empty-trash') { if (confirm(`Delete all ${I.trashed.length} item(s) in Recently deleted for good, on every device?`)) purge(I.trashed.map(r => r.id)); }
     else if (a === 'board-list') go(route.board ? { view: null, project: route.board, item: null } : { view: 'today', item: null });
     else if (a === 'open-board' && route.project) go({ view: 'board', board: route.project, project: null, item: null });
@@ -1532,7 +2047,7 @@ document.addEventListener('click', async e => {
       pickItem({ title: 'Tie a string to…', exclude: new Set([id, ...links.map(l => l.to)]), onPick: to => store.update(id, { links: [...(store.get(id)?.data.links || []), { to }] }) });
     }
     else if (id && a === 'tick') toggleDone(id);
-    else if (id && a === 'pin') { const r = store.get(id); store.update(id, { pinned: r.data.pinned ? undefined : true }); }
+    else if (id && a === 'pin') togglePin(id);
     else if (id && a === 'move') movePicker(id);
     else if (id && a === 'trash') trashItem(id);
     else if (a === 'compare') compareModal(x.dataset.id || id);
@@ -1561,6 +2076,7 @@ document.addEventListener('keydown', e => {
 // Quick add: the list's box, and the ones inside an open item.
 document.addEventListener('submit', async e => {
   const form = e.target;
+  if (form.classList.contains('lockpanel')) { e.preventDefault(); tryUnlock(form); return; }
   if (form.id === 'quickAdd') {
     e.preventDefault();
     const input = form.querySelector('input'), typed = input.value.trim();
@@ -1618,11 +2134,15 @@ async function migrate() {
   } finally { migrating = false; }
 }
 
+// For testing on this computer (the local test server) only.
+if (['127.0.0.1', 'localhost'].includes(location.hostname)) window.btApp = { get board() { return board; }, exportDoc, exportBoard, unlocked };
+
 (async function start() {
   $('#nav .brand').insertAdjacentHTML('beforeend', `<button class="iconbtn" data-act="settings" aria-label="Settings">${ICON.gear}</button>`);
   $('#newProject').innerHTML = ICON.plus;
   $('#newBtn').innerHTML = ICON.plus;
   $('#boardBtn').innerHTML = ICON.board + '<span>Board</span>';
+  $('#exportBtn').innerHTML = ICON.share;
   $('#listBack').innerHTML = ICON.back + '<span>Lists</span>';
   try {
     await store.load();
