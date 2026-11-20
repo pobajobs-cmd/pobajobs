@@ -14,13 +14,15 @@
 // Not published as a site file (see .assetsignore); worker.js imports it.
 
 const TOKEN_DAYS = 400;          // how long a device stays signed in
-const MAX_FILE = 1_900_000;      // bytes per photo (D1 rows top out at 2 MB; the app shrinks photos well under this)
+const MAX_FILE = 1_900_000;      // bytes per photo or file piece (D1 rows top out at 2 MB; the app shrinks photos, and sends other files in pieces)
 const MAX_ITEM = 900_000;        // bytes of JSON per item
 const MAX_CHANGES = 200;         // changes accepted per sync request
 const PAGE = 500;                // changes sent back per sync request
 const FAILS_PER_HOUR = 10;       // wrong passwords allowed from one connection per hour
 const ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+// Other files (PDFs, documents…) come in pieces as plain bytes; the app knows what each one is.
+const PIECE_TYPE = 'application/octet-stream';
 
 export async function handleBraintree(request, env, url) {
   try {
@@ -147,17 +149,17 @@ async function nextRev(db) {
   return row.v;
 }
 
-// ---------- Photos ----------
+// ---------- Photos and files ----------
 
 async function putFile(request, env, url) {
   if (request.method !== 'POST') return json({ error: 'POST only.' }, 405, { Allow: 'POST' });
   const id = url.searchParams.get('id') || '';
   if (!ID_RE.test(id)) return json({ error: 'Bad file id.' }, 400);
   const mime = (request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
-  if (!IMAGE_TYPES.includes(mime)) return json({ error: 'Only photos (JPEG, PNG, WebP, GIF) for now.' }, 415);
+  if (!IMAGE_TYPES.includes(mime) && mime !== PIECE_TYPE) return json({ error: 'Only photos (JPEG, PNG, WebP, GIF) and file pieces.' }, 415);
   const buf = await request.arrayBuffer();
   if (!buf.byteLength) return json({ error: 'Empty file.' }, 400);
-  if (buf.byteLength > MAX_FILE) return json({ error: 'That photo is too big.' }, 413);
+  if (buf.byteLength > MAX_FILE) return json({ error: mime === PIECE_TYPE ? 'That piece of the file is too big.' : 'That photo is too big.' }, 413);
   // A file id never changes what it points to, so a repeat upload is a no-op.
   await env.DB.prepare('INSERT OR IGNORE INTO bt_files (id, mime, size, data, created_at) VALUES (?, ?, ?, ?, ?)')
     .bind(id, mime, buf.byteLength, buf, new Date().toISOString()).run();
@@ -168,8 +170,9 @@ async function getFile(env, id) {
   if (!ID_RE.test(id)) return json({ error: 'Bad file id.' }, 400);
   const row = await env.DB.prepare('SELECT mime, data FROM bt_files WHERE id = ?').bind(id).first();
   if (!row) return json({ error: 'Not found.' }, 404);
+  // (pieces of files are only ever handed over as bytes to save, never shown as a page)
   return new Response(new Uint8Array(row.data), {
-    headers: { 'Content-Type': row.mime, 'Cache-Control': 'private, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' },
+    headers: { 'Content-Type': row.mime, 'Cache-Control': 'private, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff', ...(IMAGE_TYPES.includes(row.mime) ? {} : { 'Content-Disposition': 'attachment' }) },
   });
 }
 
