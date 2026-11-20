@@ -9,9 +9,10 @@ import { createBoard, COLOURS } from './board.js';
 import { parseYouTube, parseTime, fmtTime, thumbUrl, watchUrl, iframeHTML, rangeText } from './media.js';
 import { openDrawing } from './draw.js';
 import { addExample, EXAMPLE_TITLE } from './example.js';
+import { createGestures } from './gestures.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.5.1';
+const VERSION = '0.6.0';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -42,6 +43,11 @@ const ICON = {
   photo: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>',
   text: '<svg viewBox="0 0 24 24"><path d="M5 6h14M5 10h14M5 14h9M5 18h6"/></svg>',
   section: '<svg viewBox="0 0 24 24"><path d="M4 9V6a1 1 0 0 1 1-1h3M16 5h3a1 1 0 0 1 1 1v3M20 15v3a1 1 0 0 1-1 1h-3M8 19H5a1 1 0 0 1-1-1v-3"/><path d="M8 10h8M8 14h5"/></svg>',
+  dots: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>',
+  top: '<svg viewBox="0 0 24 24"><path d="M5 4h14M12 20V9M7 13l5-5 5 5"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+  repeat: '<svg viewBox="0 0 24 24"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg>',
+  open: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>',
 };
 const typeIcon = t => (t === 'project' ? ICON.folder : t === 'section' ? ICON.section : t === 'task' ? ICON.check : ICON.note);
 
@@ -53,6 +59,8 @@ let I = null;                       // index of the current data, rebuilt on eve
 let editor = null, editingId = null, titleTimer = null;
 const openDone = new Set();         // lists with their "Done" section expanded
 const collapsed = new Set(readLocal('bt-collapsed', []));
+const projTabs = readLocal('bt-projtab', {});   // each project's list: everything, today or upcoming
+const projTab = id => (['today', 'upcoming'].includes(projTabs[id]) ? projTabs[id] : 'all');
 const wide = matchMedia('(min-width: 900px)');
 
 function readLocal(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (e) { return fallback; } }
@@ -66,6 +74,69 @@ const today = () => ymd(new Date());
 const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
 const daysBetween = (a, b) => Math.round((parseYmd(b) - parseYmd(a)) / 864e5);
+const addMonths = (s, n) => {
+  const d = parseYmd(s), day = d.getDate();
+  d.setDate(1); d.setMonth(d.getMonth() + n);
+  d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  return ymd(d);
+};
+// The next given weekday (0 = Sunday) after s.
+const nextDow = (s, dow) => { let d = addDays(s, 1); while (parseYmd(d).getDay() !== dow) d = addDays(d, 1); return d; };
+const shortDate = s => parseYmd(s).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+
+// Repeating to-dos: ticking one moves it on to its next date (and unticks its steps).
+const REPEATS = { day: 'Every day', weekday: 'Every weekday', week: 'Every week', fortnight: 'Every 2 weeks', month: 'Every month', year: 'Every year' };
+function stepRepeat(s, rule) {
+  if (rule === 'day') return addDays(s, 1);
+  if (rule === 'weekday') { let d = addDays(s, 1); while ([0, 6].includes(parseYmd(d).getDay())) d = addDays(d, 1); return d; }
+  if (rule === 'week') return addDays(s, 7);
+  if (rule === 'fortnight') return addDays(s, 14);
+  if (rule === 'month') return addMonths(s, 1);
+  if (rule === 'year') return addMonths(s, 12);
+  return addDays(s, 1);
+}
+// Done early: the one after its date. Done late: the first one after today (not a pile of missed ones).
+function nextRepeat(from, rule) {
+  const t = today();
+  let s = stepRepeat(from, rule), n = 0;
+  while (s <= t && n++ < 3000) s = stepRepeat(s, rule);
+  return s;
+}
+
+// Dates typed at the end of a quick-add: "Bins out tomorrow", "Call Sam fri", "Dentist 3 Dec", "Pay rent 1/12".
+// (Plain "sat" and "sun" only count with "on", "by" and so on before them: "sit in the sun" isn't a date.)
+const DAY_RE = /\s+(?:(?:on|by|due|next|this)\s+)?(mon(?:day)?|tues?(?:day)?|wed(?:nesday|s)?|thu(?:rs?)?(?:day)?|fri(?:day)?|saturday|sunday)$/i;
+const DAY_RE2 = /\s+(?:on|by|due|next|this)\s+(sat|sun)$/i;
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const MON = '(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*';
+function quickDate(text) {
+  const t = today(), s = text.trim();
+  const ofDate = (d, m, y) => {
+    let year = y ? (y < 100 ? 2000 + y : y) : parseYmd(t).getFullYear();
+    const make = yr => { const dt = new Date(yr, m, d); return dt.getMonth() === m && dt.getDate() === d ? ymd(dt) : null; };
+    let out = make(year);
+    if (out && !y && out < t) out = make(year + 1);   // "3 Jan" in December means next year
+    return out;
+  };
+  const rules = [
+    [/\s+(?:on |by |due )?(?:today|tonight)$/i, () => t],
+    [/\s+(?:on |by |due )?(?:tomorrow|tmrw|tmr)$/i, () => addDays(t, 1)],
+    [/\s+(?:on |by |due )?(?:this )?weekend$/i, () => ([0, 6].includes(parseYmd(t).getDay()) ? t : nextDow(t, 6))],
+    [/\s+next week$/i, () => nextDow(t, 1)],
+    [/\s+in (\d{1,3}) (day|week|month)s?$/i, m => (m[2].toLowerCase() === 'day' ? addDays(t, +m[1]) : m[2].toLowerCase() === 'week' ? addDays(t, 7 * m[1]) : addMonths(t, +m[1]))],
+    ...[DAY_RE, DAY_RE2].map(re => [re, m => nextDow(t, ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(m[1].slice(0, 3).toLowerCase()))]),
+    [new RegExp(`\\s+(?:on |by |due )?(\\d{1,2})(?:st|nd|rd|th)?\\s+${MON}$`, 'i'), m => ofDate(+m[1], MONTHS.indexOf(m[2].toLowerCase()))],
+    [new RegExp(`\\s+(?:on |by |due )?${MON}\\s+(\\d{1,2})(?:st|nd|rd|th)?$`, 'i'), m => ofDate(+m[2], MONTHS.indexOf(m[1].toLowerCase()))],
+    [/\s+(?:on |by |due )?(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2}|\d{4}))?$/, m => ofDate(+m[1], +m[2] - 1, m[3] ? +m[3] : 0)],
+  ];
+  for (const [re, fn] of rules) {
+    const m = s.match(re);
+    if (!m) continue;
+    const due = fn(m), rest = s.slice(0, m.index).trim();
+    if (due && rest) return { title: rest, due };
+  }
+  return { title: s, due: null };
+}
 
 function fmtDay(s) {
   if (!s) return '';
@@ -130,6 +201,12 @@ const byPinnedUpdated = (a, b) => (b.data.pinned ? 1 : 0) - (a.data.pinned ? 1 :
 // Shorten to about n letters at a word break, with "…".
 const shorten = (s, n) => (s.length <= n ? s : s.slice(0, n).replace(/\s+\S*$/, '') + '…');
 const bySectionOrder = (a, b) => (a.data.order || 0) - (b.data.order || 0) || (a.data.created || '').localeCompare(b.data.created || '');
+// Inside a project things stay where you put them (drag them, or "Move to top"); pinned notes first.
+const byOrder = bySectionOrder;
+const byPinnedOrder = (a, b) => (b.data.pinned ? 1 : 0) - (a.data.pinned ? 1 : 0) || byOrder(a, b);
+const isTodo = r => isOpen(r) && r.data.type === 'task';
+// Where a project sits in the sidebar: under the nearest unfinished project above it.
+const navUnder = p => { const up = I.project(p); return up && !up.data.done ? up.id : ''; };
 
 // ---------- Routing ----------
 
@@ -161,8 +238,10 @@ const listKey = () => (search ? 'search' : route.project ? 'p:' + route.project 
 
 // ---------- Rendering ----------
 
-let renderQueued = false;
+let renderQueued = false, renderHeld = false;
 function queueRender() {
+  // Not mid-swipe or mid-drag: redrawing would pull the row out from under the finger.
+  if (gest.busy()) { renderHeld = true; return; }
   if (renderQueued) return;
   renderQueued = true;
   setTimeout(() => { renderQueued = false; render(); }, 0);
@@ -188,6 +267,7 @@ function render() {
     board.show(route.board);
   } else renderList();
   renderDetail();
+  gest.restore();
 }
 
 let board = null;
@@ -226,21 +306,29 @@ function renderNav() {
   // Project tree: projects nest under the nearest project above them.
   const projects = I.live.filter(r => r.data.type === 'project' && !r.data.done);
   const under = new Map();
-  for (const p of projects) { const up = I.project(p); const k = up && !up.data.done ? up.id : ''; if (!under.has(k)) under.set(k, []); under.get(k).push(p); }
-  const branch = (key, depth) => (under.get(key) || []).sort((a, b) => (a.data.order || 0) - (b.data.order || 0)).map(p => {
+  for (const p of projects) { const k = navUnder(p); if (!under.has(k)) under.set(k, []); under.get(k).push(p); }
+  const branch = (key, depth) => (under.get(key) || []).sort(byOrder).map(p => {
     const subs = under.has(p.id);
     const { total, done } = progress(p.id);
     const shut = collapsed.has(p.id);
+    // To-dos due today (or late) anywhere in it, so a glance at the sidebar shows where today's work is.
+    const due = I.descendants(p.id).filter(r => isTodo(r) && r.data.due && r.data.due <= t);
+    const late = due.some(r => r.data.due < t);
     return `
-      <div class="navrow proj ${(route.project === p.id || (route.view === 'board' && route.board === p.id)) && !search ? 'on' : ''}" data-project="${p.id}" style="--depth:${depth}">
+      <div class="navrow proj ${(route.project === p.id || (route.view === 'board' && route.board === p.id)) && !search ? 'on' : ''}" data-project="${p.id}" data-under="${key}" data-depth="${depth}" style="--depth:${depth}">
         <button class="caret ${subs ? '' : 'none'} ${shut ? '' : 'open'}" data-toggle="${p.id}" aria-label="Show or hide sub-projects">${subs ? ICON.caret : ''}</button>
         <span class="ic">${ICON.folder}</span><span class="name">${esc(titleOf(p))}</span>
+        ${due.length ? `<span class="duebadge ${late ? 'late' : ''}" title="${due.length} to-do${due.length === 1 ? '' : 's'} due today${late ? ' or late' : ''}">${due.length}</span>` : ''}
         ${total ? `<span class="count">${done}/${total}</span>` : ''}
       </div>${subs && !shut ? branch(p.id, depth + 1) : ''}`;
   }).join('');
   const doneProjects = I.live.filter(r => r.data.type === 'project' && r.data.done).length;
-  $('#projects').innerHTML = (branch('', 0) || '<p class="empty-nav">No projects yet. Tap + to start one, or <button class="link" data-act="example">add an example project</button> to see what Brain Tree can do.</p>')
-    + (doneProjects ? `<a href="#/done-projects" class="navrow small ${route.view === 'done-projects' && !search ? 'on' : ''}"><span class="ic">${ICON.check}</span><span class="name">Finished projects</span><span class="count">${doneProjects}</span></a>` : '');
+  const hasExample = I.live.some(r => r.data.type === 'project' && r.data.title === EXAMPLE_TITLE);
+  const tree = branch('', 0);
+  $('#projects').innerHTML = (tree || '<p class="empty-nav">No projects yet. Tap + to start one, or <button class="link" data-act="example">add an example project</button> to see what Brain Tree can do.</p>')
+    + (doneProjects ? `<a href="#/done-projects" class="navrow small ${route.view === 'done-projects' && !search ? 'on' : ''}"><span class="ic">${ICON.check}</span><span class="name">Finished projects</span><span class="count">${doneProjects}</span></a>` : '')
+    // Until there's one, an easy way to see what's possible (it's in Settings too).
+    + (tree && !hasExample ? `<button class="navrow small example" data-act="example"><span class="ic">${ICON.plus}</span><span class="name">Add the example project</span></button>` : '');
 
   const conflicts = store.conflicts().length;
   $('#lower').innerHTML = `
@@ -262,6 +350,30 @@ function renderSyncBar() {
 }
 
 // ---------- List pane ----------
+
+// Today and Upcoming, for everything (the smart lists) or for one project's contents.
+function todayGroups(pool) {
+  const t = today(), open = pool.filter(r => isOpen(r));
+  return [
+    { name: 'Overdue', items: open.filter(r => r.data.due && r.data.due < t).sort(byDueThenOrder), late: true },
+    { name: 'Today', items: open.filter(r => r.data.due === t || (r.data.start === t && !r.data.due)).sort(byDueThenOrder) },
+    { name: 'Done today', items: pool.filter(r => r.data.type === 'task' && r.data.done && (r.data.doneAt || '').startsWith(t)), done: true },
+  ];
+}
+const isUpcoming = (r, t) => isOpen(r) && ((r.data.due && r.data.due > t) || (r.data.start && r.data.start > t));
+function upcomingGroups(pool) {
+  const t = today();
+  const open = pool.filter(r => isUpcoming(r, t));
+  const keyDate = r => (r.data.start && r.data.start > t && (!r.data.due || r.data.start < r.data.due) ? r.data.start : r.data.due) || r.data.start;
+  const map = new Map();
+  for (const r of open.sort((a, b) => keyDate(a).localeCompare(keyDate(b)))) {
+    const k = keyDate(r), diff = daysBetween(t, k);
+    const label = diff < 7 ? fmtDay(k) : parseYmd(k).toLocaleDateString(undefined, { month: 'long', year: parseYmd(k).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+    if (!map.has(label)) map.set(label, []);
+    map.get(label).push(r);
+  }
+  return [...map].map(([name, items]) => ({ name, items }));
+}
 
 function renderList() {
   const key = listKey();
@@ -286,43 +398,44 @@ function renderList() {
         ${total ? `<span class="bar"><i style="width:${Math.round(100 * done / total)}%"></i></span>` : ''}
         <span class="row2">${textOf(p.data.body) ? esc(shorten(textOf(p.data.body), 140)) : 'Project notes, links and photos'}<b>Open ›</b></span>
       </button>`;
-    // Loose things first, then each section as a heading with what's in it (like the board's frames).
-    const sections = kids.filter(r => r.data.type === 'section').sort(bySectionOrder);
-    const inSections = sections.flatMap(s => I.kids.get(s.id) || []);
-    const openOf = list => [
-      ...list.filter(r => r.data.type === 'task' && !r.data.done).sort(byDueThenOrder),
-      ...list.filter(r => r.data.type === 'project').sort(byDueThenOrder),
-      ...list.filter(r => r.data.type === 'note').sort(byPinnedUpdated),
-    ];
-    groups = [
-      { name: 'To-dos', items: kids.filter(r => r.data.type === 'task' && !r.data.done).sort(byDueThenOrder) },
-      { name: 'Sub-projects', items: kids.filter(r => r.data.type === 'project').sort(byDueThenOrder) },
-      { name: 'Notes', items: kids.filter(r => r.data.type === 'note').sort(byPinnedUpdated) },
-      ...sections.map(s => ({ name: titleOf(s), section: s, items: openOf(I.kids.get(s.id) || []) })),
-      { name: 'Done', items: [...kids, ...inSections].filter(r => r.data.type === 'task' && r.data.done).sort((a, b) => (b.data.doneAt || '').localeCompare(a.data.doneAt || '')), done: true },
-    ];
+    // Everything in it, or just what's due today / coming up (from anywhere inside, sections and sub-projects too).
+    const tab = projTab(p.id), pool = I.descendants(p.id);
+    const nToday = pool.filter(r => isOpen(r) && ((r.data.due && r.data.due <= t) || (r.data.start === t && !r.data.due))).length;
+    const nSoon = pool.filter(r => isUpcoming(r, t)).length;
+    head += `<div class="seg projtabs" role="tablist" aria-label="Show">${[['all', 'Everything'], ['today', 'Today', nToday], ['upcoming', 'Upcoming', nSoon]]
+      .map(([k, label, n]) => `<button role="tab" aria-selected="${tab === k}" data-projtab="${k}" class="${tab === k ? 'on' : ''}">${label}${n ? ` <i>${n}</i>` : ''}</button>`).join('')}</div>`;
+    if (tab === 'today') {
+      addHint = 'Add a to-do for today';
+      groups = todayGroups(pool).map(g => ({ ...g, where: true }));
+    } else if (tab === 'upcoming') {
+      addHint = 'Add a to-do for tomorrow';
+      groups = upcomingGroups(pool).map(g => ({ ...g, where: true }));
+      if (!groups.length) groups = [{ name: '', items: [], empty: 'Nothing in this project has a future date yet.' }];
+    } else {
+      // Loose things first, then each section as a heading with what's in it (like the board's frames).
+      const sections = kids.filter(r => r.data.type === 'section').sort(bySectionOrder);
+      const inSections = sections.flatMap(s => I.kids.get(s.id) || []);
+      const openOf = list => [
+        ...list.filter(r => r.data.type === 'task' && !r.data.done).sort(byOrder),
+        ...list.filter(r => r.data.type === 'project').sort(byOrder),
+        ...list.filter(r => r.data.type === 'note').sort(byPinnedOrder),
+      ];
+      groups = [
+        { name: 'To-dos', items: kids.filter(r => r.data.type === 'task' && !r.data.done).sort(byOrder), drop: p.id, kind: 'task' },
+        { name: 'Sub-projects', items: kids.filter(r => r.data.type === 'project').sort(byOrder), drop: p.id, kind: 'project' },
+        { name: 'Notes', items: kids.filter(r => r.data.type === 'note').sort(byPinnedOrder), drop: p.id, kind: 'note' },
+        ...sections.map(s => ({ name: titleOf(s), section: s, items: openOf(I.kids.get(s.id) || []) })),
+        { name: 'Done', items: [...kids, ...inSections].filter(r => r.data.type === 'task' && r.data.done).sort((a, b) => (b.data.doneAt || '').localeCompare(a.data.doneAt || '')), done: true },
+      ];
+    }
   } else {
     const v = route.view || 'today';
     title = (SMART.find(s => s.id === v) || {}).name || { trash: 'Recently deleted', conflicts: 'Conflicts', 'done-projects': 'Finished projects' }[v] || 'Brain Tree';
     if (v === 'today') {
-      const open = I.live.filter(r => isOpen(r));
-      groups = [
-        { name: 'Overdue', items: open.filter(r => r.data.due && r.data.due < t).sort(byDueThenOrder), late: true },
-        { name: 'Today', items: open.filter(r => r.data.due === t || (r.data.start === t && !r.data.due)).sort(byDueThenOrder) },
-        { name: 'Done today', items: I.live.filter(r => r.data.type === 'task' && r.data.done && (r.data.doneAt || '').startsWith(t)), done: true },
-      ];
+      groups = todayGroups(I.live);
     } else if (v === 'upcoming') {
       addHint = 'Add a to-do for tomorrow';
-      const open = I.live.filter(r => isOpen(r) && ((r.data.due && r.data.due > t) || (r.data.start && r.data.start > t)));
-      const keyDate = r => (r.data.start && r.data.start > t && (!r.data.due || r.data.start < r.data.due) ? r.data.start : r.data.due) || r.data.start;
-      const map = new Map();
-      for (const r of open.sort((a, b) => keyDate(a).localeCompare(keyDate(b)))) {
-        const k = keyDate(r), diff = daysBetween(t, k);
-        const label = diff < 7 ? fmtDay(k) : parseYmd(k).toLocaleDateString(undefined, { month: 'long', year: parseYmd(k).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
-        if (!map.has(label)) map.set(label, []);
-        map.get(label).push(r);
-      }
-      groups = [...map].map(([name, items]) => ({ name, items }));
+      groups = upcomingGroups(I.live);
       if (!groups.length) groups = [{ name: '', items: [], empty: 'Nothing with a future date yet. Give to-dos and projects a start or due date to see them here.' }];
     } else if (v === 'inbox') {
       const loose = I.live.filter(r => !I.parentOf(r) && r.data.type !== 'project');
@@ -363,7 +476,7 @@ function renderList() {
   const html = groups.map(g => {
     if (g.section) {
       const s = g.section, n = (I.kids.get(s.id) || []).length;
-      return `<div class="group sec ${s.data.color ? 'c-' + s.data.color : ''}">
+      return `<div class="group sec ${s.data.color ? 'c-' + s.data.color : ''}" data-drop="${s.id}" data-kind="any">
         <div class="sechead ${route.item === s.id ? 'on' : ''}" data-open="${s.id}" role="button" tabindex="0">
           <span class="sname">${esc(g.name)}</span>${n ? `<span class="scount">${n}</span>` : ''}
           <button class="secadd" data-new="task" data-parent="${s.id}" aria-label="Add a to-do to ${esc(g.name)}" title="Add a to-do here">${ICON.plus}</button>
@@ -375,9 +488,9 @@ function renderList() {
     if (g.done) {
       const isOpenSec = openDone.has(doneKey);
       return `<div class="group done"><button class="gname toggle" data-done="${esc(doneKey)}">${esc(g.name)} (${g.items.length}) <span>${isOpenSec ? 'Hide' : 'Show'}</span></button>
-        ${isOpenSec ? g.items.map(r => rowHTML(r, { trash: g.trash })).join('') : ''}</div>`;
+        ${isOpenSec ? g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project, where: g.where })).join('') : ''}</div>`;
     }
-    return `<div class="group ${g.late ? 'late' : ''}">${g.name ? `<div class="gname">${esc(g.name)}</div>` : ''}${g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project })).join('')}</div>`;
+    return `<div class="group ${g.late ? 'late' : ''}" ${g.drop ? `data-drop="${g.drop}" data-kind="${g.kind}"` : ''}>${g.name ? `<div class="gname">${esc(g.name)}</div>` : ''}${g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project, where: g.where })).join('')}</div>`;
   }).join('');
   const nothing = !groups.some(g => g.items.length);
   $('#listBody').innerHTML = html || (nothing ? `<p class="empty">${emptyText()}</p>` : '');
@@ -398,17 +511,24 @@ function emptyText() {
   }[route.view] || '';
 }
 
-function rowHTML(r, { trash = false, inProject = false } = {}) {
+function rowHTML(r, { trash = false, inProject = false, where = false } = {}) {
   const d = r.data, t = today();
   const type = d.type || 'note';
   const sel = route.item === r.id ? 'on' : '';
   const proj = !inProject && I.project(r);
   const chips = [];
+  const rep = d.repeat && type === 'task' ? `<span class="repmark" title="${esc(REPEATS[d.repeat] || 'Repeats')}">${ICON.repeat}</span>` : '';
   if (type === 'project' && (d.start || d.due)) chips.push(`<span class="chip ${!d.done && d.due && d.due < t ? 'late' : ''}">${ICON.cal}${d.start ? fmtDay(d.start) : '…'} → ${d.due ? fmtDay(d.due) : '…'}</span>`);
-  else if (d.due && type !== 'note') chips.push(`<span class="chip ${!d.done && d.due < t ? 'late' : d.due === t ? 'now' : ''}">${ICON.cal}${fmtDay(d.due)}</span>`);
-  else if (d.start && d.start > t && type !== 'note') chips.push(`<span class="chip">Starts ${fmtDay(d.start)}</span>`);
+  else if (d.due && type !== 'note') chips.push(`<span class="chip ${!d.done && d.due < t ? 'late' : d.due === t ? 'now' : ''}">${ICON.cal}${fmtDay(d.due)}${rep}</span>`);
+  else if (d.start && d.start > t && type !== 'note') chips.push(`<span class="chip">Starts ${fmtDay(d.start)}${rep}</span>`);
+  else if (rep) chips.push(`<span class="chip">${rep}${esc(REPEATS[d.repeat] || 'Repeats')}</span>`);
   if (type === 'project') { const { total, done } = progress(r.id); if (total) chips.push(`<span class="chip">${done}/${total}</span>`); }
   if (proj) { const sec = I.parentOf(r)?.data.type === 'section' ? I.parentOf(r) : null; chips.push(`<span class="chip proj">${ICON.folder}${esc(titleOf(proj))}${sec ? ' › ' + esc(titleOf(sec)) : ''}</span>`); }
+  // In a project's Today / Upcoming: which section or sub-project it's in, if not loose in the project.
+  if (where && route.project) {
+    const par = I.parentOf(r);
+    if (par && par.id !== route.project) chips.push(`<span class="chip proj">${par.data.type === 'section' ? ICON.section : par.data.type === 'project' ? ICON.folder : ICON.check}${esc(titleOf(par))}</span>`);
+  }
   const kidCount = (I.kids.get(r.id) || []).length;
   if (kidCount && type !== 'project') chips.push(`<span class="chip">${kidCount} inside</span>`);
   if (r.conflict) chips.push(`<span class="chip late">${ICON.warn}Conflict</span>`);
@@ -480,6 +600,7 @@ function buildDetail(host, r) {
         <label class="chip sel"><select class="type" aria-label="Type"></select></label>
         <label class="chip date"><span>Start</span><input type="date" class="start"><button type="button" class="x" data-clear="start" aria-label="Clear start date">×</button></label>
         <label class="chip date"><span>Due</span><input type="date" class="due"><button type="button" class="x" data-clear="due" aria-label="Clear due date">×</button></label>
+        <label class="chip sel rep">${ICON.repeat}<select class="repeat" aria-label="Repeat"><option value="">Repeat</option>${Object.entries(REPEATS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
         <button class="chip where" data-act="move"></button>
       </div>
       <div class="swatchrow" role="group" aria-label="Colour">
@@ -506,6 +627,11 @@ function buildDetail(host, r) {
   requestAnimationFrame(grow);
 
   $('.type', host).addEventListener('change', e => store.update(r.id, { type: e.target.value }));
+  $('.repeat', host).addEventListener('change', e => {
+    const rule = e.target.value || undefined, cur = I.byId.get(r.id);
+    // Repeating needs a date to count from: today, if it hasn't got one.
+    store.update(r.id, { repeat: rule, ...(rule && !cur?.data.due ? { due: today() } : {}) });
+  });
   for (const k of ['start', 'due']) {
     $('.' + k, host).addEventListener('change', e => store.update(r.id, { [k]: e.target.value || undefined }));
   }
@@ -567,6 +693,10 @@ function updateDetail(r) {
     input.closest('.chip').classList.toggle('late', k === 'due' && !d.done && !!d.due && d.due < today());
     input.closest('.chip').hidden = type === 'section';
   }
+  const rep = $('.repeat', host);
+  rep.value = d.repeat && REPEATS[d.repeat] ? d.repeat : '';
+  rep.closest('.chip').hidden = type !== 'task';
+  rep.closest('.chip').classList.toggle('set', !!d.repeat);
   const proj = parent?.data.type === 'section' ? I.project(r) : null;
   $('.props .where', host).innerHTML = `${ICON.folder}<span>${parent ? (proj ? esc(titleOf(proj)) + ' › ' : '') + esc(titleOf(parent)) : 'No project'}</span>`;
   $('.acts [data-act=pin]', host).classList.toggle('on', !!d.pinned);
@@ -600,7 +730,7 @@ function updateDetail(r) {
   const top = $('.inside.top', host), bottom = $('.inside.bottom', host);
   const target = group ? top : bottom;
   (group ? bottom : top).innerHTML = '';
-  const openTasks = kids.filter(k => k.data.type === 'task' && !k.data.done).sort(byDueThenOrder);
+  const openTasks = kids.filter(k => k.data.type === 'task' && !k.data.done).sort(byOrder);
   const rank = k => ({ project: 0, section: 1 }[k.data.type] ?? 2);
   const others = kids.filter(k => k.data.type !== 'task').sort((a, b) => rank(a) - rank(b) || (a.data.type === 'section' ? bySectionOrder(a, b) : byPinnedUpdated(a, b)));
   const done = kids.filter(k => k.data.type === 'task' && k.data.done);
@@ -628,7 +758,7 @@ function updateDetail(r) {
   }
   $('.banners', host).innerHTML = banners.join('');
 
-  $('.stamp', host).textContent = [d.created ? 'Created ' + fmtWhen(d.created) : '', d.updated && d.updated !== d.created ? 'Edited ' + fmtWhen(d.updated) : '', r.dirty && store.signedIn() ? 'Not synced yet' : ''].filter(Boolean).join(' · ');
+  $('.stamp', host).textContent = [d.created ? 'Created ' + fmtWhen(d.created) : '', d.repeat && d.lastDone ? 'Last done ' + fmtWhen(d.lastDone) : '', d.updated && d.updated !== d.created ? 'Edited ' + fmtWhen(d.updated) : '', r.dirty && store.signedIn() ? 'Not synced yet' : ''].filter(Boolean).join(' · ');
 }
 
 // ---------- Actions ----------
@@ -650,8 +780,86 @@ async function toggleDone(id) {
   const r = store.get(id);
   if (!r) return;
   const done = !r.data.done;
-  await store.update(id, { done, doneAt: done ? new Date().toISOString() : undefined });
-  if (done && r.data.type === 'task') toast(`Done: ${titleOf(r)}`, 'Undo', () => store.update(id, { done: false, doneAt: undefined }));
+  if (done && r.data.type === 'task' && r.data.repeat) {
+    // A repeating to-do stays open: it moves on to its next date, with its steps unticked.
+    const d = r.data, next = nextRepeat(d.due || today(), d.repeat);
+    const before = { due: d.due, start: d.start, lastDone: d.lastDone };
+    const steps = I.descendants(id).filter(k => k.data.type === 'task' && k.data.done).map(k => ({ id: k.id, doneAt: k.data.doneAt }));
+    await store.update(id, { due: next, start: d.start ? addDays(d.start, daysBetween(d.due || today(), next)) : undefined, lastDone: new Date().toISOString() });
+    for (const s of steps) await store.update(s.id, { done: undefined, doneAt: undefined });
+    toast(`Done. Next one: ${fmtDay(next)}`, 'Undo', async () => {
+      await store.update(id, before);
+      for (const s of steps) await store.update(s.id, { done: true, doneAt: s.doneAt });
+    });
+    return;
+  }
+  await store.update(id, { done: done || undefined, doneAt: done ? new Date().toISOString() : undefined });
+  if (done && r.data.type === 'task') toast(`Done: ${titleOf(r)}`, 'Undo', () => store.update(id, { done: undefined, doneAt: undefined }));
+  if (done && r.data.type === 'project') toast(`Finished: ${titleOf(r)}`, 'Undo', () => store.update(id, { done: undefined, doneAt: undefined }));
+}
+
+async function setDue(id, due) {
+  const r = store.get(id);
+  if (!r || (r.data.due || '') === (due || '')) return;
+  const was = r.data.due;
+  await store.update(id, { due: due || undefined });
+  toast(due ? `Due ${fmtDay(due)}: ${titleOf(r)}` : `No date now: ${titleOf(r)}`, 'Undo', () => store.update(id, { due: was }));
+}
+
+// Things that sit side by side with it, in the order they're shown (for dragging and "Move to top").
+function siblingsOf(r) {
+  if (r.data.type === 'project') {
+    const k = navUnder(r);
+    return I.live.filter(p => p.data.type === 'project' && !p.data.done && navUnder(p) === k).sort(byOrder);
+  }
+  return (I.kids.get(I.parentOf(r)?.id || '') || []).filter(k => k.data.type === r.data.type && !k.data.done).sort(byOrder);
+}
+// Only where the order is yours to set: projects and sections, and what's inside a project.
+const canTop = r => {
+  const par = I.parentOf(r);
+  if (!['project', 'section'].includes(r.data.type) && !['project', 'section'].includes(par?.data.type)) return false;
+  return siblingsOf(r)[0]?.id !== r.id && !r.data.done;
+};
+async function toTop(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  const first = siblingsOf(r)[0];
+  if (!first || first.id === id) return;
+  const was = r.data.order;
+  await store.update(id, { order: (first.data.order || 0) - 1000 });
+  toast(`Moved to the top: ${titleOf(r)}`, 'Undo', () => store.update(id, { order: was }));
+}
+
+// A copy, with everything inside it (to-dos come out unticked, so a project works as a template).
+async function duplicate(id) {
+  const r = I.byId.get(id);
+  if (!r) return null;
+  const all = [r, ...I.descendants(id)];   // each thing comes after the one it's in
+  const ids = new Map();
+  for (const x of all) {
+    const data = structuredClone(x.data);
+    for (const k of ['created', 'updated', 'done', 'doneAt', 'trashed', 'lastDone', 'links']) delete data[k];
+    if (x === r) {
+      if ((data.title || '').trim()) data.title = data.title.trim() + ' (copy)';
+      data.order = (x.data.order || 0) + 0.5;   // right after the original
+      delete data.pinned;
+    } else data.parent = ids.get(data.parent) || data.parent;
+    // Board spots: kept on the copy's own boards; the copy itself finds a free spot on the board it's on.
+    if (data.cork) {
+      const c = {};
+      for (const [k, v] of Object.entries(data.cork)) { if (k === 'banner') c.banner = v; else if (ids.get(k)) c[ids.get(k)] = v; }
+      if (Object.keys(c).length) data.cork = c; else delete data.cork;
+    }
+    ids.set(x.id, await store.create(data));
+  }
+  // Strings between things that were copied are copied too.
+  for (const x of all) {
+    const ls = (x.data.links || []).filter(l => ids.get(l.to));
+    if (ls.length) await store.update(ids.get(x.id), { links: ls.map(l => ({ ...l, to: ids.get(l.to) })) });
+  }
+  const copy = ids.get(id);
+  toast(`Copied${all.length > 1 ? ` with ${all.length - 1} thing${all.length === 2 ? '' : 's'} inside` : ''}`, 'Open', () => (r.data.type === 'project' && !route.project ? go({ project: copy, view: null, item: null }) : openItem(copy)));
+  return copy;
 }
 
 async function trashItem(id) {
@@ -692,6 +900,209 @@ async function purge(ids) {
   }
   await store.destroy([...all]);
 }
+
+// ---------- Swipe, hold and drag (gestures.js does the finger work) ----------
+
+const idOf = el => el.dataset.open || el.dataset.project || '';
+
+// What a swipe shows: right for quick things and More, left for Delete.
+function rowActions(el) {
+  const r = I.byId.get(idOf(el));
+  if (!r || !I.alive(r) || (!route.project && !search && ['trash', 'conflicts'].includes(route.view) && el.closest('#listBody'))) return null;
+  const t = r.data.type;
+  const more = { id: 'more', label: 'More', icon: ICON.dots, tone: 'grey' };
+  const lead = t === 'task' ? [{ id: 'done', label: r.data.done ? 'Undo' : 'Done', icon: ICON.check, tone: 'green' }, { id: 'when', label: 'Date', icon: ICON.cal, tone: 'accent' }, more]
+    : t === 'project' ? [{ id: 'board', label: 'Board', icon: ICON.board, tone: 'blue' }, more]
+    : t === 'note' ? [{ id: 'pin', label: r.data.pinned ? 'Unpin' : 'Pin', icon: ICON.pin, tone: 'accent' }, more]
+    : [more];
+  return { lead, trail: [{ id: 'delete', label: 'Delete', icon: ICON.trash, tone: 'red' }] };
+}
+
+function rowAction(el, act) {
+  const id = idOf(el), r = I.byId.get(id);
+  if (!r) return;
+  if (act === 'done') toggleDone(id);
+  else if (act === 'when') whenSheet(id);
+  else if (act === 'more') itemMenu(id);
+  else if (act === 'board') go({ view: 'board', board: r.data.type === 'project' ? id : I.project(r)?.id, project: null, item: null });
+  else if (act === 'pin') store.update(id, { pinned: r.data.pinned ? undefined : true });
+  else if (act === 'delete') trashItem(id);
+}
+
+function dateButtons(due) {
+  const t = today(), seen = new Set();
+  const opts = [['Today', t], ['Tomorrow', addDays(t, 1)], ['This weekend', [0, 6].includes(parseYmd(t).getDay()) ? t : nextDow(t, 6)], ['Next week', nextDow(t, 1)]]
+    .filter(([, d]) => !seen.has(d) && seen.add(d));
+  return opts.map(([label, d]) => `<button class="${due === d ? 'on' : ''}" data-due="${d}"><b>${label}</b><small>${esc(shortDate(d))}</small></button>`).join('')
+    + `<label class="${due && !seen.has(due) ? 'on' : ''}"><b>Pick a date</b><small>${due && !seen.has(due) ? esc(shortDate(due)) : 'Calendar'}</small><input type="date" value="${due || ''}"></label>`
+    + (due ? '<button data-due=""><b>No date</b><small>Clear it</small></button>' : '');
+}
+function wireDates(el, id) {
+  el.addEventListener('click', e => {
+    const b = e.target.closest('[data-due]');
+    if (!b) return;
+    closeModal();
+    setDue(id, b.dataset.due);
+  });
+  const input = el.querySelector('.mdates input[type=date]');
+  input?.addEventListener('change', () => { if (!input.value) return; closeModal(); setDue(id, input.value); });
+  // Tapping anywhere on "Pick a date" opens the calendar.
+  input?.closest('label').addEventListener('click', e => { if (e.target !== input) { e.preventDefault(); try { input.showPicker(); } catch (err) { input.focus(); } } });
+}
+
+function whenSheet(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  modal(`
+    <div class="mhead"><span class="ic">${ICON.cal}</span><b>${esc(titleOf(r))}</b></div>
+    <div class="mdates">${dateButtons(r.data.due)}</div>
+    <div class="mbtns"><button data-close>Cancel</button></div>`, el => wireDates(el, id), 'menu');
+}
+
+// Everything you can do to a thing, from holding it (or right-clicking, or swiping right and More).
+function itemMenu(id) {
+  const r = I.byId.get(id);
+  if (!r || !I.alive(r)) return;
+  const d = r.data, type = d.type;
+  const mi = (m, icon, label, cls = '') => `<button class="mi ${cls}" data-m="${m}">${icon}<span>${label}</span></button>`;
+  const items = [mi('open', ICON.open, type === 'section' ? 'Open (rename, colour)' : 'Open')];
+  if (type === 'task') items.push(mi('done', ICON.check, d.done ? 'Mark not done' : d.repeat ? 'Done (moves to its next date)' : 'Mark done'));
+  if (type === 'project') items.push(mi('board', ICON.board, 'Open its board'), mi('add', ICON.plus, 'Add a to-do to it'), mi('done', ICON.check, d.done ? 'Reopen project' : 'Finish project'));
+  if (type === 'note') items.push(mi('pin', ICON.pin, d.pinned ? 'Unpin' : 'Pin to the top'));
+  if (canTop(r)) items.push(mi('top', ICON.top, 'Move to the top'));
+  if (type !== 'section') items.push(mi('move', ICON.move, 'Move to another project…'));
+  if (type === 'task' && d.repeat) items.push(mi('norepeat', ICON.repeat, `Stop repeating (${(REPEATS[d.repeat] || '').toLowerCase()})`));
+  if (type !== 'section') items.push(mi('dup', ICON.copy, type === 'project' ? 'Duplicate, with everything in it' : 'Duplicate'));
+  items.push(mi('delete', ICON.trash, type === 'section' ? 'Delete section (keeps what’s in it)' : 'Delete', 'danger'));
+  modal(`
+    <div class="mhead"><span class="ic t-${type}">${typeIcon(type)}</span><b>${esc(titleOf(r))}</b></div>
+    ${type === 'task' && !d.done ? `<div class="mdates">${dateButtons(d.due)}</div>` : ''}
+    <div class="mlist">${items.join('')}</div>
+    <div class="swatchrow" role="group" aria-label="Colour">
+      <button class="sw none ${d.color ? '' : 'on'}" data-mcolour="" title="No colour">×</button>
+      ${COLOURS.map(c => `<button class="sw c-${c} ${d.color === c ? 'on' : ''}" data-mcolour="${c}" title="${c[0].toUpperCase() + c.slice(1)}"></button>`).join('')}
+    </div>
+    <div class="mbtns"><button data-close>Cancel</button></div>`, el => {
+    wireDates(el, id);
+    el.addEventListener('click', async e => {
+      const c = e.target.closest('[data-mcolour]');
+      if (c) { store.update(id, { color: c.dataset.mcolour || undefined }); closeModal(); return; }
+      const b = e.target.closest('[data-m]');
+      if (!b) return;
+      const m = b.dataset.m;
+      closeModal();
+      if (m === 'open') type === 'project' && !route.project && route.view !== 'board' ? go({ project: id, view: null, item: null }) : openItem(id);
+      else if (m === 'done') toggleDone(id);
+      else if (m === 'board') go({ view: 'board', board: id, project: null, item: null });
+      else if (m === 'add') { search = ''; $('#search').value = ''; go({ project: id, view: null, item: null }); setTimeout(() => $('#quickAdd input')?.focus(), 60); }
+      else if (m === 'pin') store.update(id, { pinned: d.pinned ? undefined : true });
+      else if (m === 'top') toTop(id);
+      else if (m === 'move') movePicker(id);
+      else if (m === 'norepeat') store.update(id, { repeat: undefined });
+      else if (m === 'dup') duplicate(id);
+      else if (m === 'delete') trashItem(id);
+    });
+  }, 'menu');
+}
+
+// Where a dragged row can go. Projects: among the projects beside them in the sidebar. In a project's
+// list: anywhere among things of the same kind, loose or in any section (dropping in a section moves
+// it there). Section headings: among the other sections.
+function dropSlots(el) {
+  if (search) return null;
+  const id = idOf(el), r = I.byId.get(id);
+  if (!r) return null;
+  const box = n => n.getBoundingClientRect();
+  const across = n => () => { const b = box(n); return [b.left + 6, b.right - 6]; };
+  if (el.matches('#projects .navrow.proj')) {
+    const rows = [...$('#projects').querySelectorAll('.navrow.proj')];
+    const all = rows.filter(x => x.dataset.under === el.dataset.under);
+    const sibs = all.filter(x => x !== el);
+    if (!sibs.length) return null;
+    const ids = sibs.map(x => x.dataset.project), was = all.map(x => x.dataset.project);
+    const slots = sibs.map((s, i) => ({ y: () => box(s).top, x: across(s), sibs: ids, index: i, was }));
+    // After the last one, below anything shown inside it.
+    const last = sibs[sibs.length - 1];
+    let end = last;
+    for (let i = rows.indexOf(last) + 1; rows[i] && +rows[i].dataset.depth > +last.dataset.depth; i++) end = rows[i];
+    slots.push({ y: () => box(end).bottom, x: across(last), sibs: ids, index: ids.length, was });
+    return slots;
+  }
+  if (!route.project || projTab(route.project) !== 'all' || !el.closest('#listBody')) return null;
+  if (el.matches('.sechead')) {
+    const secs = [...$('#listBody').querySelectorAll('.group.sec')];
+    const others = secs.filter(g => !g.contains(el));
+    if (!others.length) return null;
+    const ids = others.map(g => g.dataset.drop), was = secs.map(g => g.dataset.drop);
+    const slots = others.map((g, i) => ({ y: () => box(g).top, x: across(g), sibs: ids, index: i, was }));
+    slots.push({ y: () => box(others[others.length - 1]).bottom, x: across(others[others.length - 1]), sibs: ids, index: ids.length, was });
+    return slots;
+  }
+  const kind = r.data.type;
+  if (el.closest('.group.done') || !['task', 'note', 'project'].includes(kind)) return null;
+  // Taking something out of a section needs somewhere loose to drop it, even if nothing's loose yet.
+  if (!$(`#listBody .group[data-kind="${kind}"]`)) {
+    const name = { task: 'To-dos', project: 'Sub-projects', note: 'Notes' }[kind];
+    const html = `<div class="group dropzone" data-drop="${route.project}" data-kind="${kind}"><div class="gname">${name}</div><p class="secempty">Drop here to take it out of its section</p></div>`;
+    const before = kind === 'task' ? $('#listBody').firstElementChild : $('#listBody .group.sec, #listBody .group.done');
+    before ? before.insertAdjacentHTML('beforebegin', html) : $('#listBody').insertAdjacentHTML('beforeend', html);
+  }
+  const slots = [];
+  for (const g of $('#listBody').querySelectorAll('.group[data-drop]')) {
+    if (g.dataset.kind !== kind && g.dataset.kind !== 'any') continue;
+    const all = [...g.querySelectorAll(':scope > .row.t-' + kind)];
+    const rows = all.filter(x => x !== el);
+    const ids = rows.map(x => x.dataset.open), was = all.map(x => x.dataset.open), parent = g.dataset.drop;
+    rows.forEach((x, i) => slots.push({ y: () => box(x).top, x: across(g), sibs: ids, index: i, parent, was }));
+    const tail = rows[rows.length - 1], head = g.querySelector(':scope > .sechead, :scope > .gname');
+    // After the last of its kind; with none, under the heading (to-dos) or at the end (notes, projects).
+    const y = tail ? () => box(tail).bottom : kind === 'task' && head ? () => box(head).bottom : () => box(g).bottom - 4;
+    slots.push({ y, x: across(g), sibs: ids, index: ids.length, parent, was });
+  }
+  return slots;
+}
+
+async function dropRow(el, slot) {
+  const id = idOf(el), r = I.byId.get(id);
+  if (!r) return;
+  const list = slot.sibs.map(x => I.byId.get(x)).filter(Boolean);
+  const i = Math.min(slot.index, list.length);
+  const moving = slot.parent && slot.parent !== (r.data.parent || '');
+  const seq = [...list.slice(0, i), r, ...list.slice(i)];
+  if (!moving && seq.map(x => x.id).join() === slot.was.join()) return;   // dropped where it was
+  const before = { parent: r.data.parent, order: r.data.order };
+  const patch = moving ? { parent: slot.parent } : {};
+  const prev = list[i - 1], next = list[i];
+  const a = prev?.data.order ?? 0, b = next?.data.order ?? 0;
+  if (prev && next && a < b) patch.order = (a + b) / 2;
+  else if (prev && !next) patch.order = a + 1000;
+  else if (next && !prev) patch.order = b - 1000;
+  else if (prev && next) {
+    // Two with the same place number: number the whole run again.
+    const base = Math.min(...seq.map(x => x.data.order || 0));
+    for (let k = 0; k < seq.length; k++) {
+      if (seq[k].id === id) patch.order = base + k * 1000;
+      else if (seq[k].data.order !== base + k * 1000) await store.update(seq[k].id, { order: base + k * 1000 });
+    }
+  }
+  await store.update(id, patch);
+  if (moving) {
+    const to = I.byId.get(slot.parent);
+    toast(`Moved to “${to ? titleOf(to) : 'the project'}”`, 'Undo', () => store.update(id, before));
+  }
+}
+
+const gest = createGestures({
+  rows: '#listBody .row[data-open], #detail .inside .row[data-open], #projects .navrow.proj, #listBody .sechead',
+  scrollers: '.listscroll, .navscroll, #detail .scroll',
+  actions: rowActions,
+  run: rowAction,
+  menu: el => itemMenu(idOf(el)),
+  slots: dropSlots,
+  drop: dropRow,
+  dragEnd: () => queueRender(),   // tidies away any drop zone that was added
+  idle: () => { if (renderHeld) { renderHeld = false; queueRender(); } },
+});
 
 function movePicker(id) {
   const r = store.get(id);
@@ -822,6 +1233,12 @@ async function settingsModal() {
       <h3>Getting started</h3>
       <button class="setbtn" data-s="example">Add an example project</button>
       <p class="hint">A small project that shows what’s possible: to-dos with dates and steps, sections, a board with strings, a YouTube clip and a drawing. Delete it whenever you like.</p>
+      <details><summary>Handy shortcuts</summary>
+        <p><b>Swipe</b> a to-do, note or project left to delete it, or right for Done, Date and More.</p>
+        <p><b>Hold</b> one for everything you can do to it (on a computer, right-click). Hold and <b>drag</b> to put it in order, or into a section. Projects in the sidebar drag too.</p>
+        <p><b>Type a date</b> at the end of a new to-do: “Bins out tomorrow”, “Call Sam fri”, “Dentist 3 Dec”, “Pay rent 1/12”, “Service the car in 2 weeks”.</p>
+        <p>On a keyboard: <b>N</b> adds a to-do, <b>/</b> searches.</p>
+      </details>
       <h3>This device</h3>
       <label>This device’s name<input class="devname" value="${esc(store.device())}" maxlength="40"></label>
       <p class="hint">Shown when the same thing is changed on two devices.</p>
@@ -1060,6 +1477,12 @@ document.addEventListener('click', async e => {
     return;
   }
   if ((x = el('[data-done]'))) { const k = x.dataset.done; openDone.has(k) ? openDone.delete(k) : openDone.add(k); render(); return; }
+  if ((x = el('[data-projtab]')) && route.project) {
+    projTabs[route.project] = x.dataset.projtab;
+    writeLocal('bt-projtab', projTabs);
+    renderList();
+    return;
+  }
   if ((x = el('[data-toggle]'))) {
     e.stopPropagation();
     const id = x.dataset.toggle;
@@ -1122,6 +1545,15 @@ document.addEventListener('click', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (!$('#modal').hidden) closeModal(); else if (!$('#lightbox').hidden) $('#lightbox').hidden = true; }
+  // On a keyboard: N adds a to-do, / searches (when you're not typing somewhere).
+  const typing = e.target.closest?.('input, textarea, select, [contenteditable]');
+  if (!typing && $('#modal').hidden && !e.ctrlKey && !e.metaKey && !e.altKey && document.body.dataset.view !== 'board') {
+    if (e.key === '/') { e.preventDefault(); $('#search').focus(); return; }
+    if (e.key === 'n' || e.key === 'N') {
+      const qa = $('#quickAdd input');
+      if (qa && !$('#quickAdd').hidden && qa.offsetParent) { e.preventDefault(); qa.focus(); return; }
+    }
+  }
   const row = e.target.closest?.('.row[data-open]');
   if (row && (e.key === 'Enter' || e.key === ' ') && e.target === row) { e.preventDefault(); openItem(row.dataset.open); }
 });
@@ -1131,21 +1563,33 @@ document.addEventListener('submit', async e => {
   const form = e.target;
   if (form.id === 'quickAdd') {
     e.preventDefault();
-    const input = form.querySelector('input'), title = input.value.trim();
-    if (!title) return;
+    const input = form.querySelector('input'), typed = input.value.trim();
+    if (!typed) return;
     input.value = '';
     const type = route.view === 'notes' && !route.project ? 'note' : 'task';
-    const id = await newItem(type, undefined, { title });
-    if (type === 'note') openItem(id);
+    if (type === 'note') { openItem(await newItem('note', undefined, { title: typed })); return; }
+    // In a project's Today or Upcoming tab, new to-dos are for today or tomorrow (unless you typed a date).
+    const tab = route.project && !search ? projTab(route.project) : 'all';
+    const { title, due } = quickDate(typed);
+    const extra = { title, ...(due ? { due } : tab === 'today' ? { due: today() } : tab === 'upcoming' ? { due: addDays(today(), 1) } : {}) };
+    const id = await newItem('task', undefined, extra);
+    if (due) dateToast(id, typed, due);
   } else if (form.classList.contains('quick')) {
     e.preventDefault();
-    const input = form.querySelector('input'), title = input.value.trim();
-    if (!title) return;
+    const input = form.querySelector('input'), typed = input.value.trim();
+    if (!typed) return;
     input.value = '';
-    await newItem('task', form.dataset.parent, { title });
+    const { title, due } = quickDate(typed);
+    const id = await newItem('task', form.dataset.parent, { title, ...(due ? { due } : {}) });
+    if (due) dateToast(id, typed, due);
     requestAnimationFrame(() => $(`#detail form.quick[data-parent="${form.dataset.parent}"] input`)?.focus());
   }
 });
+
+// "Bins out tomorrow" became "Bins out", due tomorrow: say so, with a way back if that word wasn't a date.
+function dateToast(id, typed, due) {
+  toast(`Due ${fmtDay(due)}`, 'Not a date', () => store.update(id, { title: typed, due: undefined }));
+}
 
 $('#search').addEventListener('input', e => {
   search = e.target.value.trim();
@@ -1178,7 +1622,7 @@ async function migrate() {
   $('#nav .brand').insertAdjacentHTML('beforeend', `<button class="iconbtn" data-act="settings" aria-label="Settings">${ICON.gear}</button>`);
   $('#newProject').innerHTML = ICON.plus;
   $('#newBtn').innerHTML = ICON.plus;
-  $('#boardBtn').innerHTML = ICON.board;
+  $('#boardBtn').innerHTML = ICON.board + '<span>Board</span>';
   $('#listBack').innerHTML = ICON.back + '<span>Lists</span>';
   try {
     await store.load();

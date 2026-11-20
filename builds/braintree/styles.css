@@ -67,6 +67,10 @@ a { color: inherit; text-decoration: none; }
 .iconbtn { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: var(--soft); }
 .iconbtn:hover { background: var(--hover); color: var(--ink); }
 .iconbtn.accent { color: var(--accent-ink); }
+/* A project's board, from the top of its list: labelled, so it's easy to find. */
+.boardlink { display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0; height: 34px; padding: 0 0.7rem 0 0.55rem; border-radius: 9px; background: var(--accent-bg); color: var(--accent-ink); font-weight: 600; font-size: 0.9rem; }
+.boardlink:hover { background: color-mix(in srgb, var(--accent) 26%, var(--card)); }
+.boardlink svg { width: 18px; height: 18px; }
 .searchbox { padding: 0.2rem 0.8rem 0.6rem; }
 .searchbox input { width: 100%; border: 0; border-radius: 10px; background: var(--hover); padding: 0.5rem 0.75rem; outline: none; font-size: 16px; }
 .searchbox input:focus { box-shadow: 0 0 0 2px var(--accent); }
@@ -79,6 +83,8 @@ a { color: inherit; text-decoration: none; }
 .navrow .count { color: var(--faint); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .navrow .count.late { color: var(--string); font-weight: 600; }
 .navrow.small { font-size: 0.92rem; color: var(--soft); }
+button.navrow { width: 100%; text-align: left; }
+.navrow.example, .navrow.example .ic { color: var(--accent-ink); }
 .navrow.warn .ic, .navrow.warn .name { color: var(--string); }
 .ic-today { color: var(--accent) !important; } .ic-upcoming { color: var(--string) !important; } .ic-inbox { color: var(--proj) !important; } .ic-todos { color: var(--ok) !important; }
 .proj .ic { color: var(--proj); }
@@ -735,5 +741,75 @@ svg.drawing { display: block; width: 100%; height: auto; fill: none; stroke: non
 .boardmenu button { display: flex; align-items: center; gap: 0.6rem; }
 .boardmenu button svg { width: 18px; height: 18px; color: var(--soft); }
 .boardbar .addbtn { font-weight: 700; color: var(--accent-ink); }
+
+/* ---------- 0.6: swipe, hold, drag, project tabs, repeats ---------- */
+
+/* Rows you can swipe, hold and drag: no text selection or iOS callout getting in the way, and only
+   up-and-down scrolling left to the browser (sideways is the swipe). */
+#listBody .row, #detail .inside .row, #projects .navrow.proj, #listBody .sechead { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }
+
+.swipeable { position: relative; overflow: hidden; }
+.swipeable > :not(.swipe-acts) { transform: translateX(var(--sx, 0px)); transition: transform 0.24s cubic-bezier(.2, .8, .2, 1); }
+.swipeable.swiping > :not(.swipe-acts) { transition: none; }
+.row.swipeable::before, .row.swipeable::after { display: none; }
+.swipe-acts { position: absolute; top: 0; bottom: 0; display: flex; overflow: hidden; transition: width 0.24s cubic-bezier(.2, .8, .2, 1); }
+.swiping > .swipe-acts { transition: none; }
+.swipe-acts.lead { left: 0; width: max(0px, var(--sx, 0px)); }
+.swipe-acts.trail { right: 0; width: max(0px, calc(-1 * var(--sx, 0px))); }
+.swipe-acts button { flex: 1 1 0; min-width: 0; overflow: hidden; display: grid; place-items: center; align-content: center; gap: 2px; color: #fff; font-size: 0.72rem; font-weight: 600; white-space: nowrap; transition: flex-grow 0.18s; }
+.swipe-acts button svg { width: 20px; height: 20px; }
+.swipe-acts.lead.full button:not(:first-child), .swipe-acts.trail.full button:not(:last-child) { flex-grow: 0; }
+.sw-green { background: #2F8A4E; } .sw-accent { background: color-mix(in srgb, var(--accent) 85%, #000); } .sw-blue { background: #3F6FB5; }
+.sw-grey { background: #8A847A; } .sw-red { background: #D2392E; }
+
+/* Holding a row: it lifts. Dragging: a copy follows the finger and a line shows where it'll land. */
+.lifted { background: var(--card) !important; box-shadow: 0 6px 22px rgba(30, 20, 5, 0.2); transform: scale(1.015); transition: transform 0.15s, box-shadow 0.15s; z-index: 2; }
+.dragging { opacity: 0.3; }
+.dragghost { position: fixed; z-index: 70; margin: 0; pointer-events: none; background: var(--card); border-radius: 10px; box-shadow: 0 10px 30px rgba(30, 20, 5, 0.28); opacity: 0.96; transform: rotate(-0.6deg); }
+.dragghost::before { display: none; }
+.dropline { position: fixed; z-index: 71; height: 3px; border-radius: 2px; background: var(--accent); pointer-events: none; }
+.dropline::before { content: ""; position: absolute; left: -5px; top: -3.5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
+.group.dropzone .secempty { border: 1.5px dashed var(--line); border-radius: 10px; padding: 0.7rem; text-align: center; }
+
+/* Sidebar: how many to-dos are due today (red if any are late). */
+.duebadge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; background: var(--accent-bg); color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.duebadge.late { background: var(--string-bg); color: var(--string); }
+
+/* A project's list: Everything / Today / Upcoming. */
+.projtabs { display: flex; width: 100%; margin: 0 0 0.4rem; }
+.projtabs button { flex: 1; padding: 0.4rem 0.4rem; }
+.projtabs i { font-style: normal; font-size: 0.75rem; color: var(--accent-ink); margin-left: 0.15rem; }
+
+/* Repeating to-dos. */
+.repmark { display: inline-grid; margin-left: 0.25rem; }
+.chip .repmark svg, .chip > .repmark svg { width: 12px; height: 12px; }
+.props .chip.rep svg { width: 14px; height: 14px; }
+.props .chip.rep.set { color: var(--accent-ink); background: var(--accent-bg); }
+
+/* The menu from holding a row (a sheet from the bottom on phones). */
+.sheet.menu { padding: 1rem; }
+.mhead { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.8rem; }
+.mhead .ic { display: grid; color: var(--accent); }
+.mhead .ic.t-project, .mhead .ic.t-section { color: var(--proj); }
+.mhead b { flex: 1; min-width: 0; font-size: 1.08rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mdates { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 0.4rem; margin-bottom: 0.8rem; }
+.mdates > * { position: relative; display: grid; gap: 1px; text-align: left; padding: 0.5rem 0.65rem; border-radius: 10px; background: var(--hover); cursor: pointer; overflow: hidden; }
+.mdates > .on { background: var(--accent-bg); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.mdates b { font-weight: 600; font-size: 0.92rem; }
+.mdates small { color: var(--soft); font-size: 0.78rem; }
+.mdates input[type=date] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; cursor: pointer; }
+.mlist { display: grid; gap: 1px; margin-bottom: 0.8rem; }
+.mi { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.6rem; border-radius: 9px; text-align: left; }
+.mi:hover { background: var(--hover); }
+.mi svg { color: var(--soft); }
+.mi.danger, .mi.danger svg { color: var(--string); }
+.sheet.menu .swatchrow { margin: 0 0 0.2rem; padding: 0 0.3rem; }
+.sheet.menu .mbtns { margin-top: 0.6rem; }
+@media (max-width: 599px) {
+  #modal:has(.sheet.menu) { place-items: end stretch; padding: 0.5rem; padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); }
+  .sheet.menu { width: 100%; animation: rise 0.2s ease-out; }
+  .sheet.menu .mbtns button { flex: 1; }
+}
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

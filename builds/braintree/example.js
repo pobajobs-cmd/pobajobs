@@ -1,6 +1,6 @@
 // The example project: a small, real project (made of ordinary items) that shows off what Brain
-// Tree does: dates, to-dos with steps, checklists, sections, a sub-project, a board with labelled
-// strings, a YouTube clip and a drawing. Add it from Settings (or the empty project list);
+// Tree does: dates, to-dos with steps, a repeating to-do, checklists, sections, a sub-project, a board
+// with labelled strings, a YouTube clip and a drawing. Add it from Settings (or the empty project list);
 // delete it like any project when you're done.
 
 import { clipDivHTML } from './media.js';
@@ -20,7 +20,7 @@ export async function addExample(store) {
   const project = await make({
     type: 'project', title: EXAMPLE_TITLE, start: day(0), due: day(21),
     body: `<p>This is an example project, to show what Brain Tree can do. Have a look around, tick things off, change anything, then delete it with the bin at the top when you're done.</p>
-<ul class="checklist"><li data-checked="true">A project holds to-dos, notes, sections and smaller projects</li><li>Open its board (the board button at the top) to see everything pinned up, with strings between related cards</li><li>Tap a card on the board to open it, drag it into a section to file it there</li><li>Try + Add on the board for a YouTube clip or a drawing</li></ul>`,
+<ul class="checklist"><li data-checked="true">A project holds to-dos, notes, sections and smaller projects</li><li>Open its board (the board button at the top) to see everything pinned up, with strings between related cards</li><li>Tap a card on the board to open it, drag it into a section to file it there</li><li>Try + Add on the board for a YouTube clip or a drawing</li><li>In the list, swipe a to-do left or right, or hold it for more (hold and drag to move it)</li></ul>`,
   });
   const P = { parent: project };
 
@@ -30,6 +30,8 @@ export async function addExample(store) {
   await make({ parent: script, type: 'task', title: 'A hook for the first 10 seconds', done: true, doneAt: new Date().toISOString() });
   await make({ parent: script, type: 'task', title: 'Three main points' });
   await make({ parent: script, type: 'task', title: 'Ending and call to action' });
+  await make({ ...P, type: 'task', title: 'Check comments on the last video', due: day(1), repeat: 'week',
+    body: '<p>A repeating to-do: tick it and it moves on to next week. Set how often under Repeat.</p>' });
   await make({ ...P, type: 'note', title: 'Ideas', color: 'yellow',
     body: '<p>Anything goes in a note: text, <b>bold</b>, lists, links, photos, clips and drawings.</p><ul><li>Behind the scenes</li><li>A quick how-to</li><li>Top 5 facts</li></ul>' });
 
