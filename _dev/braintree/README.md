@@ -20,7 +20,7 @@ Open it from the home screen and sign in there. The home-screen app keeps its ow
 
 | What | Where |
 |---|---|
-| App (published) | `builds/braintree/`: `index.html`, `app.js` (screens), `store.js` (offline data and sync), `editor.js` (note editor), `board.js` (boards), `theme.js` (looks), `media.js` (YouTube clips), `draw.js` (drawings), `example.js` (example project), `gestures.js` (swipe, hold, drag in the lists), `styles.css`, `sw.js` (offline files) |
+| App (published) | `builds/braintree/`: `index.html`, `app.js` (screens), `store.js` (offline data and sync), `editor.js` (note editor), `board.js` (boards), `theme.js` (looks), `media.js` (YouTube clips), `draw.js` (drawings), `sheet.js` (spreadsheets), `attach.js` (files and links), `export.js` (PDF, print, CSV), `example.js` (example project), `gestures.js` (swipe, hold, drag in the lists), `styles.css`, `sw.js` (offline files) |
 | Server code | `worker-braintree.js` (imported by `worker.js`; kept off the site by `.assetsignore`) |
 | Data online | D1 database `pobajobs`, tables `bt_items`, `bt_files` (photos), `bt_meta`, `bt_logins` |
 | Data on each device | The browser's IndexedDB (`braintree`), so the app works offline |
@@ -79,6 +79,28 @@ Order is `data.order` (new items get the time they were made, so they go to the 
 **Typed dates** in quick-add (`quickDate`): a date at the end of the text is taken off and becomes the due date, with a "Not a date" button on the toast to undo it. Understood: today, tonight, tomorrow, (this) weekend, next week, in N days/weeks/months, weekday names (mon … friday; "sat"/"sun" only after on/by/next/this), 3 Dec, Dec 3rd, 1/12, 1/12/27.
 
 The sidebar shows how many to-dos in each project are due today (red if any are late). Keyboard: N adds a to-do, / searches.
+
+**Pinned** (0.7): a pinned to-do or note stays at the top of its own list; a pinned project stays at the top of the sidebar (among the projects beside it), with a small pin. `data.pinned` is the time it was pinned (older items may have `true`). Pin from the hold menu, the pin in an open item's bar, or a swipe on notes and projects. (0.6.1 tried a separate Pinned list in the sidebar; it was taken back out.) **Rename** is in the hold menu.
+
+**Clips on a board** (0.6.1) play in a player laid over the board (not zoomed with it), at least 400 px wide or 90% of the screen, centred on the card and following it as the board moves. Before, it was the size of the card's picture after zooming out, often under 100 px, too small for YouTube's controls.
+
+`liststyles.html` here is the page of list-style mockups (published as an artifact). The user picked **B, Compact**, which is what the lists use from 0.7.
+
+## 0.7
+
+**Lists (style B, Compact).** One line per row: tick or icon, the title with grey extras after it (steps done `1/3`, a project's progress, a checklist's ticks, `· where it lives`), one small icon (repeat, conflict, or what a note holds: photo, clip, drawing, spreadsheet, file, link), and the date in a column on the right (red when late, the main colour when today). Headings are slim tinted bands; a section's band is in its colour. A project's loose to-dos, sub-projects and notes have no headings. Done things fold into "3 done · Show". A project's list starts with one slim line: progress bar, end date, and the way into its notes. Rows are 36 px (42 px on touch screens).
+
+**Themes and board looks.** New colour themes: Circuit board, City, Neon, Minimal (no edges: lines nearly gone) and Hacker (brings the Mono text, and puts the usual text back when you leave it). Picking one offers its board look in a toast. New board looks (`theme.LOOKS`, styles under "0.7 board looks", strings in `board.js` `wire()`): Circuit board (copper traces with 45° bends and pads), City map (transit lines with rounded corners, a station at each end, each line its own colour), Neon (glowing tubes, each its own colour), Minimal (thin straight lines), Hacker (terminal windows, dashed pipes), Chalkboard (chalk arrows) and Space (constellations; the stars don't zoom). `<html>` carries `data-theme` and, for Minimal, `data-flat`.
+
+**Card sizes on a board.** `data.cork[projectId].s` (0.5 to 3; missing means 1). Drag the corner handle on a card (shown on hover, on the selected card, and faintly on touch screens), or pick Small / Normal / Large / Huge in the open item when it was opened from the board. Cards grow from their top-left corner (CSS `scale`), and everything that measures cards allows for it. Tidy keeps sizes.
+
+**Locked projects.** Hold a project: "Lock with a password…". `data.lock = {v, salt, iter, hash}`: a PBKDF2-SHA256 hash (210,000 rounds), never the password. While locked, everything inside is left out of the index (`buildIndex` drops it from `byId`; `I.hiddenIn` says which lock hides what), so lists, boards, search, Today, counts, strings and pickers don't show it; its list and board show a password box. Unlocking lasts until "Lock" (top of its list), or 5 minutes away from the app, or closing it. Forgotten: the Brain Tree sign-in password (checked by `POST /login`, nothing kept) takes the lock off. It's a privacy screen, not encryption: the project syncs as normal.
+
+**Spreadsheets** (`sheet.js`): `<div data-sheet='{"v":1,"c":[[…]],"h":1}'>` in a note; from the note toolbar or **+ Add → Spreadsheet** on a board. Full-screen grid; paste cells copied from Excel or Google Sheets; open or save CSV. Formulas: + - * / ^ & %, comparisons, cells and ranges, SUM AVERAGE MIN MAX COUNT COUNTA PRODUCT ROUND ABS SQRT IF AND OR NOT CONCAT LEN UPPER LOWER. Shown as a table on the note and on its card.
+
+**Files and links** (`attach.js`): the paperclip in the note toolbar, or **+ Add → File / Link** on a board. A file is `<div data-doc="id" data-name data-size data-mime data-parts>`: kept whole on the device, uploaded in pieces of 1.8 MB (`<id>-p0`, `-p1`…, as `application/octet-stream`; the Worker serves non-photos as downloads only), up to 25 MB a file. Another device fetches the pieces and joins them (`store.docBlob`). A link is `<div data-weblink="https://…" data-title>`, shown with what it is (Google Doc, OneDrive, Dropbox…). On a card the file or link is a tile; tapping it opens it. Opening a file: a new tab on a computer; the share sheet on a phone.
+
+**Print and export** (`export.js`; the share icon at the top of a list or a board, or "Print or export…" in a project's or section's hold menu). A list: **PDF** (A4, two columns, made here with no library: Helvetica, so emoji are left out), **Print** (`#printout`, two columns), **Excel (CSV)**, **Text** (copied). A board: **PDF** (one A4 page), **PNG**, **SVG**, **Print**. The board picture is copied from the board itself (`board.exportSVG()`: flat for a moment, every box, line of text and picture copied into SVG, strings on top), so every look comes out as it shows; shadows, glow and pseudo-element decorations (tape, title bars) aren't copied. Files go to the share sheet on a phone, a download on a computer.
 
 ## Free tier
 
