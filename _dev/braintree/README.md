@@ -49,6 +49,8 @@ Notes show their text and checklists on the card, and the checklist boxes can be
 
 **Drawings** (0.5, `draw.js`): boxes, circles, diamonds, text, arrows that stay joined to shapes, and a pen, in a full-screen editor with undo, colours and pinch-zoom. Add one from the note toolbar or **+ Add → Drawing** on a board. Saved in the note as `<div data-draw='{"v":1,"s":[…]}'>` and shown as SVG on light paper, on the note and on its card.
 
+**Example project** (0.5.1, `example.js`): Settings → Getting started → *Add an example project* (also offered when there are no projects). It makes "Example: Make a short video" out of ordinary items: dated to-dos, a to-do with steps, a checklist note, three sections, a sub-project, labelled strings, a YouTube clip and a drawing. Delete it like any project.
+
 Tying strings: drag a card's pin (or edge dot) onto another card, or tap **String** in the toolbar, then tap one card and then the other (it stays on for more; tap the empty board to stop). Pins grow when you zoom out so they stay finger-sized.
 
 Board looks (Settings → Boards), each with its own string: **Corkboard** (push pins, red wool that sags), **Whiteboard** (sticky notes, wobbly marker arrows), **Blueprint** (outlined boxes, straight ruled lines with right-angle turns), **Notebook** (taped paper slips, fine pen arrows).
