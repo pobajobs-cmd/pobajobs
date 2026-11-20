@@ -8,9 +8,10 @@ import { createEditor, textOf, firstPhoto, mediaSummary, escHtml as esc } from '
 import { createBoard, COLOURS } from './board.js';
 import { parseYouTube, parseTime, fmtTime, thumbUrl, watchUrl, iframeHTML, rangeText } from './media.js';
 import { openDrawing } from './draw.js';
+import { addExample, EXAMPLE_TITLE } from './example.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -126,6 +127,8 @@ const titleOf = r => (r.data.title || '').trim() || (r.data.type === 'note' ? te
 const isOpen = r => (r.data.type === 'task' || r.data.type === 'project') && !r.data.done;
 const byDueThenOrder = (a, b) => (a.data.due || '9999').localeCompare(b.data.due || '9999') || (a.data.order || 0) - (b.data.order || 0);
 const byPinnedUpdated = (a, b) => (b.data.pinned ? 1 : 0) - (a.data.pinned ? 1 : 0) || (b.data.updated || '').localeCompare(a.data.updated || '');
+// Shorten to about n letters at a word break, with "…".
+const shorten = (s, n) => (s.length <= n ? s : s.slice(0, n).replace(/\s+\S*$/, '') + '…');
 const bySectionOrder = (a, b) => (a.data.order || 0) - (b.data.order || 0) || (a.data.created || '').localeCompare(b.data.created || '');
 
 // ---------- Routing ----------
@@ -236,7 +239,7 @@ function renderNav() {
       </div>${subs && !shut ? branch(p.id, depth + 1) : ''}`;
   }).join('');
   const doneProjects = I.live.filter(r => r.data.type === 'project' && r.data.done).length;
-  $('#projects').innerHTML = (branch('', 0) || '<p class="empty-nav">No projects yet. Tap + to start one.</p>')
+  $('#projects').innerHTML = (branch('', 0) || '<p class="empty-nav">No projects yet. Tap + to start one, or <button class="link" data-act="example">add an example project</button> to see what Brain Tree can do.</p>')
     + (doneProjects ? `<a href="#/done-projects" class="navrow small ${route.view === 'done-projects' && !search ? 'on' : ''}"><span class="ic">${ICON.check}</span><span class="name">Finished projects</span><span class="count">${doneProjects}</span></a>` : '');
 
   const conflicts = store.conflicts().length;
@@ -281,7 +284,7 @@ function renderList() {
       <button class="projcard" data-open="${p.id}">
         <span class="row1">${span}${total ? `<span class="chip">${done} of ${total} done</span>` : ''}${p.data.done ? '<span class="chip ok">Finished</span>' : ''}</span>
         ${total ? `<span class="bar"><i style="width:${Math.round(100 * done / total)}%"></i></span>` : ''}
-        <span class="row2">${textOf(p.data.body) ? esc(textOf(p.data.body).slice(0, 140)) : 'Project notes, links and photos'}<b>Open ›</b></span>
+        <span class="row2">${textOf(p.data.body) ? esc(shorten(textOf(p.data.body), 140)) : 'Project notes, links and photos'}<b>Open ›</b></span>
       </button>`;
     // Loose things first, then each section as a heading with what's in it (like the board's frames).
     const sections = kids.filter(r => r.data.type === 'section').sort(bySectionOrder);
@@ -814,8 +817,11 @@ async function settingsModal() {
       <div class="setrow"><span>Text size</span>${seg('size', { small: 'Small', normal: 'Normal', large: 'Large' })}</div>
       <h3>Boards</h3>
       <div class="lookpick">${Object.entries(theme.LOOKS).map(([id, l]) => `
-        <button data-look="${id}" class="${p.look === id ? 'on' : ''}">${lookPreview(id)}<span>${l.name}</span></button>`).join('')}</div>
+        <button data-pick-look="${id}" class="${p.look === id ? 'on' : ''}">${lookPreview(id)}<span>${l.name}</span></button>`).join('')}</div>
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
+      <h3>Getting started</h3>
+      <button class="setbtn" data-s="example">Add an example project</button>
+      <p class="hint">A small project that shows what’s possible: to-dos with dates and steps, sections, a board with strings, a YouTube clip and a drawing. Delete it whenever you like.</p>
       <h3>This device</h3>
       <label>This device’s name<input class="devname" value="${esc(store.device())}" maxlength="40"></label>
       <p class="hint">Shown when the same thing is changed on two devices.</p>
@@ -846,9 +852,10 @@ async function settingsModal() {
       input.addEventListener('change', () => setPref({ [input.dataset.colour]: input.value }, true));
     }
     el.addEventListener('click', e => {
-      const t = e.target.closest('[data-theme]'), s = e.target.closest('[data-k]'), r = e.target.closest('[data-reset]'), l = e.target.closest('[data-look]');
+      // (data-pick-look, not data-look: <html> itself carries data-look, so closest() would always find it)
+      const t = e.target.closest('[data-theme]'), s = e.target.closest('[data-k]'), r = e.target.closest('[data-reset]'), l = e.target.closest('[data-pick-look]');
       if (t) setPref({ theme: t.dataset.theme, accent: null }, true);
-      else if (l) setPref({ look: l.dataset.look, string: null }, true);   // each look comes with its own string
+      else if (l) setPref({ look: l.dataset.pickLook, string: null }, true);   // each look comes with its own string
       else if (s) setPref({ [s.dataset.k]: s.dataset.v }, true);
       else if (r) setPref({ [r.dataset.reset]: null }, true);
     });
@@ -856,6 +863,7 @@ async function settingsModal() {
       const b = e.target.closest('[data-s]');
       if (!b) return;
       const a = b.dataset.s;
+      if (a === 'example') { closeModal(); showExample(); }
       if (a === 'sync') { closeModal(); store.sync(); }
       if (a === 'export') downloadBackup();
       if (a === 'login') { closeModal(); showLogin(true); }
@@ -872,6 +880,15 @@ async function settingsModal() {
       if (x) x.textContent = `${st.items} items (${mb(st.itemBytes)}), ${st.files} photos (${mb(st.fileBytes)})`;
     }).catch(err => { const x = el.querySelector('.stats'); if (x) x.textContent = err.message; });
   });
+}
+
+async function showExample() {
+  const already = I.live.find(r => r.data.type === 'project' && r.data.title === EXAMPLE_TITLE);
+  if (already && !confirm('There’s already an example project. Add another one?')) { go({ project: already.id, view: null, item: null }); return; }
+  search = ''; $('#search').value = '';
+  const id = await addExample(store);
+  go({ project: id, view: null, item: null });
+  toast('Example project added. Open its board from the top of the list.');
 }
 
 function downloadBackup() {
@@ -1079,6 +1096,7 @@ document.addEventListener('click', async e => {
     else if (a === 'settings') settingsModal();
     else if (a === 'new') newMenu(route.project || undefined);
     else if (a === 'new-project') { const pid = await newItem('project', null); go({ project: pid, view: null, item: pid }); }
+    else if (a === 'example') showExample();
     else if (a === 'empty-trash') { if (confirm(`Delete all ${I.trashed.length} item(s) in Recently deleted for good, on every device?`)) purge(I.trashed.map(r => r.id)); }
     else if (a === 'board-list') go(route.board ? { view: null, project: route.board, item: null } : { view: 'today', item: null });
     else if (a === 'open-board' && route.project) go({ view: 'board', board: route.project, project: null, item: null });

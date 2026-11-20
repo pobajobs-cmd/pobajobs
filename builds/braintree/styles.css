@@ -328,6 +328,9 @@ body[data-view="board"] #toasts { bottom: calc(76px + env(safe-area-inset-bottom
 .themepick i u { width: 18px; height: 3px; border-radius: 2px; background: var(--s); }
 .setrow { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; padding: 0.55rem 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
 .setrow > span:first-child { color: var(--soft); }
+.settings .setbtn { display: block; width: 100%; margin-top: 0.2rem; padding: 0.65rem 0.8rem; border-radius: 10px; background: var(--accent-bg); color: var(--accent-ink); font-weight: 600; }
+.settings .setbtn:hover { background: color-mix(in srgb, var(--accent) 24%, var(--card)); }
+.empty-nav .link { display: inline; font-size: inherit; text-align: left; }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 9px; background: var(--hover); }
 .seg button { padding: 0.3rem 0.6rem; border-radius: 7px; font-size: 0.85rem; color: var(--soft); }
 .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); font-weight: 600; }
