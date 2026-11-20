@@ -8,7 +8,7 @@ import { createEditor, textOf, firstPhoto, escHtml as esc } from './editor.js';
 import { createBoard, COLOURS } from './board.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [

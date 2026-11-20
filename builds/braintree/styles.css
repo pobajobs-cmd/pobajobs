@@ -295,6 +295,8 @@ a { color: inherit; text-decoration: none; }
 .settings details p { color: var(--soft); }
 
 #toasts { position: fixed; z-index: 60; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom)); transform: translateX(-50%); display: grid; gap: 0.5rem; width: min(440px, calc(100% - 2rem)); pointer-events: none; }
+/* On a board, messages sit above its toolbar instead of over it. */
+body[data-view="board"] #toasts { bottom: calc(76px + env(safe-area-inset-bottom)); }
 .toast { display: flex; align-items: center; gap: 0.8rem; background: #2A2723; color: #F3F0EA; border-radius: 12px; padding: 0.7rem 0.9rem; box-shadow: var(--shadow); font-size: 0.92rem; pointer-events: auto; animation: rise 0.2s ease-out; transition: opacity 0.4s; }
 .toast span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .toast button { color: color-mix(in srgb, var(--accent) 60%, #fff); font-weight: 600; }
@@ -447,7 +449,13 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .pcard.target { outline: 3px solid var(--wire); outline-offset: 2px; }
 .pcard.is-done { opacity: 0.6; }
 .pcard.is-done .ptitle span { text-decoration: line-through; }
-.pcard .pin { position: absolute; top: -10px; left: 50%; width: 40px; height: 36px; margin-left: -20px; cursor: crosshair; z-index: 3; touch-action: none; }
+.pcard .pin { position: absolute; top: -10px; left: 50%; width: 40px; height: 36px; margin-left: -20px; cursor: crosshair; z-index: 3; touch-action: none; transform: scale(var(--iz, 1)); }
+@media (pointer: coarse) { :root[data-look="corkboard"] .pcard .pin { top: -15px; width: 52px; height: 46px; margin-left: -26px; } }
+.fhead .fpin { transform: scale(var(--iz, 1)); }
+/* String mode: the card picked first. */
+.pcard.tiefrom { outline: 3px dashed var(--wire); outline-offset: 4px; }
+.frame.tiefrom .fhead { outline: 3px dashed var(--wire); outline-offset: 3px; }
+.tying .cork, .tying .pcard, .tying .fhead { cursor: crosshair; }
 .pcard .polaroid { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #DDD; border: 6px solid #FFF; border-bottom-width: 16px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); margin: 0 0 10px; pointer-events: none; }
 .pcard .ptitle { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 700; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
 .pcard .ptitle .tick { margin-top: 0; border-color: #8A8075; }
@@ -497,7 +505,8 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .pcard .pkids .kmore { color: var(--paper-soft); font-size: 0.8rem; padding-left: 1.5rem; }
 
 /* The banner: the project's name across the top of its board. */
-.pbanner { position: absolute; z-index: 1; display: grid; justify-items: center; gap: 0.15rem; padding: 0.7rem 2.2rem; cursor: grab; white-space: nowrap; text-align: center; }
+/* (width: max-content, or the box shrinks to nothing and a long title spills past its edges) */
+.pbanner { position: absolute; z-index: 1; display: grid; justify-items: center; gap: 0.15rem; width: max-content; padding: 0.7rem 2.2rem; cursor: grab; white-space: nowrap; text-align: center; }
 .pbanner .btitle { font-size: 2.1rem; font-weight: 800; line-height: 1.15; max-width: 880px; overflow: hidden; text-overflow: ellipsis; }
 .pbanner .bsub { font-size: 0.85rem; font-weight: 600; opacity: 0.75; }
 .pbanner .bcap { display: none; }
@@ -543,7 +552,7 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
   background: color-mix(in srgb, var(--sticky) 30%, transparent); border: 2px solid color-mix(in srgb, var(--sticky) 80%, #000 12%); }
 .frame.on { border-color: var(--accent) !important; }
 .frame.drop { border-color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.fhead { position: absolute; left: 0; top: 0; max-width: 100%; height: 44px; display: flex; align-items: center; gap: 0.55rem; padding: 0 2.7rem 0 1rem; pointer-events: auto; cursor: grab;
+.fhead { position: absolute; left: 0; top: 0; width: max-content; max-width: 100%; height: 44px; display: flex; align-items: center; gap: 0.55rem; padding: 0 2.7rem 0 1rem; pointer-events: auto; cursor: grab;
   color: var(--paper-ink); font-weight: 700; font-size: 1.05rem; user-select: none; white-space: nowrap; }
 .fhead .fname { overflow: hidden; text-overflow: ellipsis; }
 .fhead .fcount { font-size: 0.78rem; font-weight: 600; opacity: 0.6; }
@@ -631,12 +640,13 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .boardbar button { padding: 0.45rem 0.65rem; border-radius: 8px; white-space: nowrap; font-size: 0.88rem; flex-shrink: 0; }
 .boardbar button:hover { background: var(--hover); }
 .boardbar button.on { background: var(--accent-bg); color: var(--accent-ink); }
-@media (max-width: 600px) { .boardbar [data-b=in], .boardbar [data-b=out], .boardbar .sep, .boardbar .long { display: none; } .boardbar button { padding: 0.45rem 0.42rem; font-size: 0.84rem; } }
+@media (max-width: 600px) { .boardbar [data-b=in], .boardbar [data-b=out], .boardbar .sep, .boardbar .long { display: none; } .boardbar button { padding: 0.45rem 0.34rem; font-size: 0.84rem; } }
 .boardbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 3px; flex-shrink: 0; }
 .stringpop { position: absolute; z-index: 7; display: flex; gap: 6px; align-items: center; padding: 8px; width: 260px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .stringpop input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; background: var(--bg); color: var(--ink); font-size: 16px; outline: none; }
 .stringpop button { font-size: 0.85rem; font-weight: 600; padding: 0.35rem 0.4rem; color: var(--accent-ink); white-space: nowrap; }
 .stringpop button.danger { color: var(--string); }
-.boardhint { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 6; margin: 0; padding: 0.45rem 0.8rem; border-radius: 999px; background: var(--card); color: var(--soft); font-size: 0.85rem; box-shadow: var(--shadow); white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.boardhint { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 6; margin: 0; padding: 0.45rem 0.9rem; border-radius: 14px; background: var(--card); color: var(--soft); font-size: 0.85rem; box-shadow: var(--shadow); width: max-content; max-width: calc(100% - 24px); text-align: center; pointer-events: none; }
+.tying .boardhint { color: var(--ink); box-shadow: 0 0 0 2px var(--wire), var(--shadow); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

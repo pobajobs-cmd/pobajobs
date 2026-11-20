@@ -21,10 +21,10 @@ const MIN_Z = 0.15, MAX_Z = 2.5;
 export const COLOURS = ['yellow', 'orange', 'pink', 'purple', 'blue', 'green', 'white'];
 const PINS = ['#D23B2F', '#2E8B3E', '#2F6FC8', '#E8B21E', '#8E44AD', '#E4702A'];
 const WORDS = {
-  corkboard: { tie: 'Tie a red string', cut: 'String cut.', hint: 'Drag a card’s pin onto another card to tie a string between them.' },
-  whiteboard: { tie: 'Draw an arrow', cut: 'Arrow rubbed out.', hint: 'Drag the dot on a card’s edge onto another card to draw an arrow.' },
-  blueprint: { tie: 'Draw a line', cut: 'Line removed.', hint: 'Drag the dot on a card’s edge onto another card to draw a line.' },
-  notebook: { tie: 'Draw an arrow', cut: 'Arrow rubbed out.', hint: 'Drag the dot on a card’s edge onto another card to draw an arrow.' },
+  corkboard: { tie: 'Tie a red string', cut: 'String cut.', done: 'Tied with a red string.', btn: 'String', first: 'Tap a card to tie a string from', next: 'Now tap the card to tie it to', hint: 'Drag a card’s pin onto another card, or tap String, to tie them together.' },
+  whiteboard: { tie: 'Draw an arrow', cut: 'Arrow rubbed out.', done: 'Arrow drawn.', btn: 'Arrow', first: 'Tap the card the arrow starts from', next: 'Now tap the card it points to', hint: 'Drag the dot on a card’s edge onto another card, or tap Arrow, to connect them.' },
+  blueprint: { tie: 'Draw a line', cut: 'Line removed.', done: 'Line drawn.', btn: 'Line', first: 'Tap the card the line starts from', next: 'Now tap the card it goes to', hint: 'Drag the dot on a card’s edge onto another card, or tap Line, to connect them.' },
+  notebook: { tie: 'Draw an arrow', cut: 'Arrow rubbed out.', done: 'Arrow drawn.', btn: 'Arrow', first: 'Tap the card the arrow starts from', next: 'Now tap the card it points to', hint: 'Drag the dot on a card’s edge onto another card, or tap Arrow, to connect them.' },
 };
 const LABEL_RX = { corkboard: 3, whiteboard: 11, blueprint: 0, notebook: 4 };
 
@@ -50,6 +50,7 @@ export function createBoard(host, api) {
       <button data-b="add-note" title="New note here">+ Note</button>
       <button data-b="add-task" title="New to-do here">+ To-do</button>
       <button data-b="add-section" title="New section: a labelled area you drop cards into">+ Section</button>
+      <button data-b="tie" title="Tap one card, then another, to connect them">String</button>
       <button data-b="place" title="Bring in something from another project or the Inbox">Pin<span class="long"> existing</span></button>
       <span class="sep"></span>
       <button data-b="tidy" title="Lay everything out neatly again">Tidy</button>
@@ -78,6 +79,7 @@ export function createBoard(host, api) {
   let cards = [], frames = [], frameIds = new Set(), guests = new Set();
   let busy = false, pendingRender = false, needsFit = false;
   let popLink = null, menuActions = [];
+  let tying = false, tieFrom = null;   // "String" mode: tap one card, then the one to tie it to
   const look = () => (api.style() in WORDS ? api.style() : 'corkboard');
   const words = () => WORDS[look()];
   const isFrame = id => frameIds.has(id);
@@ -219,7 +221,11 @@ export function createBoard(host, api) {
     for (const el of cardsEl.children) placeEl(el);
     for (const img of cardsEl.querySelectorAll('img[data-thumb]')) api.store.fileUrl(img.dataset.thumb).then(u => { if (u) img.src = u; else img.remove(); });
     const hasLinks = [...cards, ...frames].some(r => (r.data.links || []).length);
-    if (!cards.length && !frames.length) { hint.textContent = 'Nothing here yet. Add a note, a to-do or a section below.'; hint.hidden = false; }
+    const tieBtn = host.querySelector('[data-b=tie]');
+    tieBtn.textContent = words().btn;
+    tieBtn.classList.toggle('on', tying);
+    if (tying) { hint.textContent = tieFrom && I.byId.get(tieFrom) ? `${words().next} (or tap “${short(api.titleOf(I.byId.get(tieFrom)))}” again to let go).` : `${words().first}.`; hint.hidden = false; }
+    else if (!cards.length && !frames.length) { hint.textContent = 'Nothing here yet. Add a note, a to-do or a section below.'; hint.hidden = false; }
     else { hint.textContent = words().hint; hint.hidden = cards.length < 2 || hasLinks || readLocal('bt-hint-seen', false); }
     drawLines();
     if (needsFit) { needsFit = false; fit(); } else applyView();
@@ -255,7 +261,7 @@ export function createBoard(host, api) {
     const kids = type === 'project' ? [] : (I.kids.get(r.id) || []);
     const n = hash(r.id);
     return `
-      <div class="pcard t-${type} ${d.color ? 'c-' + d.color : ''} ${d.done ? 'is-done' : ''} ${sel === r.id ? 'on' : ''}" data-card="${r.id}" style="--tilt:${((n % 7) - 3) * 0.6}deg;--pin:${PINS[n % PINS.length]}">
+      <div class="pcard t-${type} ${d.color ? 'c-' + d.color : ''} ${d.done ? 'is-done' : ''} ${sel === r.id ? 'on' : ''} ${tieFrom === r.id ? 'tiefrom' : ''}" data-card="${r.id}" style="--tilt:${((n % 7) - 3) * 0.6}deg;--pin:${PINS[n % PINS.length]}">
         <span class="pin" data-pin="${r.id}" title="Drag onto another card to connect"></span>
         ${photo ? `<img class="polaroid" data-thumb="${photo}" alt="">` : ''}
         ${showTitle ? `<div class="ptitle">${type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="Done"></button>` : ''}<span>${esc(api.titleOf(r))}</span></div>` : ''}
@@ -279,7 +285,7 @@ export function createBoard(host, api) {
   function frameHTML(r, I, sel) {
     const n = (I.kids.get(r.id) || []).length;
     return `
-      <div class="frame ${r.data.color ? 'c-' + r.data.color : ''} ${sel === r.id ? 'on' : ''}" data-frame="${r.id}" style="--pin:${PINS[hash(r.id) % PINS.length]}">
+      <div class="frame ${r.data.color ? 'c-' + r.data.color : ''} ${sel === r.id ? 'on' : ''} ${tieFrom === r.id ? 'tiefrom' : ''}" data-frame="${r.id}" style="--pin:${PINS[hash(r.id) % PINS.length]}">
         <div class="fhead" data-fhead="${r.id}"><span class="fname">${esc(api.titleOf(r))}</span>${n ? `<span class="fcount">${n}</span>` : ''}
           <span class="pin fpin" data-pin="${r.id}" title="Drag onto a card to connect"></span></div>
         <span class="fsize" data-fsize="${r.id}" aria-label="Resize section"></span>
@@ -402,6 +408,8 @@ export function createBoard(host, api) {
 
   function applyView() {
     world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`;
+    // Zoomed out, pins and connect dots grow so they stay big enough for a finger.
+    world.style.setProperty('--iz', clamp(1 / view.z, 1, 2.4).toFixed(2));
     cork.style.backgroundPosition = `${view.x}px ${view.y}px`;
     cork.style.backgroundSize = `${Math.max(8, 220 * view.z)}px ${Math.max(8, 220 * view.z)}px, ${Math.max(4, 24 * view.z)}px ${Math.max(4, 24 * view.z)}px`;
   }
@@ -448,8 +456,10 @@ export function createBoard(host, api) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) { startPinch(); return; }
     if (e.target.closest('[data-tick], [data-ci], [data-openboard]')) return;   // their own tap
-    const pin = e.target.closest('[data-pin]');
     const link = e.target.closest('[data-link]');
+    // Strings end on pins, so a string's tap area can lie over a pin: the pin wins (or no card
+    // that already has a string could start another one).
+    const pin = e.target.closest('[data-pin]') || (link && !link.matches('.slabel') ? under(e.clientX, e.clientY, '[data-pin]') : null);
     const fsize = e.target.closest('[data-fsize]');
     const fhead = e.target.closest('[data-fhead]');
     let card = e.target.closest('[data-card]');
@@ -465,7 +475,7 @@ export function createBoard(host, api) {
       busy = true; return;
     }
     // A string lying across a card: a drag still moves the card, a tap edits the string.
-    if (link && !link.matches('.slabel')) card = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.closest?.('[data-card]'))?.closest('[data-card]') || null;
+    if (link && !link.matches('.slabel')) card = under(e.clientX, e.clientY, '[data-card]');
     capture(e.pointerId);
     if (card || fhead) {
       const id = card ? card.dataset.card : fhead.dataset.fhead;
@@ -520,11 +530,15 @@ export function createBoard(host, api) {
     }
   });
 
+  // The card (or section label) under a point, looking through any strings lying on top.
+  const under = (cx, cy, sel) => {
+    for (const el of document.elementsFromPoint(cx, cy)) { const hit = el.closest?.(sel); if (hit) return hit; }
+    return null;
+  };
   const targetAt = (cx, cy) => {
-    const el = document.elementFromPoint(cx, cy);
-    const c = el?.closest?.('[data-card]');
-    if (c && c.dataset.banner === undefined) return c.dataset.card;
-    return el?.closest?.('[data-fhead]')?.dataset.fhead || null;
+    const c = under(cx, cy, '[data-card], [data-fhead]');
+    if (!c || c.dataset.banner !== undefined) return null;
+    return c.dataset.card || c.dataset.fhead;
   };
 
   const end = async e => {
@@ -537,7 +551,8 @@ export function createBoard(host, api) {
     const up = e.type === 'pointerup';
     if (g.kind === 'pan') {
       saveView();
-      if (!g.moved && up) {
+      if (!g.moved && up && tying) setTying(false);          // a tap on the empty board ends String mode
+      else if (!g.moved && up) {
         const now = Date.now();
         if (lastTap && now - lastTap.t < 350 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 25) { lastTap = null; addAt('note', toWorld(e.clientX, e.clientY)); }
         else lastTap = { t: now, x: e.clientX, y: e.clientY };
@@ -546,6 +561,7 @@ export function createBoard(host, api) {
       g.el?.classList.remove('lifted');
       for (const fr of framesEl.querySelectorAll('.drop')) fr.classList.remove('drop');
       if (g.moved) await settle(g);
+      else if (up && tying) { if (g.id !== key) await tieTap(g.id); }
       else if (up && g.line) openStringPop(g.line.dataset.link, e.clientX, e.clientY);
       else if (up) { const sub = g.down?.closest?.('[data-sub]'); api.open(sub ? sub.dataset.sub : g.id); }
     } else if (g.kind === 'resize') {
@@ -554,6 +570,7 @@ export function createBoard(host, api) {
       for (const c of host.querySelectorAll('.target')) c.classList.remove('target');
       const over = targetAt(e.clientX, e.clientY);
       if (over && over !== g.from) connectMenu(g.from, over, e.clientX, e.clientY);
+      else if (up && tying) await tieTap(g.from);           // in String mode a tap on a pin picks that card
       drawLines();
     } else if (g.kind === 'tap-line' && up && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 8) {
       openStringPop(g.line.dataset.link, e.clientX, e.clientY);
@@ -686,6 +703,26 @@ export function createBoard(host, api) {
     menu(cx, cy, opts);
   }
 
+  // String mode: the first tap picks a card, the second ties it to another. It stays on for more
+  // until you tap the button again or the empty board.
+  function setTying(on) {
+    tying = on; tieFrom = null;
+    host.classList.toggle('tying', on);
+    render();
+  }
+  async function tieTap(id) {
+    if (!tieFrom || tieFrom === id) { tieFrom = tieFrom === id ? null : id; render(); return; }
+    const a = tieFrom, b = id;
+    tieFrom = null;
+    const A = api.store.get(a), B = api.store.get(b);
+    if (!A || !B) { render(); return; }
+    const links = A.data.links || [];
+    if (links.some(l => l.to === b) || (B.data.links || []).some(l => l.to === a)) { api.toast('Those two are already connected.'); render(); return; }
+    writeLocal('bt-hint-seen', true);
+    await api.store.update(a, { links: [...links, { to: b }] });
+    api.toast(words().done, 'Undo', () => api.store.update(a, { links }));
+  }
+
   // Into a section it's placed inside the frame; into a card it's listed on that card.
   async function nest(child, parent) {
     const r = api.store.get(child);
@@ -788,6 +825,7 @@ export function createBoard(host, api) {
     else if (a === 'add-note') addAt('note');
     else if (a === 'add-task') addAt('task');
     else if (a === 'add-section') addSection();
+    else if (a === 'tie') setTying(!tying);
     else if (a === 'place') {
       const I = api.index();
       api.placePicker(key, [key, ...I.descendants(key).map(r => r.id), ...cards.map(r => r.id)], async id => {
@@ -815,6 +853,7 @@ export function createBoard(host, api) {
       if (boardKey !== key) {
         key = boardKey;
         heights.clear();
+        tying = false; tieFrom = null; host.classList.remove('tying');
         const saved = readLocal('bt-view:' + key, null);
         if (saved) { view = saved; needsFit = false; } else needsFit = true;
         applyView();
