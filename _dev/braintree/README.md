@@ -45,6 +45,8 @@ Open it from the home screen and sign in there. The home-screen app keeps its ow
 
 Notes show their text and checklists on the card, and the checklist boxes can be ticked right there.
 
+Tying strings: drag a card's pin (or edge dot) onto another card, or tap **String** in the toolbar, then tap one card and then the other (it stays on for more; tap the empty board to stop). Pins grow when you zoom out so they stay finger-sized.
+
 Board looks (Settings → Boards), each with its own string: **Corkboard** (push pins, red wool that sags), **Whiteboard** (sticky notes, wobbly marker arrows), **Blueprint** (outlined boxes, straight ruled lines with right-angle turns), **Notebook** (taped paper slips, fine pen arrows).
 
 Before 0.4, sections were sub-projects drawn as frames; the app turns those into sections the first time it opens.
