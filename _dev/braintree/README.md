@@ -20,7 +20,7 @@ Open it from the home screen and sign in there. The home-screen app keeps its ow
 
 | What | Where |
 |---|---|
-| App (published) | `builds/braintree/`: `index.html`, `app.js` (screens), `store.js` (offline data and sync), `editor.js` (note editor), `board.js` (boards), `theme.js` (looks), `media.js` (YouTube clips), `draw.js` (drawings), `styles.css`, `sw.js` (offline files) |
+| App (published) | `builds/braintree/`: `index.html`, `app.js` (screens), `store.js` (offline data and sync), `editor.js` (note editor), `board.js` (boards), `theme.js` (looks), `media.js` (YouTube clips), `draw.js` (drawings), `example.js` (example project), `gestures.js` (swipe, hold, drag in the lists), `styles.css`, `sw.js` (offline files) |
 | Server code | `worker-braintree.js` (imported by `worker.js`; kept off the site by `.assetsignore`) |
 | Data online | D1 database `pobajobs`, tables `bt_items`, `bt_files` (photos), `bt_meta`, `bt_logins` |
 | Data on each device | The browser's IndexedDB (`braintree`), so the app works offline |
@@ -58,6 +58,27 @@ Board looks (Settings → Boards), each with its own string: **Corkboard** (push
 Before 0.4, sections were sub-projects drawn as frames; the app turns those into sections the first time it opens.
 
 Appearance (`theme.js`) is saved in the hidden synced item `pref-appearance`. `looks.html` is the logo and theme options page.
+
+## Lists: swipe, hold, drag (0.6)
+
+`gestures.js` does the finger work; `app.js` says what each row offers (`rowActions`, `itemMenu`) and what a drop means (`dropSlots`, `dropRow`). It works on list rows, rows inside an open item, section headings and the sidebar's projects.
+
+| Gesture | What it does |
+|---|---|
+| Swipe left | Delete (to Recently deleted, with Undo). A long swipe deletes straight away. |
+| Swipe right | To-do: Done, Date, More. Project: Board, More. Note: Pin, More. A long swipe does the first one. |
+| Hold (right-click with a mouse) | The item's menu: dates, open, done, board, add a to-do, pin, move to the top, move to another project, duplicate, stop repeating, colour, delete. |
+| Hold and drag (just drag with a mouse) | Put it in order. Projects among their neighbours in the sidebar; in a project's list (Everything tab), to-dos, notes and sub-projects among their own kind, loose or in any section (dropping in a section moves it there, with Undo); section headings among sections. |
+
+Order is `data.order` (new items get the time they were made, so they go to the bottom). Inside a project, lists now keep that order instead of sorting by due date; the project's **Today** and **Upcoming** tabs (saved per project in `localStorage` `bt-projtab`) are the date views. A drop sets `order` halfway between the neighbours, or renumbers the run if two share a number. Redraws wait until a gesture ends (`gest.busy()`), and a row swiped open stays open across a redraw (`gest.restore()`).
+
+**Duplicate** copies the item and everything inside it, to-dos unticked, board spots kept on the copy's own boards, strings kept when both ends were copied (so a finished project works as a template).
+
+**Repeating to-dos**: `data.repeat` = `day | weekday | week | fortnight | month | year`. Ticking one doesn't finish it: `due` (and `start`, by the same amount) moves to the next date after today, its steps are unticked, and `data.lastDone` is stamped. Undo puts it all back. Setting a repeat on a to-do with no due date gives it today.
+
+**Typed dates** in quick-add (`quickDate`): a date at the end of the text is taken off and becomes the due date, with a "Not a date" button on the toast to undo it. Understood: today, tonight, tomorrow, (this) weekend, next week, in N days/weeks/months, weekday names (mon … friday; "sat"/"sun" only after on/by/next/this), 3 Dec, Dec 3rd, 1/12, 1/12/27.
+
+The sidebar shows how many to-dos in each project are due today (red if any are late). Keyboard: N adds a to-do, / searches.
 
 ## Free tier
 
