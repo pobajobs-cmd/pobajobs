@@ -27,18 +27,27 @@ Open it from the home screen and sign in there. The home-screen app keeps its ow
 
 **After changing any file in `builds/braintree/`, bump `VERSION` in `sw.js`.** That's how devices know to fetch the new copy. They then show "Brain Tree has been updated. Reload".
 
-## Boards (0.2 / 0.3)
+## Boards (0.4)
 
-`board.js` draws the corkboard / whiteboard. Everything on a board is a real item, so the lists match:
+`board.js` draws the boards. Every project has one (there's no overall board). The project's name is the banner across the top. Everything on a board is a real item, so the lists match:
 
 | On the board | Stored as | In the lists |
 |---|---|---|
-| Where a card sits | `data.cork[boardKey] = {x, y}` (`home` or a project id) | — |
-| A section | a project with `data.cork[boardKey] = {x, y, w, h}` | a sub-project |
-| Dropping a card into or out of a section | `data.parent` | it moves into or out of that project |
+| Where a card sits | `data.cork[projectId] = {x, y}` | — |
+| Where the banner sits (once you've moved it) | the project's `data.cork.banner = {x, y}` | — |
+| A section (labelled frame) | an item with `type: 'section'` inside the project, `data.cork[projectId] = {x, y, w, h}` | a heading in the project's list, with its items under it |
+| Dropping a card into or out of a section, or moving a section over cards | `data.parent` | it moves under or out of that heading |
+| Things inside a to-do or note | `data.parent` | listed on that card, not as cards of their own |
+| A sub-project | a card with "Open its board" | a sub-project (and its own board) |
 | "Put … inside …" from a connection | `data.parent` | it's inside that item |
 | Strings / arrows | `data.links = [{to, label}]` | the item's "Strings" list |
 | Sticky colour | `data.color` | a colour bar on the row |
+
+Notes show their text and checklists on the card, and the checklist boxes can be ticked right there.
+
+Board looks (Settings → Boards), each with its own string: **Corkboard** (push pins, red wool that sags), **Whiteboard** (sticky notes, wobbly marker arrows), **Blueprint** (outlined boxes, straight ruled lines with right-angle turns), **Notebook** (taped paper slips, fine pen arrows).
+
+Before 0.4, sections were sub-projects drawn as frames; the app turns those into sections the first time it opens.
 
 Appearance (`theme.js`) is saved in the hidden synced item `pref-appearance`. `looks.html` is the logo and theme options page.
 
