@@ -384,6 +384,7 @@ body[data-view="board"] #toasts { bottom: calc(76px + env(safe-area-inset-bottom
 .lrow .ic { color: var(--string); display: grid; }
 .lrow .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lrow em { font-style: normal; font-size: 0.8rem; color: var(--string); background: var(--string-bg); padding: 0.1rem 0.45rem; border-radius: 6px; white-space: nowrap; }
+.lrow .via { font-size: 0.75rem; color: var(--soft); white-space: nowrap; }
 .lrow .untie { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--faint); }
 .lrow .untie:hover { background: var(--hover); color: var(--string); }
 .lrow .untie svg { width: 16px; height: 16px; }
@@ -457,6 +458,10 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .strings .pinhead { stroke: rgba(0, 0, 0, 0.35); stroke-width: 1.2; filter: drop-shadow(0 2px 1.5px rgba(0, 0, 0, 0.4)); }
 .strings .pinshine { fill: rgba(255, 255, 255, 0.7); }
 .strings .slabel { pointer-events: all; cursor: pointer; }
+/* 0.7.1 branches: a string's label (or this knot, when it has none) is where its branches meet */
+.strings .junction { pointer-events: all; cursor: pointer; fill: var(--lc, var(--wire)); stroke: rgba(0, 0, 0, 0.3); stroke-width: 1.2; }
+.strings .slabel.picked rect { stroke-width: 3; stroke-dasharray: 5 3; }
+.strings .junction.picked { stroke: var(--ink); stroke-width: 2.5; stroke-dasharray: 3 2; }
 .strings .slabel rect { fill: #FBF8F1; stroke: var(--wire); stroke-width: 1.5; }
 .strings .slabel text { fill: #2B2620; font: 600 12px var(--font); }
 :root[data-look="whiteboard"] .strings .slabel rect { fill: var(--card); stroke-width: 2; }
@@ -495,6 +500,8 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .pcard.tiefrom { outline: 3px dashed var(--wire); outline-offset: 4px; }
 .frame.tiefrom .fhead { outline: 3px dashed var(--wire); outline-offset: 3px; }
 .tying .cork, .tying .pcard, .tying .fhead { cursor: crosshair; }
+.pcard .chip.locked { display: inline-flex; align-items: center; gap: 4px; }
+.pcard .chip.locked svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 .pcard .polaroid { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #DDD; border: 6px solid #FFF; border-bottom-width: 16px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); margin: 0 0 10px; pointer-events: none; }
 .pcard .ptitle { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 700; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
 .pcard .ptitle .tick { margin-top: 0; border-color: #8A8075; }
@@ -886,7 +893,7 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .boardbar button.on { background: var(--accent-bg); color: var(--accent-ink); }
 @media (max-width: 600px) { .boardbar [data-b=in], .boardbar [data-b=out], .boardbar .sep, .boardbar .long { display: none; } .boardbar button { padding: 0.45rem 0.34rem; font-size: 0.84rem; } }
 .boardbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 3px; flex-shrink: 0; }
-.stringpop { position: absolute; z-index: 7; display: flex; gap: 6px; align-items: center; padding: 8px; width: 260px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.stringpop { position: absolute; z-index: 7; display: flex; gap: 4px; align-items: center; padding: 8px; width: 310px; max-width: calc(100% - 16px); background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .stringpop input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; background: var(--bg); color: var(--ink); font-size: 16px; outline: none; }
 .stringpop button { font-size: 0.85rem; font-weight: 600; padding: 0.35rem 0.4rem; color: var(--accent-ink); white-space: nowrap; }
 .stringpop button.danger { color: var(--string); }

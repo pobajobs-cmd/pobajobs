@@ -15,7 +15,7 @@ import { linkService } from './attach.js';
 import * as ex from './export.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -317,6 +317,7 @@ let board = null;
 const boardApi = {
   store,
   index: () => I,
+  locked: r => isLocked(r),
   open: id => go({ item: id }),
   openBoard: id => go({ view: 'board', board: id, project: null, item: null }),
   selected: () => route.item,
@@ -613,6 +614,7 @@ function rowHTML(r, { trash = false, inProject = false, where = false } = {}) {
   const kind = type === 'note' && noteKind(d.body);
   const ic = r.conflict ? `<span class="meta late" title="Conflict: changed on two devices">${ICON.warn}</span>`
     : d.repeat && type === 'task' ? `<span class="meta" title="${esc(REPEATS[d.repeat] || 'Repeats')}">${ICON.repeat}</span>`
+    : type === 'project' && d.lock ? `<span class="meta" title="${isLocked(r) ? 'Locked' : 'Unlocked for now'}">${isLocked(r) ? ICON.lock : ICON.unlock}</span>`
     : kind ? `<span class="meta" title="${kind[1]}">${ROWIC[kind[0]]}</span>` : '';
   // The date column: when it's due (or starts); a note shows when it was last changed.
   let when = '', wcls = '';
@@ -811,18 +813,25 @@ function updateDetail(r) {
     for (const b of bs.querySelectorAll('[data-cardsize]')) b.classList.toggle('on', +b.dataset.cardsize === near);
   }
 
-  // Strings: links this item has to others, and others to it.
-  const outgoing = (d.links || []).map(l => ({ id: l.to, label: l.label, from: r.id, to: l.to }));
-  const incoming = I.live.filter(x => x.id !== r.id && (x.data.links || []).some(l => l.to === r.id))
-    .map(x => ({ id: x.id, label: x.data.links.find(l => l.to === r.id).label, from: x.id, to: r.id }));
-  const strings = [...outgoing, ...incoming].filter(x => I.byId.has(x.id));
+  // Strings: every string this is on (from it, to it, or joined to one as a branch), listing the
+  // other things on each. × cuts a string between two ends; on a branch it takes that branch off.
+  const strings = [];
+  for (const x of I.live) for (const l of x.data.links || []) {
+    const ends = [x.id, l.to], also = (l.also || []).filter(c => !ends.includes(c));
+    if (!ends.includes(r.id) && !also.includes(r.id)) continue;
+    for (const o of [...ends, ...also]) {
+      if (o === r.id || !I.byId.has(o)) continue;
+      const off = also.includes(r.id) ? r.id : also.includes(o) ? o : null;   // the branch × takes off
+      strings.push({ id: o, label: l.label, branch: !!off, untie: off ? `data-unbranch="${x.id}|${l.to}|${off}"` : `data-untie="${x.id}|${l.to}"` });
+    }
+  }
   $('.links', host).innerHTML = `
     <div class="ihead"><h3>Strings</h3><span class="add"><button data-act="tie">+ Tie to…</button></span></div>
     ${strings.length ? strings.map(x => { const o = I.byId.get(x.id); return `
       <div class="lrow" data-open="${x.id}" role="button" tabindex="0">
         <span class="ic t-${o.data.type}">${typeIcon(o.data.type)}</span>
-        <span class="name">${esc(titleOf(o))}</span>${x.label ? `<em>${esc(x.label)}</em>` : ''}
-        <button class="untie" data-untie="${x.from}|${x.to}" aria-label="Cut this string">${ICON.close}</button>
+        <span class="name">${esc(titleOf(o))}</span>${x.label ? `<em>${esc(x.label)}</em>` : ''}${x.branch ? '<small class="via">branch</small>' : ''}
+        <button class="untie" ${x.untie} aria-label="${x.branch ? 'Take off this string' : 'Cut this string'}">${ICON.close}</button>
       </div>`; }).join('') : '<p class="hint">Tie this to anything else in Brain Tree, here or by dragging from a card on a board.</p>'}`;
 
   // Body: only replace it from outside (another device) when you're not typing in it.
@@ -956,10 +965,14 @@ async function duplicate(id) {
     }
     ids.set(x.id, await store.create(data));
   }
-  // Strings between things that were copied are copied too.
+  // Strings between things that were copied are copied too (with any of their branches that were).
   for (const x of all) {
     const ls = (x.data.links || []).filter(l => ids.get(l.to));
-    if (ls.length) await store.update(ids.get(x.id), { links: ls.map(l => ({ ...l, to: ids.get(l.to) })) });
+    if (ls.length) await store.update(ids.get(x.id), { links: ls.map(l => {
+      const y = { ...l, to: ids.get(l.to), also: (l.also || []).map(c => ids.get(c)).filter(Boolean) };
+      if (!y.also.length) delete y.also;
+      return y;
+    }) });
   }
   const copy = ids.get(id);
   toast(`Copied${all.length > 1 ? ` with ${all.length - 1} thing${all.length === 2 ? '' : 's'} inside` : ''}`, 'Open', () => (r.data.type === 'project' && !route.project ? go({ project: copy, view: null, item: null }) : openItem(copy)));
@@ -1527,7 +1540,7 @@ async function settingsModal() {
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
       <h3>Getting started</h3>
       <button class="setbtn" data-s="example">Add an example project</button>
-      <p class="hint">A small project that shows what’s possible: to-dos with dates and steps, sections, a board with strings, a YouTube clip and a drawing. Delete it whenever you like.</p>
+      <p class="hint">A small project that shows everything Brain Tree can do: dates, steps and repeats, sections, a board with strings and a branch, a clip, a drawing, a photo, a spreadsheet, a file, a link, a pinned to-do and a locked project. Delete it whenever you like.</p>
       <details><summary>Handy shortcuts</summary>
         <p><b>Swipe</b> a to-do, note or project left to delete it, or right for Done, Date and More.</p>
         <p><b>Hold</b> one for everything you can do to it (on a computer, right-click). Hold and <b>drag</b> to put it in order, or into a section. Projects in the sidebar drag too.</p>
@@ -1608,7 +1621,7 @@ async function showExample() {
   const already = I.live.find(r => r.data.type === 'project' && r.data.title === EXAMPLE_TITLE);
   if (already && !confirm('There’s already an example project. Add another one?')) { go({ project: already.id, view: null, item: null }); return; }
   search = ''; $('#search').value = '';
-  const id = await addExample(store);
+  const id = await addExample(store, { makeLock });
   go({ project: id, view: null, item: null });
   toast('Example project added. Open its board from the top of the list.');
 }
@@ -1985,6 +1998,19 @@ document.addEventListener('click', async e => {
     const links = store.get(from)?.data.links || [];
     store.update(from, { links: links.filter(l => l.to !== to) });
     toast('String cut.', 'Undo', () => store.update(from, { links }));
+    return;
+  }
+  if ((x = el('[data-unbranch]'))) {
+    e.stopPropagation();
+    const [from, to, c] = x.dataset.unbranch.split('|');
+    const links = store.get(from)?.data.links || [];
+    store.update(from, { links: links.map(l => {
+      if (l.to !== to) return l;
+      const y = { ...l, also: (l.also || []).filter(i => i !== c) };
+      if (!y.also.length) delete y.also;
+      return y;
+    }) });
+    toast('Taken off the string.', 'Undo', () => store.update(from, { links }));
     return;
   }
   if ((x = el('[data-done]'))) { const k = x.dataset.done; openDone.has(k) ? openDone.delete(k) : openDone.add(k); render(); return; }

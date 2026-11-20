@@ -376,13 +376,26 @@ function mergeKeyed(was = {}, mine = {}, other = {}) {
   return out;
 }
 
-// Strings: keep every string either side added, drop any either side removed.
+// Strings: keep every string either side added, drop any either side removed. A string both sides
+// still have keeps this side's label if it changed it, and the branches (also) either side added,
+// less any either side took off.
 function mergeLinks(was = [], mine = [], other = []) {
   const key = l => l.to;
-  const wasK = new Set(was.map(key)), mineK = new Set(mine.map(key));
-  const removed = new Set([...wasK].filter(k => !mineK.has(k)));
+  const wasM = new Map(was.map(l => [key(l), l])), mineM = new Map(mine.map(l => [key(l), l]));
+  const removed = new Set([...wasM.keys()].filter(k => !mineM.has(k)));
   const out = new Map(other.filter(l => !removed.has(key(l))).map(l => [key(l), l]));
-  for (const l of mine) if (!wasK.has(key(l))) out.set(key(l), l);
+  for (const l of mine) {
+    const k = key(l), w = wasM.get(k), o = out.get(k);
+    if (!w) { out.set(k, l); continue; }   // tied here
+    if (!o) continue;                     // cut on the other device: stays cut
+    const m = { ...o };
+    if ((l.label || '') !== (w.label || '')) { if (l.label) m.label = l.label; else delete m.label; }
+    const wa = new Set(w.also || []), la = new Set(l.also || []);
+    const also = new Set((o.also || []).filter(c => !(wa.has(c) && !la.has(c))));
+    for (const c of la) if (!wa.has(c)) also.add(c);
+    if (also.size) m.also = [...also]; else delete m.also;
+    out.set(k, m);
+  }
   return [...out.values()];
 }
 

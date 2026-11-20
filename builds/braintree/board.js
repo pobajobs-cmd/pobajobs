@@ -13,7 +13,8 @@
 //   where a card sits:  data.cork[projectId] = {x, y}
 //   a section:          an item of type "section" inside the project, data.cork[projectId] = {x, y, w, h}.
 //                       Cards dropped in it go inside it; in the lists it's a heading in the project.
-//   strings:            data.links = [{to, label}], listed under "Strings" on each item
+//   strings:            data.links = [{to, label, also}], listed under "Strings" on each item.
+//                       also (0.7.1) = more cards joined to that string where its label is (a T junction)
 //   "put inside":       data.parent, the same tree the lists show. What's inside a card is listed on it.
 
 import { sanitize, escHtml as esc } from './editor.js';
@@ -27,21 +28,25 @@ const SECTION_W = 2 * PAD + 2 * CARD_W + GAP, SECTION_H = 320;
 const MIN_Z = 0.15, MAX_Z = 2.5;
 export const COLOURS = ['yellow', 'orange', 'pink', 'purple', 'blue', 'green', 'white'];
 const PINS = ['#D23B2F', '#2E8B3E', '#2F6FC8', '#E8B21E', '#8E44AD', '#E4702A'];
+// The String button and what it asks you to tap are the same on every look, so it's always easy to
+// find (0.7.1: it used to be renamed Trace, Pipe, Neon… to suit the look). What's said when a
+// string is tied or cut still suits the look.
+const TIE = { btn: 'String', first: 'Tap a card to start a string from, or a string’s label to branch it', next: 'Now tap the card to tie it to' };
 const WORDS = {
-  corkboard: { tie: 'Tie a red string', cut: 'String cut.', done: 'Tied with a red string.', btn: 'String', first: 'Tap a card to tie a string from', next: 'Now tap the card to tie it to', hint: 'Drag a card’s pin onto another card, or tap String, to tie them together.' },
-  whiteboard: { tie: 'Draw an arrow', cut: 'Arrow rubbed out.', done: 'Arrow drawn.', btn: 'Arrow', first: 'Tap the card the arrow starts from', next: 'Now tap the card it points to', hint: 'Drag the dot on a card’s edge onto another card, or tap Arrow, to connect them.' },
-  blueprint: { tie: 'Draw a line', cut: 'Line removed.', done: 'Line drawn.', btn: 'Line', first: 'Tap the card the line starts from', next: 'Now tap the card it goes to', hint: 'Drag the dot on a card’s edge onto another card, or tap Line, to connect them.' },
-  notebook: { tie: 'Draw an arrow', cut: 'Arrow rubbed out.', done: 'Arrow drawn.', btn: 'Arrow', first: 'Tap the card the arrow starts from', next: 'Now tap the card it points to', hint: 'Drag the dot on a card’s edge onto another card, or tap Arrow, to connect them.' },
-  circuit: words('Trace', 'Route a trace', 'Trace removed.', 'Trace routed.', 'trace'),
-  city: words('Line', 'Run a transit line', 'Line closed.', 'Line opened.', 'line'),
-  neon: words('Neon', 'Bend a neon tube', 'Tube switched off.', 'Tube lit.', 'tube'),
-  minimal: words('Line', 'Draw a line', 'Line removed.', 'Line drawn.', 'line'),
-  hacker: words('Pipe', 'Pipe one into the other', 'Pipe killed.', 'Piped.', 'pipe'),
-  chalkboard: words('Arrow', 'Chalk an arrow', 'Arrow wiped off.', 'Arrow chalked.', 'arrow'),
-  space: words('Join', 'Join the stars', 'Constellation broken.', 'Stars joined.', 'line'),
+  corkboard: { ...TIE, tie: 'Tie a red string', cut: 'String cut.', done: 'Tied with a red string.', hint: 'Drag a card’s pin onto another card, or tap String, to tie them together.' },
+  whiteboard: words('Draw an arrow', 'Arrow rubbed out.', 'Arrow drawn.'),
+  blueprint: words('Draw a line', 'Line removed.', 'Line drawn.'),
+  notebook: words('Draw an arrow', 'Arrow rubbed out.', 'Arrow drawn.'),
+  circuit: words('Route a trace', 'Trace removed.', 'Trace routed.'),
+  city: words('Run a transit line', 'Line closed.', 'Line opened.'),
+  neon: words('Bend a neon tube', 'Tube switched off.', 'Tube lit.'),
+  minimal: words('Draw a line', 'Line removed.', 'Line drawn.'),
+  hacker: words('Pipe one into the other', 'Pipe killed.', 'Piped.'),
+  chalkboard: words('Chalk an arrow', 'Arrow wiped off.', 'Arrow chalked.'),
+  space: words('Join the stars', 'Constellation broken.', 'Stars joined.'),
 };
-function words(btn, tie, cut, done, noun) {
-  return { tie, cut, done, btn, first: `Tap the card the ${noun} starts from`, next: `Now tap the card it goes to`, hint: `Drag the dot on a card’s edge onto another card, or tap ${btn}, to connect them.` };
+function words(tie, cut, done) {
+  return { ...TIE, tie, cut, done, hint: 'Drag the dot on a card’s edge onto another card, or tap String, to tie them together.' };
 }
 const LABEL_RX = { corkboard: 3, whiteboard: 11, blueprint: 0, notebook: 4, circuit: 0, city: 5, neon: 11, minimal: 6, hacker: 0, chalkboard: 4, space: 11 };
 // The class each look's strings are drawn with (and the dashed one that follows your finger).
@@ -82,7 +87,7 @@ export function createBoard(host, api) {
       <button data-b="fit" title="Fit everything on screen">Fit</button>
       <button data-b="in" aria-label="Zoom in">+</button>
     </div>
-    <div class="stringpop" hidden><input placeholder="Label (optional)" maxlength="40"><button data-s="save">Save</button><button data-s="remove" class="danger">Remove</button></div>
+    <div class="stringpop" hidden><input placeholder="Label (optional)" maxlength="40"><button data-s="save">Save</button><button data-s="branch" title="Join another card to this string">Branch</button><button data-s="remove" class="danger">Remove</button></div>
     <div class="boardmenu" hidden></div>
     <p class="boardhint" hidden></p>`;
   const cork = host.querySelector('.cork');
@@ -105,6 +110,9 @@ export function createBoard(host, api) {
   let busy = false, pendingRender = false, needsFit = false;
   let popLink = null, menuActions = [];
   let tying = false, tieFrom = null;   // "String" mode: tap one card, then the one to tie it to
+                                       // (tieFrom 'L:from|to' = a string picked, to branch it to a card)
+  let tieOnce = false;                 // String mode just for one branch (from a string's Branch button)
+  const junctions = new Map();         // 'from|to' -> where that string's label (and its branches) sit
   const look = () => (api.style() in WORDS ? api.style() : 'corkboard');
   const words = () => WORDS[look()];
   const isFrame = id => frameIds.has(id);
@@ -257,7 +265,12 @@ export function createBoard(host, api) {
     const tieBtn = host.querySelector('[data-b=tie]');
     tieBtn.textContent = words().btn;
     tieBtn.classList.toggle('on', tying);
-    if (tying) { hint.textContent = tieFrom && I.byId.get(tieFrom) ? `${words().next} (or tap “${short(api.titleOf(I.byId.get(tieFrom)))}” again to let go).` : `${words().first}.`; hint.hidden = false; }
+    if (tying) {
+      const lk = tieFrom?.startsWith('L:') ? tieFrom.slice(2) : null, lb = lk && linkOf(lk);
+      hint.textContent = lb ? `Now tap the card to join to ${lb.label ? `“${short(lb.label)}”` : 'that string'} (or tap it again to let go).`
+        : tieFrom && I.byId.get(tieFrom) ? `${words().next} (or tap “${short(api.titleOf(I.byId.get(tieFrom)))}” again to let go).` : `${words().first}.`;
+      hint.hidden = false;
+    }
     else if (!cards.length && !frames.length) { hint.textContent = 'Nothing here yet. Add a note, a to-do or a section below.'; hint.hidden = false; }
     else { hint.textContent = words().hint; hint.hidden = cards.length < 2 || hasLinks || readLocal('bt-hint-seen', false); }
     drawLines();
@@ -281,10 +294,13 @@ export function createBoard(host, api) {
 
   function cardHTML(r, I, t, sel) {
     const d = r.data, type = d.type || 'note';
-    const { html: body, media, more } = cardBody(d.body);
+    // A locked project shows only its name until it's unlocked (its notes are part of what's hidden).
+    const locked = type === 'project' && !!api.locked?.(r);
+    const { html: body, media, more } = locked ? {} : cardBody(d.body);
     const chips = [];
-    const prog = type === 'project' ? api.progress(r.id) : null;
-    if (type === 'project') {
+    const prog = type === 'project' && !locked ? api.progress(r.id) : null;
+    if (locked) chips.push(`<span class="chip locked"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Locked</span>`);
+    else if (type === 'project') {
       if (prog.total) chips.push(`<span class="chip">${prog.done}/${prog.total}</span>`);
       if (d.start || d.due) chips.push(`<span class="chip ${!d.done && d.due && d.due < t ? 'late' : ''}">${d.start ? api.fmtDay(d.start) : '…'} → ${d.due ? api.fmtDay(d.due) : '…'}</span>`);
     } else if (d.due && type === 'task') chips.push(`<span class="chip ${!d.done && d.due < t ? 'late' : d.due === t ? 'now' : ''}">${api.fmtDay(d.due)}</span>`);
@@ -312,7 +328,7 @@ export function createBoard(host, api) {
         ${kids.length ? kidsHTML(kids) : ''}
         ${prog && prog.total ? `<span class="pbar"><i style="width:${Math.round(100 * prog.done / prog.total)}%"></i></span>` : ''}
         ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
-        ${type === 'project' ? `<span class="openboard" data-openboard="${r.id}">Open its board ›</span>` : ''}
+        ${type === 'project' && !locked ? `<span class="openboard" data-openboard="${r.id}">Open its board ›</span>` : ''}
         <span class="csize" data-csize="${r.id}" title="Drag to make it bigger or smaller"></span>
       </div>`;
   }
@@ -442,17 +458,29 @@ export function createBoard(host, api) {
   }
 
   function wire(fromId, toId) {
-    const L = look();
-    if (L === 'corkboard') {
+    if (look() === 'corkboard') {
       const a = pinPoint(fromId), b = pinPoint(toId);
-      if (!a || !b) return null;
-      const s = sag(a, b);
-      return { ...s, html: `<path class="wire wool" d="${s.d}"/><path class="wire twist" d="${s.d}"/>` };
+      return a && b ? wool(a, b) : null;
     }
     const A = rectOf(fromId), B = rectOf(toId);
-    if (!A || !B) return null;
+    return A && B ? shape(A, B, fromId + '>' + toId) : null;
+  }
+  // A branch: from where a string's label sits (J) to another card, drawn like the look's strings
+  // (from a point instead of a card) and, for city lines and neon, in the same colour as the string.
+  function branchWire(J, toId, stringKey) {
+    if (look() === 'corkboard') { const b = pinPoint(toId); return b ? wool(J, b) : null; }
+    const B = rectOf(toId);
+    return B ? shape({ x: J.x, y: J.y, w: 0, h: 0 }, B, stringKey + '+' + toId, stringKey) : null;
+  }
+  function wool(a, b) {
+    const s = sag(a, b);
+    return { ...s, html: `<path class="wire wool" d="${s.d}"/><path class="wire twist" d="${s.d}"/>` };
+  }
+  // The look's string between two boxes; seedKey picks its wobble, colourKey its colour.
+  function shape(A, B, seedKey, colourKey = seedKey) {
+    const L = look();
     if (L === 'blueprint') return ruled(A, B);
-    const lc = LINE_COLOURS[L] && !api.ownWire?.() ? `style="--lc:${LINE_COLOURS[L][hash(fromId + '>' + toId) % LINE_COLOURS[L].length]}"` : '';
+    const lc = LINE_COLOURS[L] && !api.ownWire?.() ? `style="--lc:${LINE_COLOURS[L][hash(colourKey) % LINE_COLOURS[L].length]}"` : '';
     if (L === 'circuit') {
       // Copper: 45° bends, a round pad at each end.
       const pts = routePts(A, B, 9, true), d = cornered(pts, 14, false), a = pts[0], z = pts[pts.length - 1];
@@ -484,8 +512,8 @@ export function createBoard(host, api) {
       const star = p => `<circle class="star halo" cx="${f(p.x)}" cy="${f(p.y)}" r="7"/><circle class="star" cx="${f(p.x)}" cy="${f(p.y)}" r="3"/>`;
       return { d, mid: { x: (p0.x + p3.x) / 2, y: (p0.y + p3.y) / 2 }, html: `<path class="wire starline" d="${d}"/>${star(p0)}${star(p3)}` };
     }
-    if (L === 'chalkboard') return inked(A, B, hash(fromId + '>' + toId), { amp: 2.2, head: 15, cls: 'chalk' });
-    return inked(A, B, hash(fromId + '>' + toId), L === 'whiteboard' ? { amp: 2.6, head: 15, cls: 'marker' } : { amp: 1.2, head: 11, cls: 'pen' });
+    if (L === 'chalkboard') return inked(A, B, hash(seedKey), { amp: 2.2, head: 15, cls: 'chalk' });
+    return inked(A, B, hash(seedKey), L === 'whiteboard' ? { amp: 2.6, head: 15, cls: 'marker' } : { amp: 1.2, head: 11, cls: 'pen' });
   }
 
   function drawLines() {
@@ -493,13 +521,27 @@ export function createBoard(host, api) {
     const on = new Set([...cards, ...frames].map(r => r.id));
     let html = '';
     const labels = [];
+    junctions.clear();
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       if (!on.has(l.to)) continue;
       const s = wire(r.id, l.to);
       if (!s) continue;
       const id = `${r.id}|${esc(l.to)}`;
+      junctions.set(id, s.mid);
       html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${s.html}`;
-      if (l.label) labels.push(`<g class="slabel" data-link="${id}" ${s.lc || ''} transform="translate(${f(s.mid.x)} ${f(s.mid.y)})"><rect x="${-l.label.length * 3.6 - 8}" y="-11" width="${l.label.length * 7.2 + 16}" height="22" rx="${LABEL_RX[L]}"/><text text-anchor="middle" y="4">${esc(l.label)}</text></g>`);
+      // Branches: more cards joined to this string where its label is, like a T junction.
+      let branched = false;
+      for (const c of l.also || []) {
+        if (!on.has(c) || c === r.id || c === l.to) continue;
+        const b = branchWire(s.mid, c, r.id + '>' + l.to);
+        if (!b) continue;
+        html += `<path class="wire hit" data-branch="${id}|${esc(c)}" d="${b.d}"/><g class="branch">${b.html}</g>`;
+        branched = true;
+      }
+      const picked = tieFrom === 'L:' + id ? ' picked' : '';
+      if (l.label) labels.push(`<g class="slabel${picked}" data-link="${id}" ${s.lc || ''} transform="translate(${f(s.mid.x)} ${f(s.mid.y)})"><rect x="${-l.label.length * 3.6 - 8}" y="-11" width="${l.label.length * 7.2 + 16}" height="22" rx="${LABEL_RX[L]}"/><text text-anchor="middle" y="4">${esc(l.label)}</text></g>`);
+      // (no label: a knot where the branches meet, which works like a label)
+      else if (branched || picked) labels.push(`<circle class="junction${picked}" data-link="${id}" ${s.lc || ''} cx="${f(s.mid.x)}" cy="${f(s.mid.y)}" r="6"/>`);
     }
     let pins = '';
     if (L === 'corkboard') for (const r of [...frames, ...cards]) {
@@ -560,10 +602,12 @@ export function createBoard(host, api) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) { startPinch(); return; }
     if (e.target.closest('[data-tick], [data-ci], [data-openboard], [data-play], [data-big], [data-mclose], [data-mbig], [data-docopen], [data-linkopen]')) return;   // their own tap
-    const link = e.target.closest('[data-link]');
+    const link = e.target.closest('[data-link], [data-branch]');
+    // A string's label (or the knot where its branches meet): tap to edit, drag onto a card to branch.
+    const knot = !!link?.matches('.slabel, .junction');
     // Strings end on pins, so a string's tap area can lie over a pin: the pin wins (or no card
     // that already has a string could start another one).
-    const pin = e.target.closest('[data-pin]') || (link && !link.matches('.slabel') ? under(e.clientX, e.clientY, '[data-pin]') : null);
+    const pin = e.target.closest('[data-pin]') || (link && !knot ? under(e.clientX, e.clientY, '[data-pin]') : null);
     const fsize = e.target.closest('[data-fsize]');
     const csize = e.target.closest('[data-csize]');
     const fhead = e.target.closest('[data-fhead]');
@@ -586,9 +630,12 @@ export function createBoard(host, api) {
       busy = true; return;
     }
     // A string lying across a card: a drag still moves the card, a tap edits the string.
-    if (link && !link.matches('.slabel')) card = under(e.clientX, e.clientY, '[data-card]');
+    if (link && !knot) card = under(e.clientX, e.clientY, '[data-card]');
     capture(e.pointerId);
-    if (card || fhead) {
+    if (knot) {
+      e.preventDefault();
+      gesture = { kind: 'label', link: link.dataset.link, sx: e.clientX, sy: e.clientY, moved: false };
+    } else if (card || fhead) {
       const id = card ? card.dataset.card : fhead.dataset.fhead;
       gesture = { kind: 'move', id, el: elOf(id), sx: e.clientX, sy: e.clientY, moved: false, line: link, down: e.target, starts: carried(id) };
     } else if (link) {
@@ -644,13 +691,27 @@ export function createBoard(host, api) {
     } else if (g.kind === 'connect') {
       const b = toWorld(e.clientX, e.clientY);
       drawLines();
-      if (look() === 'corkboard') { const a = pinPoint(g.from); if (a) lines.insertAdjacentHTML('beforeend', `<path class="wire wool live" d="${sag(a, b).d}"/>`); }
-      else { const A = rectOf(g.from); if (A) lines.insertAdjacentHTML('beforeend', `<path class="wire ${WIRE_CLASS[look()] || 'pen'} live" d="M${A.x + A.w / 2} ${A.y + A.h / 2}L${b.x} ${b.y}"/>`); }
+      const A = rectOf(g.from), a = look() === 'corkboard' ? pinPoint(g.from) : A && { x: A.x + A.w / 2, y: A.y + A.h / 2 };
+      if (a) lines.insertAdjacentHTML('beforeend', liveLine(a, b));
       for (const c of host.querySelectorAll('.target')) c.classList.remove('target');
       const over = targetAt(e.clientX, e.clientY);
       if (over && over !== g.from) elOf(over)?.classList.add('target');
+    } else if (g.kind === 'label') {
+      // Dragging a label out: a branch follows your finger to the card it'll join.
+      if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 6) return;
+      g.moved = true;
+      const b = toWorld(e.clientX, e.clientY);
+      drawLines();
+      const J = junctions.get(g.link);
+      if (J) lines.insertAdjacentHTML('beforeend', liveLine(J, b));
+      for (const c of host.querySelectorAll('.target')) c.classList.remove('target');
+      const over = targetAt(e.clientX, e.clientY);
+      if (over && canBranch(g.link, over)) elOf(over)?.classList.add('target');
     }
   });
+  // The dashed string that follows your finger while you tie or branch.
+  const liveLine = (a, b) => (look() === 'corkboard' ? `<path class="wire wool live" d="${sag(a, b).d}"/>`
+    : `<path class="wire ${WIRE_CLASS[look()] || 'pen'} live" d="M${f(a.x)} ${f(a.y)}L${f(b.x)} ${f(b.y)}"/>`);
 
   // The card (or section label) under a point, looking through any strings lying on top.
   const under = (cx, cy, sel) => {
@@ -684,7 +745,7 @@ export function createBoard(host, api) {
       for (const fr of framesEl.querySelectorAll('.drop')) fr.classList.remove('drop');
       if (g.moved) await settle(g);
       else if (up && tying) { if (g.id !== key) await tieTap(g.id); }
-      else if (up && g.line) openStringPop(g.line.dataset.link, e.clientX, e.clientY);
+      else if (up && g.line) await tapLine(g.line, e.clientX, e.clientY);
       else if (up) { const sub = g.down?.closest?.('[data-sub]'); api.open(sub ? sub.dataset.sub : g.id); }
     } else if (g.kind === 'scale') {
       if (g.s != null && g.s !== g.s0) await setScale(g.id, g.s);
@@ -697,10 +758,77 @@ export function createBoard(host, api) {
       else if (up && tying) await tieTap(g.from);           // in String mode a tap on a pin picks that card
       drawLines();
     } else if (g.kind === 'tap-line' && up && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 8) {
-      openStringPop(g.line.dataset.link, e.clientX, e.clientY);
+      await tapLine(g.line, e.clientX, e.clientY);
+    } else if (g.kind === 'label') {
+      for (const c of host.querySelectorAll('.target')) c.classList.remove('target');
+      if (g.moved) {
+        const over = up && targetAt(e.clientX, e.clientY);
+        if (!over || !(await addBranch(g.link, over))) drawLines();
+      } else if (up) await tapString(g.link, e.clientX, e.clientY);
     }
     flush();
   };
+
+  // A tap on a string edits it (or, in String mode, picks it to branch); a tap on a branch offers
+  // to open the card at its end or take that card off the string.
+  const stringOf = branchId => branchId.split('|').slice(0, 2).join('|');
+  async function tapLine(el, cx, cy) {
+    if (el.dataset.branch && !tying) branchMenu(el.dataset.branch, cx, cy);
+    else await tapString(el.dataset.branch ? stringOf(el.dataset.branch) : el.dataset.link, cx, cy);
+  }
+  async function tapString(link, cx, cy) {
+    if (!tying) { openStringPop(link, cx, cy); return; }
+    const card = tieFrom && !tieFrom.startsWith('L:') ? tieFrom : null;
+    if (card) { tieFrom = null; if (!(await addBranch(link, card))) render(); return; }
+    if (tieOnce && tieFrom === 'L:' + link) { setTying(false); return; }   // let go of a one-off branch
+    tieFrom = tieFrom === 'L:' + link ? null : 'L:' + link;
+    render();
+  }
+  function linkOf(link) {
+    const [from, to] = link.split('|');
+    return (api.store.get(from)?.data.links || []).find(l => l.to === to) || null;
+  }
+  function canBranch(link, c) {
+    const [from, to] = link.split('|'), l = linkOf(link);
+    return !!l && c !== key && c !== from && c !== to && !(l.also || []).includes(c);
+  }
+  async function addBranch(link, c) {
+    const [from, to] = link.split('|');
+    const r = api.store.get(from), l = linkOf(link);
+    if (!r || !l || c === key) return false;
+    if (!canBranch(link, c)) { api.toast(c === from || c === to || (l.also || []).includes(c) ? 'That card is already on this string.' : 'That can’t join this string.'); return false; }
+    const links = r.data.links || [];
+    writeLocal('bt-hint-seen', true);
+    await api.store.update(from, { links: links.map(x => (x.to === to ? { ...x, also: [...(x.also || []), c] } : x)) });
+    api.toast(`“${short(api.titleOf(api.store.get(c)))}” joined to ${l.label ? `“${short(l.label)}”` : 'the string'}.`, 'Undo', () => api.store.update(from, { links }));
+    return true;
+  }
+  async function removeBranch(branchId) {
+    const [from, to, c] = branchId.split('|');
+    const links = api.store.get(from)?.data.links || [];
+    const next = links.map(x => {
+      if (x.to !== to) return x;
+      const y = { ...x, also: (x.also || []).filter(id => id !== c) };
+      if (!y.also.length) delete y.also;
+      return y;
+    });
+    await api.store.update(from, { links: next });
+    api.toast('Branch taken off.', 'Undo', () => api.store.update(from, { links }));
+  }
+  function branchMenu(branchId, cx, cy) {
+    const c = branchId.split('|')[2], name = short(api.titleOf(api.store.get(c) || { data: {} }));
+    menu(cx, cy, [
+      { label: `Open “${name}”`, fn: () => api.open(c) },
+      { label: `Take “${name}” off this string`, danger: true, fn: () => removeBranch(branchId) },
+    ]);
+  }
+  // From the string's own menu: the next card you tap joins it.
+  // (just the one: once it's joined, String mode ends again)
+  function startBranch(link) {
+    tying = true; tieFrom = 'L:' + link; tieOnce = true;
+    host.classList.add('tying');
+    render();
+  }
   cork.addEventListener('pointerup', end);
   cork.addEventListener('pointercancel', end);
 
@@ -888,11 +1016,18 @@ export function createBoard(host, api) {
   // String mode: the first tap picks a card, the second ties it to another. It stays on for more
   // until you tap the button again or the empty board.
   function setTying(on) {
-    tying = on; tieFrom = null;
+    tying = on; tieFrom = null; tieOnce = false;
     host.classList.toggle('tying', on);
     render();
   }
   async function tieTap(id) {
+    if (tieFrom?.startsWith('L:')) {
+      const link = tieFrom.slice(2);
+      tieFrom = null;
+      const ok = await addBranch(link, id);
+      if (ok && tieOnce) setTying(false); else if (!ok) render();
+      return;
+    }
     if (!tieFrom || tieFrom === id) { tieFrom = tieFrom === id ? null : id; render(); return; }
     const a = tieFrom, b = id;
     tieFrom = null;
@@ -948,7 +1083,7 @@ export function createBoard(host, api) {
     popLink = { from, to };
     const b = host.getBoundingClientRect();
     pop.hidden = false;
-    pop.style.left = clamp(cx - b.left - 130, 8, b.width - 268) + 'px';
+    pop.style.left = clamp(cx - b.left - 150, 8, b.width - pop.offsetWidth - 8) + 'px';
     pop.style.top = clamp(cy - b.top + 12, 8, b.height - 60) + 'px';
     const input = pop.querySelector('input');
     input.value = l.label || '';
@@ -963,9 +1098,18 @@ export function createBoard(host, api) {
     if (remove) {
       await api.store.update(from, { links: links.filter(l => l.to !== to) });
       api.toast(words().cut, 'Undo', () => api.store.update(from, { links }));
-    } else await api.store.update(from, { links: links.map(l => (l.to === to ? { to, ...(label ? { label } : {}) } : l)) });
+    } else await api.store.update(from, { links: links.map(l => { if (l.to !== to) return l; const n = { ...l, label }; if (!label) delete n.label; return n; }) });
   }
-  pop.addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b) saveString(b.dataset.s === 'remove'); });
+  pop.addEventListener('click', async e => {
+    const b = e.target.closest('[data-s]');
+    if (!b) return;
+    if (b.dataset.s !== 'branch') { saveString(b.dataset.s === 'remove'); return; }
+    const link = popLink && `${popLink.from}|${popLink.to}`;
+    if (!link) return;
+    const typed = pop.querySelector('input').value.trim(), was = linkOf(link)?.label || '';
+    if (typed !== was) await saveString(false); else { pop.hidden = true; popLink = null; }
+    startBranch(link);
+  });
   pop.querySelector('input').addEventListener('keydown', e => { if (e.key === 'Enter') saveString(false); if (e.key === 'Escape') { pop.hidden = true; popLink = null; } });
 
   const viewCentre = () => toWorld(cork.getBoundingClientRect().left + cork.clientWidth / 2, cork.getBoundingClientRect().top + cork.clientHeight / 3);
