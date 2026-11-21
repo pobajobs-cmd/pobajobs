@@ -256,7 +256,12 @@ export function createBoard(host, api) {
   // in the free spot nearest to what it's strung to, keeping the whole thing compact and about
   // the shape of a screen.
   function smartLayout(h, order, pack, kidsOf, todo) {
-    const G = 64;
+    // (0.7.4) The shape of the screen it's laid out on: tall on a phone, wide on a computer. Sections
+    // are narrower on a tall screen, and the gaps between things are wide enough for strings to go
+    // round them rather than squeeze between cards.
+    const A = clamp(cork.clientWidth / Math.max(1, cork.clientHeight - 60), 0.45, 2.4) || 1.6;
+    const tall = A < 0.9;
+    const G = 96;
     const rec = new Map([...frames, ...todo].map(r => [r.id, r]));
     const adj = new Map();
     const tie = (a, b) => {
@@ -286,7 +291,7 @@ export function createBoard(host, api) {
     const units = [];
     for (const s of frames) {
       const kids = cardChain(kidsOf(s).filter(k => rec.has(k.id)).sort(order));
-      const b = pack(kids, Math.min(3, Math.max(1, Math.ceil(Math.sqrt(kids.length)))));
+      const b = pack(kids, Math.min(tall ? 2 : 3, Math.max(1, Math.ceil(Math.sqrt(kids.length)))));
       const w = Math.max(320, b.w + 2 * PAD), hh = Math.max(220, HEAD + PAD + b.h + PAD);
       const place = new Map([[s.id, { x: 0, y: 0, w, h: hh }]]);
       for (const [id, p] of b.at) place.set(id, { x: PAD + p.x, y: HEAD + PAD + p.y });
@@ -306,9 +311,9 @@ export function createBoard(host, api) {
         group.push(x);
         for (const y of adj.get(x.id)?.keys() || []) { const r = rest.find(z => z.id === y); if (r && !seen.has(y)) { seen.add(y); stack.push(r); } }
       }
-      if (group.length > 1) units.push(block(cardChain(group.sort(order)), 3)); else single.push(c);
+      if (group.length > 1) units.push(block(cardChain(group.sort(order)), tall ? 2 : 3)); else single.push(c);
     }
-    if (single.length) units.push(block(single, 4));
+    if (single.length) units.push(block(single, tall ? 2 : 4));
 
     // Placing them.
     const uw = (U, V) => { let n = 0; for (const a of U.ids) for (const b of V.ids) n += wt(a, b); return n; };
@@ -323,15 +328,19 @@ export function createBoard(host, api) {
         for (const p of placed) cand.push(
           [p.x + p.u.w + G, p.y], [p.x, p.y + p.u.h + G], [p.x - u.w - G, p.y], [p.x, p.y - u.h - G],
           [p.x + p.u.w + G, p.y + p.u.h - u.h], [p.x + p.u.w - u.w, p.y + p.u.h + G]);
-        const area = (bx1 - bx0) * (by1 - by0);
+        // How wide the board has to be shown to fit this screen: the smaller, the bigger it can be
+        // drawn (so it grows whichever way keeps it closest to the screen's shape).
+        const fitOf = (W, H) => Math.max(W, H * A);
+        const fit0 = fitOf(bx1 - bx0, by1 - by0);
         for (const [x, y] of cand) {
           if (placed.some(p => x < p.x + p.u.w + G - 1 && x + u.w + G - 1 > p.x && y < p.y + p.u.h + G - 1 && y + u.h + G - 1 > p.y)) continue;
           const cx = x + u.w / 2, cy = y + u.h / 2;
           let s = 0;
           for (const p of placed) { const w = uw(u, p.u); if (w) s += w * Math.hypot(cx - (p.x + p.u.w / 2), cy - (p.y + p.u.h / 2)); }
           const W = Math.max(bx1, x + u.w) - Math.min(bx0, x), H = Math.max(by1, y + u.h) - Math.min(by0, y);
-          s += (W * H - area) / 300;                                              // grow as little as possible
-          s += Math.max(0, W / H - 2) * 600 + Math.max(0, H / W - 0.85) * 600;    // about the shape of a screen
+          s += (fitOf(W, H) - fit0) * 1.6;
+          // (and, between equals, nearer the middle)
+          s += Math.hypot(cx - (bx0 + bx1) / 2, (cy - (by0 + by1) / 2) * A) * 0.05;
           if (s < bestS) { bestS = s; best = [x, y]; }
         }
         if (!best) best = [bx1 + G, by0];
@@ -581,17 +590,28 @@ export function createBoard(host, api) {
     const z = pts[pts.length - 1];
     return d + `L${f(z.x)} ${f(z.y)}`;
   }
-  // Halfway along a route (where its label goes).
-  function alongMid(pts) {
-    let half = 0;
-    for (let i = 1; i < pts.length; i++) half += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-    half /= 2;
+  // Halfway along a route (where its label goes), or any fraction t of the way.
+  const alongMid = pts => alongAt(pts, 0.5);
+  function alongAt(pts, t) {
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    let left = len * t;
     for (let i = 1; i < pts.length; i++) {
       const a = pts[i - 1], b = pts[i], l = Math.hypot(b.x - a.x, b.y - a.y);
-      if (l > 0 && l >= half) return { x: a.x + (b.x - a.x) * half / l, y: a.y + (b.y - a.y) * half / l };
-      half -= l;
+      if (l > 0 && l >= left) return { x: a.x + (b.x - a.x) * left / l, y: a.y + (b.y - a.y) * left / l };
+      left -= l;
     }
-    return pts[0];
+    return pts[pts.length - 1];
+  }
+  // (0.7.4) Where a string's label goes: halfway, unless that's over a card, then the nearest clear
+  // spot along the string (its branches start there too).
+  function labelSpot(s, label) {
+    if (!s.pts || !obstacles || !label) return s.mid;
+    const w = label.length * 7.2 + 16, h = 22;
+    const clear = p => !obstacles.some(o => p.x - w / 2 < o.x + o.w && p.x + w / 2 > o.x && p.y - h / 2 < o.y + o.h && p.y + h / 2 > o.y);
+    if (clear(s.mid)) return s.mid;
+    for (const t of [0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82]) { const p = alongAt(s.pts, t); if (clear(p)) return p; }
+    return s.mid;
   }
   // A route with its corners rounded, as points every few pixels (for the hand-drawn looks).
   function bendPts(pts, r, step) {
@@ -683,6 +703,7 @@ export function createBoard(host, api) {
   // runs with right-angle turns (rounded or cut the look's way), keeping clear of the cards between.
   const ROUND_LOOKS = new Set(['whiteboard', 'blueprint', 'notebook', 'circuit', 'city', 'neon', 'minimal', 'hacker', 'chalkboard']);
   let obstacles = null;   // the cards (and the banner) to keep clear of, a little bigger than drawn
+  let frameBoxes = null;  // (0.7.4) the sections: a string goes round one it isn't in, if that's not far
 
   function segHits(p, q, r) {
     let t0 = 0, t1 = 1;
@@ -701,13 +722,18 @@ export function createBoard(host, api) {
   function dodge(s, A, B, skip, seedKey, colourKey) {
     if (!s?.pts || !obstacles || !ROUND_LOOKS.has(look()) || holds(A, B) || holds(B, A)) return s;
     const obs = obstacles.filter(o => !skip.has(o.id));
-    if (!crosses(s.pts, obs)) return s;
-    const pts = findRoute(A, B, obs, GAP_AT_END[look()] ?? 5);
+    // (sections the string isn't in: from or to one of their cards, or the section itself)
+    const ca = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, cb = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
+    const soft = (frameBoxes || []).filter(fr => !skip.has(fr.id) && !inRect(fr, ca) && !inRect(fr, cb));
+    if (!crosses(s.pts, obs) && !crosses(s.pts, soft)) return s;
+    const pts = findRoute(A, B, obs, GAP_AT_END[look()] ?? 5, soft);
     return pts ? alongPts(pts, seedKey, colourKey) : s;
   }
 
-  function findRoute(A, B, obs, gap) {
-    const M = 16, BEND = 40, CROSS = 5000;
+  // (crossing a card costs a lot; going through a section the string isn't in costs a little, so it
+  // goes round unless that's a long way)
+  function findRoute(A, B, obs, gap, soft = []) {
+    const M = 16, BEND = 40, CROSS = 5000, THROUGH = 700;
     const ca = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, cb = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
     // Where a string may leave (or reach) a card: any side but the one facing right away, at the
     // point along it nearest the other card.
@@ -724,8 +750,9 @@ export function createBoard(host, api) {
     const ends = [A, B].filter(X => X.w || X.h).map(X => ({ x: X.x + 2, y: X.y + 2, w: X.w - 4, h: X.h - 4 }));
     const x0 = Math.min(A.x, B.x) - 260, x1 = Math.max(A.x + A.w, B.x + B.w) + 260, y0 = Math.min(A.y, B.y) - 260, y1 = Math.max(A.y + A.h, B.y + B.h) + 260;
     const near = obs.filter(o => o.x < x1 && o.x + o.w > x0 && o.y < y1 && o.y + o.h > y0);
+    const nearSoft = soft.filter(o => o.x < x1 && o.x + o.w > x0 && o.y < y1 && o.y + o.h > y0);
     const xs = new Set(), ys = new Set();
-    for (const o of [...near, ...ends]) { xs.add(Math.round(o.x - M)); xs.add(Math.round(o.x + o.w + M)); ys.add(Math.round(o.y - M)); ys.add(Math.round(o.y + o.h + M)); }
+    for (const o of [...near, ...ends, ...nearSoft]) { xs.add(Math.round(o.x - M)); xs.add(Math.round(o.x + o.w + M)); ys.add(Math.round(o.y - M)); ys.add(Math.round(o.y + o.h + M)); }
     let best = null, bestScore = Infinity;
     const tryRoute = (a, b, S, T, mid) => {
       const raw = [a.p, S, ...mid, T, b.e];
@@ -740,6 +767,7 @@ export function createBoard(host, api) {
       for (let i = 1; i < pts.length && score < bestScore; i++) {
         const p = pts[i - 1], q = pts[i];
         for (const o of near) if (segHits(p, q, o)) score += CROSS;
+        for (const o of nearSoft) if (segHits(p, q, o)) score += THROUGH;
         // (the cards at the ends: not crossed except by the bit leaving or reaching them)
         if (i > 1 && i < pts.length - 1) for (const o of ends) if (segHits(p, q, o)) score += CROSS;
       }
@@ -757,8 +785,8 @@ export function createBoard(host, api) {
       for (const x of [...xs, Math.round((S.x + T.x) / 2)]) tryRoute(a, b, S, T, [{ x, y: S.y }, { x, y: T.y }]);
       for (const y of [...ys, Math.round((S.y + T.y) / 2)]) tryRoute(a, b, S, T, [{ x: S.x, y }, { x: T.x, y }]);
     }
-    // Still crossing something: one more turn, using the closest ways past.
-    if (bestScore >= CROSS) {
+    // Still crossing something (a card, or a section it isn't in): one more turn, using the closest ways past.
+    if (bestScore >= THROUGH) {
       const mx = (ca.x + cb.x) / 2, my = (ca.y + cb.y) / 2;
       const cx = [...xs].sort((p, q) => Math.abs(p - mx) - Math.abs(q - mx)).slice(0, 8);
       const cy = [...ys].sort((p, q) => Math.abs(p - my) - Math.abs(q - my)).slice(0, 8);
@@ -777,11 +805,13 @@ export function createBoard(host, api) {
     const labels = [];
     junctions.clear();
     // (not drawings on the board: strings may cross those, like anything drawn on it)
+    frameBoxes = ROUND_LOOKS.has(L) ? frames.map(r => { const b = rectOf(r.id); return b && { id: r.id, x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 }; }).filter(Boolean) : null;
     obstacles = ROUND_LOOKS.has(L) ? [key, ...cards.filter(r => !isSketch(r)).map(r => r.id)].map(id => { const b = rectOf(id); return b && { id, x: b.x - 6, y: b.y - 6, w: b.w + 12, h: b.h + 12 }; }).filter(Boolean) : null;
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       if (!on.has(l.to)) continue;
       const s = wire(r.id, l.to);
       if (!s) continue;
+      if (l.label) s.mid = labelSpot(s, l.label);
       const id = `${r.id}|${esc(l.to)}`;
       junctions.set(id, s.mid);
       html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${s.html}`;

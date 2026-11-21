@@ -648,7 +648,13 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 :root:not([data-look="corkboard"]) .pcard .pin { top: 50%; left: auto; right: -11px; width: 20px; height: 20px; margin: -10px 0 0; border-radius: 50%;
   background: var(--pin-bg, var(--card)); border: 2px solid var(--pin-edge, var(--accent)); opacity: 0; transition: opacity 0.15s; }
 :root:not([data-look="corkboard"]) .pcard:hover .pin, :root:not([data-look="corkboard"]) .pcard.on .pin { opacity: 1; }
-@media (pointer: coarse) { :root:not([data-look="corkboard"]) .pcard .pin { opacity: 0.85; } }
+/* (0.7.4: on a touch screen the dots stay faint, so a zoomed-out board isn't covered in rings, and
+   show fully on the picked card and in String mode) */
+@media (pointer: coarse) {
+  :root:not([data-look="corkboard"]) .pcard .pin { opacity: 0.28; }
+  :root:not([data-look="corkboard"]) .pcard.on .pin, :root:not([data-look="corkboard"]) .tying .pcard .pin { opacity: 0.95; }
+  :root:not([data-look="corkboard"]) .fhead .fpin { opacity: 0.4; }
+}
 :root:not([data-look="corkboard"]) .fhead .fpin { width: 18px; height: 18px; margin-top: -9px; right: 10px; background: var(--pin-bg, var(--card)); border: 2px solid var(--pin-edge, var(--accent)); }
 /* (the connect dots on the dark looks) */
 :root[data-look="circuit"] { --pin-bg: #0A2C1D; --pin-edge: #E0B252; }
