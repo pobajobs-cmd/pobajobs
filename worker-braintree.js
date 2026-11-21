@@ -283,7 +283,8 @@ async function rpc(m, ctx) {
 }
 
 const MCP_INSTRUCTIONS = `Brain Tree is the user's own planner (projects, to-dos, notes and boards), on their phone and computer.
-When the user asks to put a plan from this chat into Brain Tree ("block it out"), call block_out_project once with the whole thing: sections for the phases or areas of work, to-dos for actions (with steps for the smaller actions inside one), notes for reference material and decisions, and strings for links worth seeing on the board (with a short label like "feeds into").
+When the user asks to put a plan from this chat into Brain Tree ("block it out"), call block_out_project once with the whole thing: sections for the phases or areas of work, to-dos for actions (with steps for the smaller actions inside one), notes for reference material and decisions, and strings.
+Strings are what make the board useful, so always include them. Tie a string wherever one thing feeds into, needs, comes before, is based on or is for another, across sections as well as inside them: from research and notes to the to-dos that use them, from each step of the work to the next, from a decision to what it affects. Most to-dos and notes should be on at least one string; as a guide, about one string for every two or three things. Give every item you'll tie a key, and give each string a short label (one to three words) saying how they're linked, like "feeds into", "needs", "before", "based on" or "for".
 Before blocking a project out, ask the user for this chat's link so the project can link back to it: on the web it's the address in the browser bar (claude.ai/chat/...), which only they can open; Share → Copy link makes a public copy instead. Pass it as chat_url. If they'd rather not, carry on without it.
 Don't make up dates; only use ones the user gave. Keep titles short and clear, put detail in notes.
 To change an existing project, read it first with get_project (or find things with search) and use the ids it gives. remove_item only moves things to Recently deleted, where the user can restore them.
@@ -304,7 +305,7 @@ const ITEM_FIELDS = {
 const ITEM = { type: 'object', properties: ITEM_FIELDS, required: ['title'] };
 const ITEM_WITH_KIDS = { type: 'object', properties: { ...ITEM_FIELDS, items: { type: 'array', items: ITEM, description: 'For a smaller project: what goes in it.' } }, required: ['title'] };
 const SECTION = { type: 'object', properties: { key: ITEM_FIELDS.key, title: { type: 'string' }, color: { type: 'string', enum: COLOURS }, items: { type: 'array', items: ITEM_WITH_KIDS } }, required: ['title'] };
-const STRINGS = { type: 'array', description: 'Strings between things (shown on the board). from/to: a key or the exact title of something in this call.', items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, label: { type: 'string' } }, required: ['from', 'to'] } };
+const STRINGS = { type: 'array', description: 'Strings between things, shown on the board: include plenty (about one for every two or three things), wherever one thing feeds into, needs, comes before or is based on another, across sections too. from/to: a key or the exact title of something in this call (or, with add_items, something already in the project).', items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, label: { type: 'string', description: 'One to three words saying how they link, like "feeds into", "needs", "before".' } }, required: ['from', 'to'] } };
 
 const MCP_TOOLS = [
   { name: 'list_projects', title: 'List projects', description: 'All the projects in Brain Tree (with their smaller projects), with ids and how many to-dos are done.',
@@ -313,7 +314,7 @@ const MCP_TOOLS = [
     inputSchema: { type: 'object', properties: { project_id: { type: 'string' } }, required: ['project_id'] }, annotations: { readOnlyHint: true } },
   { name: 'search', title: 'Search Brain Tree', description: 'Find to-dos, notes, sections and projects by words in their title or notes.',
     inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, annotations: { readOnlyHint: true } },
-  { name: 'block_out_project', title: 'Block out a project', description: 'Create a whole new project in one go: its notes, sections with their to-dos and notes, loose to-dos and notes, smaller projects, and strings. Pass chat_url (this chat\'s link) so the project links back to the chat.',
+  { name: 'block_out_project', title: 'Block out a project', description: 'Create a whole new project in one go: its notes, sections with their to-dos and notes, loose to-dos and notes, smaller projects, and the strings that show how they connect on its board (include plenty: give items keys and tie them). Pass chat_url (this chat\'s link) so the project links back to the chat.',
     inputSchema: { type: 'object', properties: {
       title: { type: 'string' }, notes: { type: 'string', description: 'What the project is about (same format as item notes).' },
       chat_url: { type: 'string', description: 'This Claude chat\'s link, from the user.' },
@@ -323,7 +324,7 @@ const MCP_TOOLS = [
       items: { type: 'array', items: ITEM_WITH_KIDS, description: 'To-dos, notes and smaller projects not in a section.' },
       strings: STRINGS,
     }, required: ['title'] } },
-  { name: 'add_items', title: 'Add to a project', description: 'Add to-dos, notes, smaller projects and sections to an existing project, section or to-do (things added to a to-do become its steps).',
+  { name: 'add_items', title: 'Add to a project', description: 'Add to-dos, notes, smaller projects and sections to an existing project, section or to-do (things added to a to-do become its steps). Strings can tie new things and things already in the project (by title); with only strings, it just ties them.',
     inputSchema: { type: 'object', properties: { parent_id: { type: 'string', description: 'The project, section or to-do to add to.' }, sections: { type: 'array', items: SECTION }, items: { type: 'array', items: ITEM_WITH_KIDS }, strings: STRINGS }, required: ['parent_id'] } },
   { name: 'update_item', title: 'Change something', description: 'Change a to-do, note, section or project: rename it, tick it off (or not), change or add to its notes, set or clear dates, change a note\'s colour, move it somewhere else, or (projects) set the Claude chat link.',
     inputSchema: { type: 'object', properties: {
@@ -622,10 +623,13 @@ const TOOL_FNS = {
     plan.named.set(data.title.toLowerCase(), id);
     planItems(T, id, { sections: a.sections || [], items: a.items || [], strings: a.strings || [] }, plan);
     const made = counted(plan);
+    // (few strings for the size of it: say so, so Claude can tie more with tie_string)
+    const things = plan.items.filter(x => x.data.type !== 'section' && !(x.data.type === 'task' && plan.items.some(y => y.id === x.data.parent && y.data.type === 'task'))).length;
+    const fewStrings = things >= 4 && plan.strings.length < Math.ceil(things / 4);
     plan.items.unshift({ id, data });
     await savePlan(ctx.env, T, plan);
     const url = linkTo(ctx, id);
-    return { text: `Blocked out “${data.title}” in Brain Tree: ${made}${a.chat_url ? ', and a link back to this chat' : ''}.${plan.skipped.length ? `\nStrings left out (couldn't find both ends): ${plan.skipped.join('; ')}.` : ''}\nOpen it: ${url}\nIts board: ${linkTo(ctx, id, true)}`,
+    return { text: `Blocked out “${data.title}” in Brain Tree: ${made}${a.chat_url ? ', and a link back to this chat' : ''}.${plan.skipped.length ? `\nStrings left out (couldn't find both ends): ${plan.skipped.join('; ')}.` : ''}${fewStrings ? `\nOnly ${plan.strings.length} string${plan.strings.length === 1 ? '' : 's'} for ${things} things: the board shows how things connect through strings, so tie more where one thing feeds into, needs or comes before another: add_items with parent_id ${id} and just a strings list (titles work) ties several at once.` : ''}\nOpen it: ${url}\nIts board: ${linkTo(ctx, id, true)}`,
       data: { project_id: id, url } };
   },
 
