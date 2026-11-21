@@ -186,7 +186,7 @@ export function createBoard(host, api) {
     if (![...out.keys()].some(id => !guests.has(id) && !sketchIds.has(id)) && (cards.length || frames.length)) {
       let gx = Infinity, gy = -Infinity;
       for (const [id, p] of out) if (guests.has(id)) { gx = Math.min(gx, p.x); gy = Math.max(gy, p.y + h(id)); }
-      const sm = smartLayout(h, order, pack, kidsOf, cards.filter(c => !out.has(c.id)));
+      const sm = autoTidy(cards.filter(c => !out.has(c.id)));
       const dx = gx === Infinity ? 0 : gx, dy = gy === -Infinity ? 0 : gy + 90;
       for (const [id, p] of sm) out.set(id, { ...p, x: p.x + dx, y: p.y + dy });
     }
@@ -249,59 +249,124 @@ export function createBoard(host, api) {
     return out;
   }
 
-  // Laying out a whole board from scratch, by its strings. Each section is packed with its cards,
-  // in an order that puts strung-together cards side by side. Loose cards strung only to each
-  // other stay together as a group; ones strung into a section are placed on their own, next to
-  // it; ones strung to nothing are packed in one block. Then each of those goes, one at a time,
-  // in the free spot nearest to what it's strung to, keeping the whole thing compact and about
-  // the shape of a screen.
-  function smartLayout(h, order, pack, kidsOf, todo) {
-    // (0.7.4) The shape of the screen it's laid out on: tall on a phone, wide on a computer. Sections
-    // are narrower on a tall screen, and the gaps between things are wide enough for strings to go
-    // round them rather than squeeze between cards.
-    const A = clamp(cork.clientWidth / Math.max(1, cork.clientHeight - 60), 0.45, 2.4) || 1.6;
-    const tall = A < 0.9;
-    const G = 96;
-    const rec = new Map([...frames, ...todo].map(r => [r.id, r]));
-    const adj = new Map();
-    const tie = (a, b) => {
-      if (a === b || !rec.has(a) || !rec.has(b)) return;
-      for (const [x, y] of [[a, b], [b, a]]) { if (!adj.has(x)) adj.set(x, new Map()); adj.get(x).set(y, (adj.get(x).get(y) || 0) + 1); }
-    };
-    for (const r of rec.values()) for (const l of r.data.links || []) { tie(r.id, l.to); for (const c of l.also || []) { tie(r.id, c); tie(l.to, c); } }
-    const wt = (a, b) => adj.get(a)?.get(b) || 0;
-    const degree = id => { let n = 0; for (const v of adj.get(id)?.values() || []) n += v; return n; };
-    // One after another, each the one strung most to those already taken (else the best connected left).
-    const chain = (list, w, deg) => {
-      const left = [...list], out = [];
-      while (left.length) {
-        let bi = 0, bs = 0;
-        for (let i = 0; i < left.length; i++) { let s = 0; for (const x of out) s += w(left[i], x); if (s > bs) { bs = s; bi = i; } }
-        if (!bs) { let bd = -1; for (let i = 0; i < left.length; i++) { const d = deg(left[i]); if (d > bd) { bd = d; bi = i; } } }
-        out.push(left.splice(bi, 1)[0]);
-      }
-      return out;
-    };
-    const cardChain = list => chain(list, (a, b) => wt(a.id, b.id), r => degree(r.id));
-    const block = (list, maxCols) => {
-      const b = pack(list, Math.min(maxCols, Math.max(1, Math.ceil(Math.sqrt(list.length)))));
-      return { ids: list.map(r => r.id), w: b.w, h: b.h, place: new Map([...b.at].map(([id, p]) => [id, { x: p.x, y: p.y }])) };
-    };
+  // ---------- Tidy (0.7.5) ----------
+  // A board laid out to be read, sections first as whole blocks, then the cards inside each:
+  //  - things go in the order they flow (what feeds into what), reading left to right and down
+  //  - what's strung together sits together
+  //  - strings cross each other, and cards that aren't theirs, as little as possible
+  //  - the whole board is about the shape of the screen it's tidied on
+  // It starts from the flow order, then tries swapping sections, swapping cards within sections
+  // and making sections narrower or wider, keeping each change that scores tidier.
+  //   tidyAll(todo):  everything laid out from scratch (Tidy everything, and a board nothing's been placed on)
+  //   tidyInside():   sections stay where they are; the cards in each are rearranged
 
-    const units = [];
-    for (const s of frames) {
-      const kids = cardChain(kidsOf(s).filter(k => rec.has(k.id)).sort(order));
-      const b = pack(kids, Math.min(tall ? 2 : 3, Math.max(1, Math.ceil(Math.sqrt(kids.length)))));
-      const w = Math.max(320, b.w + 2 * PAD), hh = Math.max(220, HEAD + PAD + b.h + PAD);
-      const place = new Map([[s.id, { x: 0, y: 0, w, h: hh }]]);
-      for (const [id, p] of b.at) place.set(id, { x: PAD + p.x, y: HEAD + PAD + p.y });
-      units.push({ ids: [s.id, ...kids.map(k => k.id)], w, h: hh, place });
+  const TG = 96;   // the gap between sections (room for strings to pass)
+  const hOf = id => heights.get(id) || 140 * sc(id);
+  const rankOf = r => ({ task: 0, note: 1, project: 2 }[r.data.type] ?? 3);
+  const byOrder = (a, b) => rankOf(a) - rankOf(b) || (a.data.order || 0) - (b.data.order || 0) || (a.data.created || '').localeCompare(b.data.created || '');
+  const screenShape = () => clamp(cork.clientWidth / Math.max(1, cork.clientHeight - 60), 0.45, 2.4) || 1.6;
+
+  // The strings between these things, as one-way ties: from → to, and from → each of its branches.
+  function tiesAmong(ids) {
+    const out = [];
+    for (const r of [...frames, ...cards]) {
+      if (!ids.has(r.id)) continue;
+      for (const l of r.data.links || []) {
+        if (ids.has(l.to) && l.to !== r.id) out.push([r.id, l.to]);
+        for (const c of l.also || []) if (ids.has(c) && c !== r.id) out.push([r.id, c]);
+      }
     }
-    const inSection = id => frameIds.has(id) || frameIds.has(rec.get(id)?.data.parent);
-    const loose = todo.filter(c => !frameIds.has(c.data.parent)).sort(order);
-    const toSection = c => [...(adj.get(c.id)?.keys() || [])].some(inSection);
-    for (const c of loose.filter(toSection)) units.push({ ids: [c.id], w: cw(c.id), h: h(c.id), place: new Map([[c.id, { x: 0, y: 0 }]]) });
-    const rest = loose.filter(c => !toSection(c)), seen = new Set(), single = [];
+    return out;
+  }
+
+  // Do two straight lines cross (not just meet at an end)?
+  function segsCross(a, b, c, d) {
+    const o = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+    return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
+  }
+
+  // How hard an arrangement is to read, as one number: lower is tidier. pos: id -> {x, y, w?, h?}.
+  function untidiness(pos, ties, A) {
+    const box = id => { const p = pos.get(id); return p && { x: p.x, y: p.y, w: p.w ?? cw(id), h: p.h ?? hOf(id) }; };
+    const mid = id => { const b = box(id); return b && { x: b.x + b.w / 2, y: b.y + (isFrame(id) ? HEAD / 2 : b.h / 2) }; };
+    let s = 0;
+    const segs = [];
+    for (const [a, b] of ties) {
+      const p = mid(a), q = mid(b);
+      if (!p || !q) continue;
+      s += Math.hypot(q.x - p.x, q.y - p.y);                                                  // short strings
+      if (q.y < p.y - 80 || (Math.abs(q.y - p.y) <= 80 && q.x < p.x - 80)) s += 800;         // ones running backwards
+      segs.push([p, q, a, b]);
+    }
+    for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {       // strings crossing strings
+      const [p1, q1, a1, b1] = segs[i], [p2, q2, a2, b2] = segs[j];
+      if (a1 === a2 || a1 === b2 || b1 === a2 || b1 === b2) continue;
+      if (segsCross(p1, q1, p2, q2)) s += 700;
+    }
+    const others = [];
+    for (const id of pos.keys()) if (!isFrame(id) && id !== key) { const b = box(id); others.push({ id, x: b.x + 10, y: b.y + 10, w: b.w - 20, h: b.h - 20 }); }
+    for (const [p, q, a, b] of segs) for (const o of others) if (o.id !== a && o.id !== b && segHits(p, q, o)) s += 900;   // strings over other cards
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const id of pos.keys()) { const b = box(id); x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
+    if (x0 < Infinity) s += Math.max(x1 - x0, (y1 - y0) * A) * 1.2;                           // fits the screen
+    return s;
+  }
+
+  // Cards in reading order: left to right, then the next row down.
+  function gridOf(list, cols) {
+    const colW = Math.max(CARD_W, ...list.map(r => cw(r.id)));
+    const place = new Map();
+    let y = 0;
+    for (let i = 0; i < list.length; i += cols) {
+      let rh = 0;
+      list.slice(i, i + cols).forEach((r, j) => { place.set(r.id, { x: j * (colW + GAP), y }); rh = Math.max(rh, hOf(r.id)); });
+      y += rh + GAP;
+    }
+    return { place, w: list.length ? Math.min(cols, list.length) * (colW + GAP) - GAP : 0, h: Math.max(0, y - GAP) };
+  }
+
+  // Things in the order they flow: each after what feeds into it (where strings go round in a
+  // circle, whatever has fewest coming in goes first), and next to what it was strung to just before;
+  // otherwise in the order they're in the list.
+  function flowOrder(nodes, w) {
+    const left = [...nodes], out = [];
+    while (left.length) {
+      let bi = 0, best = Infinity;
+      left.forEach((n, i) => {
+        let inn = 0, outw = 0, near = 0;
+        for (const o of left) if (o !== n) { inn += w(o, n); outw += w(n, o); }
+        for (let k = out.length - 1, f = 1; k >= 0 && f > 0.1; k--, f /= 2) near += (w(out[k], n) + w(n, out[k])) * f;
+        const v = inn * 1000 - near * 50 - outw * 4 + i * 20;
+        if (v < best) { best = v; bi = i; }
+      });
+      out.push(left.splice(bi, 1)[0]);
+    }
+    return out;
+  }
+
+  function tidyAll(todo) {
+    const A = screenShape(), tall = A < 0.9, maxCols = tall ? 2 : 3;
+    const ids = new Set([...frames, ...todo].map(r => r.id));
+    const ties = tiesAmong(ids);
+    const wt = new Map();
+    for (const [a, b] of ties) wt.set(a + '>' + b, (wt.get(a + '>' + b) || 0) + 1);
+    const w = (a, b) => wt.get(a + '>' + b) || 0;
+    const cardFlow = list => flowOrder([...list].sort(byOrder), (a, b) => w(a.id, b.id));
+    const parentOf = id => todo.find(c => c.id === id)?.data.parent;
+    const inSection = id => frameIds.has(id) || frameIds.has(parentOf(id));
+
+    // The blocks to place: each section with its cards; loose cards strung into a section, one by
+    // one (so they can sit beside it); loose cards strung only to each other, as a group; and the
+    // rest in one block at the end.
+    const units = [];
+    for (const s of [...frames].sort((a, b) => (a.data.order || 0) - (b.data.order || 0))) {   // (in their list order)
+      const kids = cardFlow(todo.filter(c => c.data.parent === s.id));
+      units.push({ frame: s, members: kids, cols: Math.min(maxCols, Math.max(1, Math.ceil(Math.sqrt(kids.length)))) });
+    }
+    const loose = todo.filter(c => !frameIds.has(c.data.parent)).sort(byOrder);
+    const linked = id => ties.filter(([a, b]) => a === id || b === id).map(([a, b]) => (a === id ? b : a));
+    for (const c of loose.filter(c => linked(c.id).some(inSection))) units.push({ members: [c], cols: 1 });
+    const rest = loose.filter(c => !linked(c.id).some(inSection)), seen = new Set(), single = [];
     for (const c of rest) {
       if (seen.has(c.id)) continue;
       const group = [], stack = [c];
@@ -309,49 +374,130 @@ export function createBoard(host, api) {
       while (stack.length) {
         const x = stack.pop();
         group.push(x);
-        for (const y of adj.get(x.id)?.keys() || []) { const r = rest.find(z => z.id === y); if (r && !seen.has(y)) { seen.add(y); stack.push(r); } }
+        for (const y of linked(x.id)) { const r = rest.find(z => z.id === y); if (r && !seen.has(y)) { seen.add(y); stack.push(r); } }
       }
-      if (group.length > 1) units.push(block(cardChain(group.sort(order)), tall ? 2 : 3)); else single.push(c);
+      if (group.length > 1) units.push({ members: cardFlow(group), cols: Math.min(maxCols, Math.ceil(Math.sqrt(group.length))) });
+      else single.push(c);
     }
-    if (single.length) units.push(block(single, tall ? 2 : 4));
+    if (single.length) units.push({ members: single, cols: Math.min(tall ? 2 : 4, Math.max(1, Math.ceil(Math.sqrt(single.length)))), last: true });
 
-    // Placing them.
-    const uw = (U, V) => { let n = 0; for (const a of U.ids) for (const b of V.ids) n += wt(a, b); return n; };
-    const udeg = U => { let n = 0; for (const a of U.ids) for (const [b, v] of adj.get(a) || []) if (!U.ids.includes(b)) n += v; return n; };
-    const placed = [];
-    let bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
-    for (const u of chain(units, uw, udeg)) {
-      let best = null, bestS = Infinity;
-      if (!placed.length) best = [0, 0];
-      else {
-        const cand = [];
-        for (const p of placed) cand.push(
-          [p.x + p.u.w + G, p.y], [p.x, p.y + p.u.h + G], [p.x - u.w - G, p.y], [p.x, p.y - u.h - G],
-          [p.x + p.u.w + G, p.y + p.u.h - u.h], [p.x + p.u.w - u.w, p.y + p.u.h + G]);
-        // How wide the board has to be shown to fit this screen: the smaller, the bigger it can be
-        // drawn (so it grows whichever way keeps it closest to the screen's shape).
-        const fitOf = (W, H) => Math.max(W, H * A);
-        const fit0 = fitOf(bx1 - bx0, by1 - by0);
-        for (const [x, y] of cand) {
-          if (placed.some(p => x < p.x + p.u.w + G - 1 && x + u.w + G - 1 > p.x && y < p.y + p.u.h + G - 1 && y + u.h + G - 1 > p.y)) continue;
-          const cx = x + u.w / 2, cy = y + u.h / 2;
-          let s = 0;
-          for (const p of placed) { const w = uw(u, p.u); if (w) s += w * Math.hypot(cx - (p.x + p.u.w / 2), cy - (p.y + p.u.h / 2)); }
-          const W = Math.max(bx1, x + u.w) - Math.min(bx0, x), H = Math.max(by1, y + u.h) - Math.min(by0, y);
-          s += (fitOf(W, H) - fit0) * 1.6;
-          // (and, between equals, nearer the middle)
-          s += Math.hypot(cx - (bx0 + bx1) / 2, (cy - (by0 + by1) / 2) * A) * 0.05;
-          if (s < bestS) { bestS = s; best = [x, y]; }
-        }
-        if (!best) best = [bx1 + G, by0];
+    const build = u => {
+      const g = gridOf(u.members, u.cols);
+      if (u.frame) {
+        u.w = Math.max(320, g.w + 2 * PAD); u.h = Math.max(220, HEAD + PAD + g.h + PAD);
+        u.place = new Map([[u.frame.id, { x: 0, y: 0, w: u.w, h: u.h }]]);
+        for (const [id, p] of g.place) u.place.set(id, { x: PAD + p.x, y: HEAD + PAD + p.y });
+      } else { u.w = g.w; u.h = g.h; u.place = g.place; }
+    };
+    units.forEach(build);
+    const unitOf = new Map();
+    for (const u of units) for (const id of u.place.keys()) unitOf.set(id, u);
+    const uw = (U, V) => { let n = 0; for (const [a, b] of ties) if (unitOf.get(a) === U && unitOf.get(b) === V) n++; return n; };
+    const order = flowOrder(units.filter(u => !u.last), uw);
+    const lastU = units.find(u => u.last);
+    if (lastU) order.push(lastU);
+
+    // Rows to read along, as wide as suits the screen.
+    const area = units.reduce((t, u) => t + (u.w + TG) * (u.h + TG), 0);
+    const widest = Math.max(...units.map(u => u.w));
+    let rowW = Math.max(widest, Math.sqrt(area * A));
+    const place = () => {
+      const pos = new Map();
+      let x = 0, y = 0, rowH = 0;
+      for (const u of order) {
+        if (x > 0 && x + u.w > rowW) { x = 0; y += rowH + TG; rowH = 0; }
+        for (const [id, p] of u.place) pos.set(id, { ...p, x: x + p.x, y: y + p.y });
+        x += u.w + TG; rowH = Math.max(rowH, u.h);
       }
-      const [x, y] = best;
-      placed.push({ u, x, y });
-      bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x + u.w); by1 = Math.max(by1, y + u.h);
+      return pos;
+    };
+    let best = untidiness(place(), ties, A);
+    const keep = undo => { const s = untidiness(place(), ties, A); if (s < best - 1) { best = s; return true; } undo(); return false; };
+    // (rows a bit narrower or wider, if that suits the screen better)
+    const tryWidths = () => {
+      const base = rowW;
+      for (const k of [0.7, 0.85, 1.2, 1.45, 1.75]) {
+        const was = rowW;
+        rowW = Math.max(widest, base * k);
+        keep(() => { rowW = was; });
+      }
+    };
+    tryWidths();
+    const until = performance.now() + 300;
+    for (let pass = 0; pass < 5 && performance.now() < until; pass++) {
+      let better = false;
+      for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) {
+        if (order[i].last || order[j].last) continue;
+        [order[i], order[j]] = [order[j], order[i]];
+        if (keep(() => { [order[i], order[j]] = [order[j], order[i]]; })) better = true;
+      }
+      for (const u of units) {
+        const m = u.members;
+        for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) {
+          [m[i], m[j]] = [m[j], m[i]]; build(u);
+          if (keep(() => { [m[i], m[j]] = [m[j], m[i]]; build(u); })) better = true;
+        }
+        for (const c of [u.cols - 1, u.cols + 1]) {
+          if (c < 1 || c > maxCols || c > m.length || u.last) continue;
+          const was = u.cols; u.cols = c; build(u);
+          if (keep(() => { u.cols = was; build(u); })) better = true;
+        }
+      }
+      if (!better) break;
+    }
+    tryWidths();
+    return place();
+  }
+
+  function tidyInside() {
+    const A = screenShape();
+    const pos = new Map();
+    for (const r of [...frames, ...cards]) { const b = rectOf(r.id); if (b) pos.set(r.id, isFrame(r.id) ? { x: b.x, y: b.y, w: b.w, h: b.h } : { x: b.x, y: b.y }); }
+    const ties = tiesAmong(new Set(pos.keys()));
+    const wt = new Map();
+    for (const [a, b] of ties) wt.set(a + '>' + b, (wt.get(a + '>' + b) || 0) + 1);
+    const w = (a, b) => wt.get(a + '>' + b) || 0;
+    const secs = [];
+    for (const s of frames) {
+      const f = pos.get(s.id);
+      if (!f) continue;
+      const kids = flowOrder(cards.filter(c => c.data.parent === s.id && !guests.has(c.id) && !isSketch(c)).sort(byOrder), (a, b) => w(a.id, b.id));
+      const colW = Math.max(CARD_W, ...kids.map(r => cw(r.id)));
+      secs.push({ s, f, kids, cols: Math.max(1, Math.min(kids.length || 1, Math.floor((f.w - 2 * PAD + GAP) / (colW + GAP)))) });
+    }
+    const apply = sec => {
+      const g = gridOf(sec.kids, sec.cols);
+      for (const [id, p] of g.place) pos.set(id, { x: sec.f.x + PAD + p.x, y: sec.f.y + HEAD + PAD + p.y });
+      sec.f.w = Math.max(320, g.w + 2 * PAD, sec.w0 ?? (sec.w0 = sec.f.w));
+      sec.f.h = Math.max(220, HEAD + PAD + g.h + PAD);
+    };
+    secs.forEach(apply);
+    let best = untidiness(pos, ties, A);
+    const until = performance.now() + 300;
+    for (let pass = 0; pass < 5 && performance.now() < until; pass++) {
+      let better = false;
+      for (const sec of secs) {
+        const m = sec.kids;
+        for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) {
+          [m[i], m[j]] = [m[j], m[i]]; apply(sec);
+          const s = untidiness(pos, ties, A);
+          if (s < best - 1) { best = s; better = true; } else { [m[i], m[j]] = [m[j], m[i]]; apply(sec); }
+        }
+      }
+      if (!better) break;
     }
     const out = new Map();
-    for (const { u, x, y } of placed) for (const [id, p] of u.place) out.set(id, { ...p, x: Math.round(x - bx0 + p.x), y: Math.round(y - by0 + p.y) });
+    for (const sec of secs) { out.set(sec.s.id, pos.get(sec.s.id)); for (const k of sec.kids) out.set(k.id, pos.get(k.id)); }
     return out;
+  }
+
+  // A board nothing's been placed on is laid out the same way, worked out once (until something
+  // on it changes) rather than at every redraw.
+  let autoCache = null;
+  function autoTidy(todo) {
+    const sig = JSON.stringify([key, Math.round(screenShape() * 10), todo.map(r => [r.id, r.data.parent || '', Math.round(hOf(r.id)), sc(r.id)]), frames.map(f => f.id), tiesAmong(new Set([...frames, ...todo].map(r => r.id)))]);
+    if (autoCache?.sig !== sig) autoCache = { sig, out: tidyAll(todo) };
+    return new Map([...autoCache.out].map(([id, p]) => [id, { ...p }]));
   }
 
   // ---------- Drawing ----------
@@ -605,13 +751,16 @@ export function createBoard(host, api) {
   }
   // (0.7.4) Where a string's label goes: halfway, unless that's over a card, then the nearest clear
   // spot along the string (its branches start there too).
-  function labelSpot(s, label) {
+  // (0.7.5: and not on another label either: placed holds the ones already put down)
+  function labelSpot(s, label, placed = []) {
     if (!s.pts || !obstacles || !label) return s.mid;
     const w = label.length * 7.2 + 16, h = 22;
-    const clear = p => !obstacles.some(o => p.x - w / 2 < o.x + o.w && p.x + w / 2 > o.x && p.y - h / 2 < o.y + o.h && p.y + h / 2 > o.y);
-    if (clear(s.mid)) return s.mid;
-    for (const t of [0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82]) { const p = alongAt(s.pts, t); if (clear(p)) return p; }
-    return s.mid;
+    const hits = (p, o) => p.x - w / 2 < o.x + o.w && p.x + w / 2 > o.x && p.y - h / 2 < o.y + o.h && p.y + h / 2 > o.y;
+    const clear = p => !obstacles.some(o => hits(p, o)) && !placed.some(o => hits(p, o));
+    let spot = s.mid;
+    if (!clear(spot)) for (const t of [0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82]) { const p = alongAt(s.pts, t); if (clear(p)) { spot = p; break; } }
+    placed.push({ x: spot.x - w / 2 - 4, y: spot.y - h / 2 - 2, w: w + 8, h: h + 4 });
+    return spot;
   }
   // A route with its corners rounded, as points every few pixels (for the hand-drawn looks).
   function bendPts(pts, r, step) {
@@ -637,6 +786,9 @@ export function createBoard(host, api) {
       const a = pinPoint(fromId), b = pinPoint(toId);
       return a && b ? wool(a, b) : null;
     }
+    // (all the strings routed together, when nothing's being dragged: see routeAll)
+    const routed = routeMap?.get(fromId + '|' + toId);
+    if (routed) return { ...routed };
     const A = rectOf(fromId), B = rectOf(toId);
     if (!A || !B) return null;
     const seed = fromId + '>' + toId;
@@ -704,6 +856,7 @@ export function createBoard(host, api) {
   const ROUND_LOOKS = new Set(['whiteboard', 'blueprint', 'notebook', 'circuit', 'city', 'neon', 'minimal', 'hacker', 'chalkboard']);
   let obstacles = null;   // the cards (and the banner) to keep clear of, a little bigger than drawn
   let frameBoxes = null;  // (0.7.4) the sections: a string goes round one it isn't in, if that's not far
+  let routeMap = null;    // (0.7.5) every string's route, worked out together (see routeAll)
 
   function segHits(p, q, r) {
     let t0 = 0, t1 = 1;
@@ -726,13 +879,27 @@ export function createBoard(host, api) {
     const ca = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, cb = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
     const soft = (frameBoxes || []).filter(fr => !skip.has(fr.id) && !inRect(fr, ca) && !inRect(fr, cb));
     if (!crosses(s.pts, obs) && !crosses(s.pts, soft)) return s;
-    const pts = findRoute(A, B, obs, GAP_AT_END[look()] ?? 5, soft);
-    return pts ? alongPts(pts, seedKey, colourKey) : s;
+    const r = findRoute(A, B, obs, GAP_AT_END[look()] ?? 5, soft);
+    return r ? alongPts(r.pts, seedKey, colourKey) : s;
   }
 
   // (crossing a card costs a lot; going through a section the string isn't in costs a little, so it
-  // goes round unless that's a long way)
-  function findRoute(A, B, obs, gap, soft = []) {
+  // goes round unless that's a long way; 0.7.5: crossing another string, or running along on top
+  // of one, costs a little too.) Returns {pts, score, pen}: pen is what the route still crosses.
+  const STRING_CROSS = 160, STRING_ALONG = 3;
+  function stringCost(p, q, others) {
+    let c = 0;
+    for (const o of others) {
+      if (segsCross(p, q, o.p, o.q)) { c += STRING_CROSS; continue; }
+      // (lying along another string, a few pixels apart, costs by the length shared)
+      const flat = Math.abs(p.y - q.y) < 0.5 && Math.abs(o.p.y - o.q.y) < 0.5 && Math.abs(p.y - o.p.y) < 7;
+      const upright = Math.abs(p.x - q.x) < 0.5 && Math.abs(o.p.x - o.q.x) < 0.5 && Math.abs(p.x - o.p.x) < 7;
+      if (flat) c += Math.max(0, Math.min(Math.max(p.x, q.x), Math.max(o.p.x, o.q.x)) - Math.max(Math.min(p.x, q.x), Math.min(o.p.x, o.q.x))) * STRING_ALONG;
+      else if (upright) c += Math.max(0, Math.min(Math.max(p.y, q.y), Math.max(o.p.y, o.q.y)) - Math.max(Math.min(p.y, q.y), Math.min(o.p.y, o.q.y))) * STRING_ALONG;
+    }
+    return c;
+  }
+  function findRoute(A, B, obs, gap, soft = [], others = []) {
     const M = 16, BEND = 40, CROSS = 5000, THROUGH = 700;
     const ca = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, cb = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
     // Where a string may leave (or reach) a card: any side but the one facing right away, at the
@@ -751,9 +918,15 @@ export function createBoard(host, api) {
     const x0 = Math.min(A.x, B.x) - 260, x1 = Math.max(A.x + A.w, B.x + B.w) + 260, y0 = Math.min(A.y, B.y) - 260, y1 = Math.max(A.y + A.h, B.y + B.h) + 260;
     const near = obs.filter(o => o.x < x1 && o.x + o.w > x0 && o.y < y1 && o.y + o.h > y0);
     const nearSoft = soft.filter(o => o.x < x1 && o.x + o.w > x0 && o.y < y1 && o.y + o.h > y0);
+    const nearStrings = others.filter(o => Math.max(o.p.x, o.q.x) > x0 && Math.min(o.p.x, o.q.x) < x1 && Math.max(o.p.y, o.q.y) > y0 && Math.min(o.p.y, o.q.y) < y1);
     const xs = new Set(), ys = new Set();
     for (const o of [...near, ...ends, ...nearSoft]) { xs.add(Math.round(o.x - M)); xs.add(Math.round(o.x + o.w + M)); ys.add(Math.round(o.y - M)); ys.add(Math.round(o.y + o.h + M)); }
-    let best = null, bestScore = Infinity;
+    // (and just beside other strings' straight runs, so a string can run alongside rather than on top)
+    for (const o of nearStrings) {
+      if (Math.abs(o.p.x - o.q.x) < 0.5) { xs.add(Math.round(o.p.x - 10)); xs.add(Math.round(o.p.x + 10)); }
+      if (Math.abs(o.p.y - o.q.y) < 0.5) { ys.add(Math.round(o.p.y - 10)); ys.add(Math.round(o.p.y + 10)); }
+    }
+    let best = null, bestScore = Infinity, bestPen = 0;
     const tryRoute = (a, b, S, T, mid) => {
       const raw = [a.p, S, ...mid, T, b.e];
       const pts = [raw[0]];
@@ -762,16 +935,18 @@ export function createBoard(host, api) {
       for (let i = pts.length - 2; i > 0; i--) { const p = pts[i - 1], q = pts[i], r = pts[i + 1]; if ((Math.abs(p.x - q.x) < 0.5 && Math.abs(q.x - r.x) < 0.5) || (Math.abs(p.y - q.y) < 0.5 && Math.abs(q.y - r.y) < 0.5)) pts.splice(i, 1); }
       let len = 0;
       for (let i = 1; i < pts.length; i++) len += Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
-      let score = len + (pts.length - 2) * BEND;
-      if (score >= bestScore) return;
-      for (let i = 1; i < pts.length && score < bestScore; i++) {
+      const base = len + (pts.length - 2) * BEND;
+      if (base >= bestScore) return;
+      let pen = 0;
+      for (let i = 1; i < pts.length && base + pen < bestScore; i++) {
         const p = pts[i - 1], q = pts[i];
-        for (const o of near) if (segHits(p, q, o)) score += CROSS;
-        for (const o of nearSoft) if (segHits(p, q, o)) score += THROUGH;
+        for (const o of near) if (segHits(p, q, o)) pen += CROSS;
+        for (const o of nearSoft) if (segHits(p, q, o)) pen += THROUGH;
         // (the cards at the ends: not crossed except by the bit leaving or reaching them)
-        if (i > 1 && i < pts.length - 1) for (const o of ends) if (segHits(p, q, o)) score += CROSS;
+        if (i > 1 && i < pts.length - 1) for (const o of ends) if (segHits(p, q, o)) pen += CROSS;
+        if (nearStrings.length) pen += stringCost(p, q, nearStrings);
       }
-      if (score < bestScore) { bestScore = score; best = pts; }
+      if (base + pen < bestScore) { bestScore = base + pen; best = pts; bestPen = pen; }
     };
     const startOf = a => (a.n ? { x: a.p.x + a.n.x * M, y: a.p.y + a.n.y * M } : a.p);
     for (const a of pa) a.S = startOf(a);
@@ -785,8 +960,8 @@ export function createBoard(host, api) {
       for (const x of [...xs, Math.round((S.x + T.x) / 2)]) tryRoute(a, b, S, T, [{ x, y: S.y }, { x, y: T.y }]);
       for (const y of [...ys, Math.round((S.y + T.y) / 2)]) tryRoute(a, b, S, T, [{ x: S.x, y }, { x: T.x, y }]);
     }
-    // Still crossing something (a card, or a section it isn't in): one more turn, using the closest ways past.
-    if (bestScore >= THROUGH) {
+    // Still crossing something (a card, a section it isn't in, another string): one more turn, using the closest ways past.
+    if (bestPen >= STRING_CROSS) {
       const mx = (ca.x + cb.x) / 2, my = (ca.y + cb.y) / 2;
       const cx = [...xs].sort((p, q) => Math.abs(p - mx) - Math.abs(q - mx)).slice(0, 8);
       const cy = [...ys].sort((p, q) => Math.abs(p - my) - Math.abs(q - my)).slice(0, 8);
@@ -795,7 +970,52 @@ export function createBoard(host, api) {
         tryRoute(a, b, a.S, b.S, [{ x: a.S.x, y }, { x, y }, { x, y: b.S.y }]);
       }
     }
-    return best;
+    return best && { pts: best, score: bestScore, pen: bestPen };
+  }
+
+  // (0.7.5) All the strings on the board routed together, so they keep out of each other's way:
+  // each is routed once with the ones before it in mind, then again with all the others. A
+  // string the look draws its own way (a curve, a straight line) keeps that unless going round
+  // is clearly tidier. Worked out again only when something on the board has moved.
+  let routeCache = null;
+  function routeAll() {
+    const L = look(), gap = GAP_AT_END[L] ?? 5;
+    const jobs = [];
+    for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
+      const A = rectOf(r.id), B = rectOf(l.to);
+      if (A && B && r.id !== l.to) jobs.push({ k: `${r.id}|${l.to}`, from: r.id, to: l.to, A, B });
+    }
+    const R = b => [Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h)];
+    const sig = L + JSON.stringify([jobs.map(j => [j.k, R(j.A), R(j.B)]), obstacles.map(o => [o.id, ...R(o)]), (frameBoxes || []).map(o => [o.id, ...R(o)]), api.ownWire?.() || 0]);
+    if (routeCache?.sig === sig) return routeCache.map;
+    const len = pts => { let n = 0; for (let i = 1; i < (pts || []).length; i++) n += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return n; };
+    const segsOf = pts => { const out = []; for (let i = 1; i < (pts || []).length; i++) out.push({ p: pts[i - 1], q: pts[i] }); return out; };
+    for (const j of jobs) { j.seed = j.from + '>' + j.to; j.own = shape(j.A, j.B, j.seed); j.ownLen = len(j.own?.pts); }
+    jobs.sort((a, b) => a.ownLen - b.ownLen);
+    const map = new Map();
+    const one = (j, others) => {
+      const s = j.own;
+      if (!s?.pts || holds(j.A, j.B) || holds(j.B, j.A)) return s;
+      const skip = new Set([j.from, j.to]);
+      const obs = obstacles.filter(o => !skip.has(o.id));
+      const ca = { x: j.A.x + j.A.w / 2, y: j.A.y + j.A.h / 2 }, cb = { x: j.B.x + j.B.w / 2, y: j.B.y + j.B.h / 2 };
+      const soft = (frameBoxes || []).filter(fr => !skip.has(fr.id) && !inRect(fr, ca) && !inRect(fr, cb));
+      // what the look's own way crosses
+      let pen = 0;
+      for (let i = 1; i < s.pts.length; i++) {
+        const p = s.pts[i - 1], q = s.pts[i];
+        for (const o of obs) if (segHits(p, q, o)) pen += 5000;
+        for (const o of soft) if (segHits(p, q, o)) pen += 700;
+        pen += stringCost(p, q, others);
+      }
+      if (!pen) return s;
+      const r = findRoute(j.A, j.B, obs, gap, soft, others);
+      return r && r.score < j.ownLen + pen - 30 ? alongPts(r.pts, j.seed, j.seed) : s;
+    };
+    for (const j of jobs) { const others = []; for (const s of map.values()) others.push(...segsOf(s?.pts)); map.set(j.k, one(j, others)); }
+    for (const j of jobs) { const others = []; for (const [k, s] of map) if (k !== j.k) others.push(...segsOf(s?.pts)); map.set(j.k, one(j, others)); }
+    routeCache = { sig, map };
+    return map;
   }
 
   function drawLines() {
@@ -807,11 +1027,15 @@ export function createBoard(host, api) {
     // (not drawings on the board: strings may cross those, like anything drawn on it)
     frameBoxes = ROUND_LOOKS.has(L) ? frames.map(r => { const b = rectOf(r.id); return b && { id: r.id, x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 }; }).filter(Boolean) : null;
     obstacles = ROUND_LOOKS.has(L) ? [key, ...cards.filter(r => !isSketch(r)).map(r => r.id)].map(id => { const b = rectOf(id); return b && { id, x: b.x - 6, y: b.y - 6, w: b.w + 12, h: b.h + 12 }; }).filter(Boolean) : null;
+    // (while a card or section is being dragged, each string just finds its own way: quicker)
+    const dragging = gesture && ['move', 'scale', 'resize'].includes(gesture.kind);
+    routeMap = ROUND_LOOKS.has(L) && !dragging ? routeAll() : null;
+    const placedLabels = [];
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       if (!on.has(l.to)) continue;
       const s = wire(r.id, l.to);
       if (!s) continue;
-      if (l.label) s.mid = labelSpot(s, l.label);
+      if (l.label) s.mid = labelSpot(s, l.label, placedLabels);
       const id = `${r.id}|${esc(l.to)}`;
       junctions.set(id, s.mid);
       html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${s.html}`;
@@ -1535,7 +1759,10 @@ export function createBoard(host, api) {
       const r = b.getBoundingClientRect();
       menu(r.left + 10, r.top, a === 'fit'
         ? [{ label: 'Fit everything on screen', fn: () => fit() }]
-        : [{ label: 'Tidy: lay every card out again', fn: () => tidy() }], true);
+        : [
+          { label: 'Tidy everything (sections and cards)', fn: () => tidy('all') },
+          ...(frames.length ? [{ label: 'Tidy inside sections (sections stay put)', fn: () => tidy('inside') }] : []),
+        ], true);
     }
     else if (a === 'add') {
       if (!menuEl.hidden) { menuEl.hidden = true; return; }
@@ -1558,20 +1785,38 @@ export function createBoard(host, api) {
     else if (a === 'draw') drawOnBoard();
   });
 
-  async function tidy() {
-    // Cards brought in from elsewhere keep their spot (that's what keeps them here), and so do
-    // drawings made on the board (they were drawn where they are); the rest are laid out again.
-    const I = api.index();
-    const slot = r => (r.id === key ? 'banner' : key);
-    const mine = [I.byId.get(key), ...frames, ...cards.filter(r => !guests.has(r.id) && !(isSketch(r) && Number.isFinite(r.data.cork?.[key]?.x)))].filter(r => r?.data.cork?.[slot(r)]);
-    const before = new Map(mine.map(r => [r.id, r.data.cork]));
+  // (0.7.5) Tidy works the layout out once and saves it (see "Tidy" above). 'all': everything laid
+  // out again; cards brought in from elsewhere keep their spots (that's what keeps them here), and
+  // so do drawings made on the board (they were drawn where they are). 'inside': sections stay put.
+  async function tidy(mode) {
+    if (busy) return;
+    let out;
+    if (mode === 'inside') out = tidyInside();
+    else {
+      out = tidyAll(cards.filter(r => !guests.has(r.id) && !(isSketch(r) && Number.isFinite(r.data.cork?.[key]?.x))));
+      // (under the ones brought in from elsewhere, if there are any)
+      let gx = Infinity, gy = -Infinity;
+      for (const r of cards) if (guests.has(r.id)) { const p = pos.get(r.id); if (p) { gx = Math.min(gx, p.x); gy = Math.max(gy, p.y + hOf(r.id)); } }
+      if (gy > -Infinity) for (const p of out.values()) { p.x += gx; p.y += gy + 90; }
+    }
+    const ids = [...out.keys()].filter(id => api.store.get(id));
+    const before = new Map(ids.map(id => [id, api.store.get(id).data.cork]));
+    const proj = api.store.get(key), banner = proj?.data.cork;
     busy = true;
     try {
-      // (a card keeps its size)
-      for (const r of mine) { const c = { ...r.data.cork }, sz = c[slot(r)]?.s; if (sz) c[slot(r)] = { s: sz }; else delete c[slot(r)]; await api.store.update(r.id, { cork: Object.keys(c).length ? c : undefined }); }
+      for (const id of ids) {
+        const r = api.store.get(id), p = out.get(id), s = r.data.cork?.[key]?.s;   // (a card keeps its size)
+        const spot = isFrame(id) ? { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: Math.round(p.h) } : { x: Math.round(p.x), y: Math.round(p.y), ...(s ? { s } : {}) };
+        await api.store.update(id, { cork: { ...(r.data.cork || {}), [key]: spot } });
+      }
+      // (the banner goes back over the middle of it all)
+      if (mode !== 'inside' && banner?.banner) { const c = { ...banner }; delete c.banner; await api.store.update(key, { cork: Object.keys(c).length ? c : undefined }); }
     } finally { busy = false; }
-    needsFit = true; render();
-    api.toast('Board tidied.', 'Undo', async () => { for (const [id, c] of before) await api.store.update(id, { cork: c }); });
+    needsFit = mode !== 'inside'; render();
+    api.toast(mode === 'inside' ? 'Tidied inside the sections.' : 'Board tidied.', 'Undo', async () => {
+      for (const [id, c] of before) await api.store.update(id, { cork: c });
+      if (mode !== 'inside' && banner?.banner) await api.store.update(key, { cork: banner });
+    });
   }
 
   // ---------- The board as a picture (for export and print) ----------
