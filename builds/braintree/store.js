@@ -394,6 +394,7 @@ function mergeLinks(was = [], mine = [], other = []) {
     if (!o) continue;                     // cut on the other device: stays cut
     const m = { ...o };
     if ((l.label || '') !== (w.label || '')) { if (l.label) m.label = l.label; else delete m.label; }
+    if ((l.dir || '') !== (w.dir || '')) { if (l.dir) m.dir = l.dir; else delete m.dir; }   // (0.7.7: which way it points)
     const wa = new Set(w.also || []), la = new Set(l.also || []);
     const also = new Set((o.also || []).filter(c => !(wa.has(c) && !la.has(c))));
     for (const c of la) if (!wa.has(c)) also.add(c);

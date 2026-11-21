@@ -89,7 +89,7 @@ export function createBoard(host, api) {
       <button data-b="fit" title="Fit everything on screen">Fit</button>
       <button data-b="in" aria-label="Zoom in">+</button>
     </div>
-    <div class="stringpop" hidden><input placeholder="Label (optional)" maxlength="40"><button data-s="save">Save</button><button data-s="branch" title="Join another card to this string">Branch</button><button data-s="auto" title="Let the autorouter find its way again" hidden>Auto</button><button data-s="remove" class="danger">Remove</button><p class="pophint">Drag the string or its dots to reshape it. Double-tap a big dot to take that turn out.</p></div>
+    <div class="stringpop" hidden><input placeholder="Label (optional)" maxlength="40"><button data-s="save">Save</button><button data-s="branch" title="Join another card to this string">Branch</button><button data-s="auto" title="Let the autorouter find its way again" hidden>Auto</button><button data-s="remove" class="danger">Remove</button><button data-s="dir" class="dirbtn" title="Tap to change which way it points"></button><p class="pophint">Drag the string or its dots to reshape it. Double-tap a big dot to take that turn out.</p></div>
     <div class="boardmenu" hidden></div>
     <p class="boardhint" hidden></p>`;
   const cork = host.querySelector('.cork');
@@ -315,17 +315,41 @@ export function createBoard(host, api) {
     return s;
   }
 
-  // Cards in reading order: left to right, then the next row down.
+  // (0.7.7) Room for labels: how wide the label is on a string between two cards (either way round).
+  // (a string that points needs a bit more, so its arrowheads show either side of the label)
+  let labelRoom = new Map();
+  function measureLabelRoom() {
+    labelRoom = new Map();
+    for (const r of [...frames, ...cards]) for (const l of r.data.links || []) if (l.label) {
+      const d = dirOf(l), w = labelSize(l.label).w + (d === 'both' ? 48 : d === 'none' ? 0 : 26);
+      for (const k of [r.id + '|' + l.to, l.to + '|' + r.id]) { const o = labelRoom.get(k); labelRoom.set(k, { w: Math.max(o?.w || 0, w), points: !!o?.points || d !== 'none' }); }
+    }
+  }
+  const roomBetween = (a, b) => labelRoom.get(a + '|' + b)?.w || 0;
+  const pointsBetween = (a, b) => !!labelRoom.get(a + '|' + b)?.points;
+
+  // Cards in reading order: left to right, then the next row down. (0.7.7: where a labelled string
+  // joins two cards side by side, the gap between those columns is wide enough for its label, up to
+  // a point; one above the other, the gap between those rows is.)
   function gridOf(list, cols) {
     const colW = Math.max(CARD_W, ...list.map(r => cw(r.id)));
+    const rows = [];
+    for (let i = 0; i < list.length; i += cols) rows.push(list.slice(i, i + cols));
+    const colGap = new Array(Math.max(0, cols - 1)).fill(GAP), rowGap = new Array(Math.max(0, rows.length - 1)).fill(GAP);
+    rows.forEach((row, i) => row.forEach((r, j) => {
+      const right = row[j + 1], below = rows[i + 1]?.[j];
+      if (right) { const w = roomBetween(r.id, right.id); if (w) colGap[j] = Math.max(colGap[j], Math.min(200, w + 30)); }
+      if (below && roomBetween(r.id, below.id)) rowGap[i] = Math.max(rowGap[i], pointsBetween(r.id, below.id) ? 72 : 50);
+    }));
     const place = new Map();
-    let y = 0;
-    for (let i = 0; i < list.length; i += cols) {
-      let rh = 0;
-      list.slice(i, i + cols).forEach((r, j) => { place.set(r.id, { x: j * (colW + GAP), y }); rh = Math.max(rh, hOf(r.id)); });
-      y += rh + GAP;
-    }
-    return { place, w: list.length ? Math.min(cols, list.length) * (colW + GAP) - GAP : 0, h: Math.max(0, y - GAP) };
+    let y = 0, w = 0;
+    rows.forEach((row, i) => {
+      let x = 0, rh = 0;
+      row.forEach((r, j) => { place.set(r.id, { x, y }); rh = Math.max(rh, hOf(r.id)); x += colW + (colGap[j] ?? 0); });
+      w = Math.max(w, x - (colGap[row.length - 1] ?? 0));
+      y += rh + (rowGap[i] ?? 0);
+    });
+    return { place, w, h: y };
   }
 
   // Things in the order they flow: each after what feeds into it (where strings go round in a
@@ -348,6 +372,7 @@ export function createBoard(host, api) {
   }
 
   function tidyAll(todo) {
+    measureLabelRoom();
     const A = screenShape(), tall = A < 0.9, maxCols = tall ? 2 : 3;
     const ids = new Set([...frames, ...todo].map(r => r.id));
     const ties = tiesAmong(ids);
@@ -453,6 +478,7 @@ export function createBoard(host, api) {
   }
 
   function tidyInside() {
+    measureLabelRoom();
     const A = screenShape();
     const pos = new Map();
     for (const r of [...frames, ...cards]) { const b = rectOf(r.id); if (b) pos.set(r.id, isFrame(r.id) ? { x: b.x, y: b.y, w: b.w, h: b.h } : { x: b.x, y: b.y }); }
@@ -498,7 +524,8 @@ export function createBoard(host, api) {
   // on it changes) rather than at every redraw.
   let autoCache = null;
   function autoTidy(todo) {
-    const sig = JSON.stringify([key, Math.round(screenShape() * 10), todo.map(r => [r.id, r.data.parent || '', Math.round(hOf(r.id)), sc(r.id)]), frames.map(f => f.id), tiesAmong(new Set([...frames, ...todo].map(r => r.id)))]);
+    const sig = JSON.stringify([key, Math.round(screenShape() * 10), todo.map(r => [r.id, r.data.parent || '', Math.round(hOf(r.id)), sc(r.id)]), frames.map(f => f.id), tiesAmong(new Set([...frames, ...todo].map(r => r.id))),
+      [...frames, ...todo].flatMap(r => (r.data.links || []).filter(l => l.label).map(l => r.id + l.to + l.label.length + (l.dir || '')))]);
     if (autoCache?.sig !== sig) autoCache = { sig, out: tidyAll(todo) };
     return new Map([...autoCache.out].map(([id, p]) => [id, { ...p }]));
   }
@@ -662,7 +689,10 @@ export function createBoard(host, api) {
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
     const droop = Math.min(140, 18 + dist * 0.18) + extra;
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 + droop;
-    return { d: `M${a.x} ${a.y} Q${mx} ${my} ${b.x} ${b.y}`, mid: { x: mx, y: (a.y + b.y) / 4 + my / 2 } };
+    // (line: the curve as points, for labels and arrowheads to follow)
+    const line = [];
+    for (let i = 0; i <= 16; i++) { const t = i / 16, u = 1 - t; line.push({ x: u * u * a.x + 2 * u * t * mx + t * t * b.x, y: u * u * a.y + 2 * u * t * my + t * t * b.y }); }
+    return { d: `M${a.x} ${a.y} Q${mx} ${my} ${b.x} ${b.y}`, mid: { x: mx, y: (a.y + b.y) / 4 + my / 2 }, line };
   }
 
   // The sides of two boxes that face each other, and where on them a string leaves and arrives.
@@ -712,7 +742,8 @@ export function createBoard(host, api) {
     const ang = Math.atan2(tip.y - back.y, tip.x - back.x), spread = 0.47;
     const hd = `M${f(tip.x - head * Math.cos(ang - spread))} ${f(tip.y - head * Math.sin(ang - spread))}L${f(tip.x)} ${f(tip.y)}L${f(tip.x - head * Math.cos(ang + spread))} ${f(tip.y - head * Math.sin(ang + spread))}`;
     const d = smooth(pts);
-    return { d, mid: pts[Math.round(N / 2)], pts: raw, html: `<path class="wire ${cls}" d="${d}"/><path class="wire ${cls}" d="${hd}"/>` };
+    // (bare: without its arrowhead, for a string set to point another way: see withArrows)
+    return { d, mid: pts[Math.round(N / 2)], pts: raw, bare: `<path class="wire ${cls}" d="${d}"/>`, html: `<path class="wire ${cls}" d="${d}"/><path class="wire ${cls}" d="${hd}"/>` };
   }
 
   // Corners of a route: straight runs that turn at right angles, or (city lines, traces) run at 45°
@@ -752,18 +783,143 @@ export function createBoard(host, api) {
     }
     return pts[pts.length - 1];
   }
-  // (0.7.4) Where a string's label goes: halfway, unless that's over a card, then the nearest clear
-  // spot along the string (its branches start there too).
-  // (0.7.5: and not on another label either: placed holds the ones already put down)
-  function labelSpot(s, label, placed = []) {
-    if (!s.pts || !obstacles || !label) return s.mid;
-    const w = label.length * 7.2 + 16, h = 22;
-    const hits = (p, o) => p.x - w / 2 < o.x + o.w && p.x + w / 2 > o.x && p.y - h / 2 < o.y + o.h && p.y + h / 2 > o.y;
-    const clear = p => !obstacles.some(o => hits(p, o)) && !placed.some(o => hits(p, o));
-    let spot = s.mid;
-    if (!clear(spot)) for (const t of [0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82]) { const p = alongAt(s.pts, t); if (clear(p)) { spot = p; break; } }
-    placed.push({ x: spot.x - w / 2 - 4, y: spot.y - h / 2 - 2, w: w + 8, h: h + 4 });
-    return spot;
+  // ---------- Where labels go (0.7.7) ----------
+  // A string's label goes on a clear stretch of it: not over a card or a section's name, not on
+  // another label, and over as few other strings as it can (every look). If the string has no
+  // room (two cards close together), the label sits just beside it, in the nearest clear space,
+  // with a dotted line back to the string. Shortest strings are placed first (they have least
+  // room). Tidy leaves room for labels between cards, and the autorouter keeps other strings from
+  // running under them. (A knot where branches meet, on a string with no label, is placed the same
+  // way, but only on the string.)
+  const labelSize = label => ({ w: label.length * 7.2 + 16, h: 22 });
+  function labelBlocks() {
+    const out = [];
+    for (const id of [key, ...cards.filter(r => !isSketch(r)).map(r => r.id)]) { const b = rectOf(id); if (b) out.push({ x: b.x - 3, y: b.y - 3, w: b.w + 6, h: b.h + 6 }); }
+    for (const r of frames) { const b = rectOf(r.id); if (b) out.push({ x: b.x, y: b.y, w: b.w, h: HEAD - 8 }); }   // (a section's name)
+    return out;
+  }
+  const boxHit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  // The nearest point on a line of points to p.
+  function nearestOn(pts, p) {
+    let best = pts[0], bd = Infinity;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
+      const t = L2 ? clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / L2, 0, 1) : 0, q = { x: a.x + dx * t, y: a.y + dy * t }, d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < bd) { bd = d; best = q; }
+    }
+    return best;
+  }
+  function labelSpot(s, label, placed, blocks, others, knot = false) {
+    const pts = s.line || s.pts;
+    if (!pts || pts.length < 2) return { x: s.mid.x, y: s.mid.y };
+    const { w, h } = knot ? { w: 14, h: 14 } : labelSize(label);
+    const boxAt = p => ({ x: p.x - w / 2 - 3, y: p.y - h / 2 - 3, w: w + 6, h: h + 6 });
+    const cost = p => {
+      const b = boxAt(p);
+      let c = 0;
+      for (const o of blocks) if (boxHit(b, o)) c += 1e6;
+      for (const o of placed) if (boxHit(b, o)) c += 1e6;
+      for (const o of others) for (let i = 1; i < o.length; i++) if (segHits(o[i - 1], o[i], b)) { c += 60; break; }
+      return c;
+    };
+    // Spots to try, the most natural first: along the string, then beside it, then further round.
+    const cands = [];
+    for (const t of [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82]) cands.push({ p: alongAt(pts, t), base: Math.abs(t - 0.5) * 40 });
+    if (!knot) {
+      for (const t of [0.5, 0.36, 0.64, 0.22, 0.78]) {
+        const P = alongAt(pts, t), a = alongAt(pts, Math.max(0, t - 0.04)), b = alongAt(pts, Math.min(1, t + 0.04));
+        const tl = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = -(b.y - a.y) / tl, ny = (b.x - a.x) / tl;
+        const half = Math.abs(nx) * w / 2 + Math.abs(ny) * h / 2;
+        for (const k of [1, 1.8, 2.8, 4.2]) for (const sg of [1, -1]) {
+          const d = (half + 9) * k;
+          cands.push({ p: { x: P.x + nx * d * sg, y: P.y + ny * d * sg }, base: 120 + d + Math.abs(t - 0.5) * 60, beside: true });
+        }
+      }
+      const P = alongAt(pts, 0.5);
+      for (const r of [70, 110, 160, 220]) for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; cands.push({ p: { x: P.x + Math.cos(a) * r, y: P.y + Math.sin(a) * r * 0.6 }, base: 160 + r, beside: true }); }
+    }
+    cands.sort((a, b) => a.base - b.base);
+    let best = cands[0], bestC = Infinity;
+    for (const c of cands) {
+      if (c.base >= bestC) break;        // (nothing after this can do better)
+      const v = c.base + cost(c.p);
+      if (v < bestC) { bestC = v; best = c; }
+    }
+    placed.push(boxAt(best.p));
+    const out = { x: best.p.x, y: best.p.y, w, h };
+    if (best.beside) out.anchor = nearestOn(pts, best.p);
+    return out;
+  }
+  // Labels (and knots) for a list of strings ({s, label, knot}), each given its spot (.at).
+  function placeLabels(list, blocks = labelBlocks()) {
+    const placed = [], lines = list.map(it => it.s.line || it.s.pts || []);
+    const order = list.map((_, i) => i).filter(i => list[i].label || list[i].knot).sort((a, b) => polyLen(lines[a]) - polyLen(lines[b]));
+    for (const i of order) list[i].at = labelSpot(list[i].s, list[i].label, placed, blocks, lines.filter((_, k) => k !== i), !list[i].label);
+    return list;
+  }
+
+  // ---------- Which way a string points (0.7.7) ----------
+  // data.links[].dir: 'to' (an arrowhead at the card it was tied to), 'from' (at the card it was
+  // tied from), 'both' or 'none'. Left unset, it's the look's own: an arrow at the far end on the
+  // looks that draw one. Branches follow their string.
+  const ARROW_LOOKS = new Set(['blueprint', 'hacker', 'minimal', 'whiteboard', 'notebook', 'chalkboard']);
+  const DIRS = ['to', 'from', 'both', 'none'];
+  const dirOf = l => (DIRS.includes(l?.dir) ? l.dir : ARROW_LOOKS.has(look()) ? 'to' : 'none');
+  // (how far back from each end an arrowhead's tip goes, clear of the dot, pad, station, star or pin there)
+  const TIP_BACK = { corkboard: [9, 9], city: [8, 8], circuit: [6.5, 6.5], space: [8, 8], blueprint: [4.5, 0] };
+  function backAlong(P, d) {
+    for (let i = P.length - 1; i > 0; i--) {
+      const a = P[i], b = P[i - 1], l = Math.hypot(b.x - a.x, b.y - a.y);
+      if (l >= d) return { x: a.x + (b.x - a.x) * d / l, y: a.y + (b.y - a.y) * d / l };
+      d -= l;
+    }
+    return P[0];
+  }
+  // An arrowhead at the end of a line of points, drawn the look's way.
+  function arrowHead(P, L, lc, back) {
+    const tip = backAlong(P, back), base = backAlong(P, back + 12), ang = Math.atan2(tip.y - base.y, tip.x - base.x);
+    const at = (len, side) => ({ x: tip.x - len * Math.cos(ang) + side * Math.sin(ang), y: tip.y - len * Math.sin(ang) - side * Math.cos(ang) });
+    const tri = (len, half, cls = 'shead') => { const a = at(len, half), b = at(len, -half); return `<path class="${cls}" ${lc || ''} d="M${f(tip.x)} ${f(tip.y)}L${f(a.x)} ${f(a.y)}L${f(b.x)} ${f(b.y)}z"/>`; };
+    const vee = (len, cls) => { const a = at(len, len * 0.5), b = at(len, -len * 0.5); const d = `M${f(a.x)} ${f(a.y)}L${f(tip.x)} ${f(tip.y)}L${f(b.x)} ${f(b.y)}`; return cls.map(c => `<path class="wire ${c}" ${lc || ''} d="${d}"/>`).join(''); };
+    if (L === 'whiteboard') return vee(15, ['marker']);
+    if (L === 'chalkboard') return vee(15, ['chalk']);
+    if (L === 'notebook') return vee(11, ['pen']);
+    if (L === 'neon') return vee(14, ['tube glow', 'tube']);
+    if (L === 'city') return tri(17, 8.5);
+    if (L === 'corkboard') return tri(15, 7);
+    if (L === 'circuit') return tri(13, 6);
+    if (L === 'space') return tri(10, 4.5);
+    return tri(10, 4.5, 'arrowhead');   // (blueprint, hacker, minimal: like their usual arrow)
+  }
+  // A string (or branch) drawn pointing the way it's set to. startGap: how far its start is hidden
+  // (a branch starts under its string's label).
+  function withArrows(s, dir, L, startGap = 0) {
+    let html = (s.bare ?? s.html).replace(/ marker-end="url\(#bt-arrow\)"/g, '');
+    const P = s.line || s.pts;
+    if (!P || P.length < 2 || dir === 'none') return html;
+    const [b0, b1] = TIP_BACK[L] || [1, 0];
+    if (dir === 'to' || dir === 'both') html += arrowHead(P, L, s.lc, b1);
+    if (dir === 'from' || dir === 'both') html += arrowHead([...P].reverse(), L, s.lc, Math.max(b0, startGap));
+    return html;
+  }
+  // Where a string's arrowheads are (boxes round them), for labels to keep off.
+  function headZones(s, dir, L) {
+    const P = s.line || s.pts, out = [];
+    if (!P || P.length < 2 || dir === 'none') return out;
+    const [b0, b1] = TIP_BACK[L] || [1, 0], zone = c => ({ x: c.x - 11, y: c.y - 11, w: 22, h: 22 });
+    if (dir === 'to' || dir === 'both') out.push(zone(backAlong(P, b1 + 8)));
+    if (dir === 'from' || dir === 'both') out.push(zone(backAlong([...P].reverse(), b0 + 8)));
+    return out;
+  }
+  // How far along a line of points it first comes out of a box.
+  function outOf(P, box) {
+    let n = 0;
+    for (let i = 1; i < P.length; i++) {
+      const a = P[i - 1], b = P[i], l = Math.hypot(b.x - a.x, b.y - a.y), k = Math.max(1, Math.ceil(l / 2));
+      for (let j = 1; j <= k; j++) { const x = a.x + (b.x - a.x) * j / k, y = a.y + (b.y - a.y) * j / k; if (x < box.x || x > box.x + box.w || y < box.y || y > box.y + box.h) return n + l * j / k; }
+      n += l;
+    }
+    return n;
   }
   // A route with its corners rounded, as points every few pixels (for the hand-drawn looks).
   function bendPts(pts, r, step) {
@@ -987,7 +1143,7 @@ export function createBoard(host, api) {
   // with all the others in place. A string a look draws its own way (a curve, a straight line)
   // keeps that if it gets through cleanly. Shaped strings (data.links[].via, see below) keep their
   // shape, and the others go round them. It's worked out just after a redraw, once nothing's moving.
-  const CELL = 16, ROUTE_TURN = 3, ROUTE_SOFT = 1.5, ROUTE_CROSS = 20, ROUTE_ALONG = 4;
+  const CELL = 16, ROUTE_TURN = 3, ROUTE_SOFT = 1.5, ROUTE_CROSS = 20, ROUTE_ALONG = 4, ROUTE_LABEL = 14;   // (0.7.7: a square under another string's label)
   const ORTHO_LOOKS = new Set(['blueprint', 'hacker']), OCTO_LOOKS = new Set(['circuit', 'city']);   // (right angles; right angles and 45°)
   const polyLen = pts => { let n = 0; for (let i = 1; i < (pts || []).length; i++) n += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return n; };
 
@@ -997,7 +1153,7 @@ export function createBoard(host, api) {
     if (x0 === Infinity) return null;
     const gx0 = Math.floor((x0 - 320) / CELL) * CELL, gy0 = Math.floor((y0 - 320) / CELL) * CELL;
     const cols = Math.ceil((x1 + 320 - gx0) / CELL), rows = Math.ceil((y1 + 320 - gy0) / CELL), N = cols * rows;
-    const G = { gx0, gy0, cols, rows, owner: new Int32Array(N), sect: new Int32Array(N), usedH: new Uint8Array(N), usedV: new Uint8Array(N), obsIndex: new Map(), secIndex: new Map() };
+    const G = { gx0, gy0, cols, rows, owner: new Int32Array(N), sect: new Int32Array(N), usedH: new Uint8Array(N), usedV: new Uint8Array(N), lab: new Uint8Array(N), obsIndex: new Map(), secIndex: new Map() };
     // (the squares whose middle is inside a box)
     const cover = (o, fn) => {
       const c0 = Math.max(0, Math.ceil((o.x - gx0) / CELL - 0.5)), c1 = Math.min(cols - 1, Math.floor((o.x + o.w - gx0) / CELL - 0.5));
@@ -1008,6 +1164,8 @@ export function createBoard(host, api) {
     // (smaller sections over bigger ones)
     (frameBoxes || []).map((fr, j) => [fr, j]).sort((a, b) => b[0].w * b[0].h - a[0].w * a[0].h)
       .forEach(([fr, j]) => { G.secIndex.set(fr.id, j + 1); cover(fr, k => { G.sect[k] = j + 1; }); });
+    // (0.7.7) where labels sit: n = 1 marks one, -1 takes it off
+    G.markLabel = (at, n) => { if (at) cover({ x: at.x - at.w / 2 - 4, y: at.y - at.h / 2 - 4, w: at.w + 8, h: at.h + 8 }, k => { G.lab[k] = Math.max(0, Math.min(255, G.lab[k] + n)); }); };
     return G;
   }
   const cellAt = (G, x, y) => { const c = Math.floor((x - G.gx0) / CELL), r = Math.floor((y - G.gy0) / CELL); return c >= 0 && r >= 0 && c < G.cols && r < G.rows ? r * G.cols + c : -1; };
@@ -1032,14 +1190,14 @@ export function createBoard(host, api) {
       const o = G.owner[k];
       if (o && o !== ia && o !== ib) pen += 1000;
       if (G.sect[k] && G.sect[k] !== sa && G.sect[k] !== sb) pen += ROUTE_SOFT;
-      pen += (flat ? G.usedV[k] : G.usedH[k]) * ROUTE_CROSS + (flat ? G.usedH[k] : G.usedV[k]) * ROUTE_ALONG;
+      pen += (flat ? G.usedV[k] : G.usedH[k]) * ROUTE_CROSS + (flat ? G.usedH[k] : G.usedV[k]) * ROUTE_ALONG + G.lab[k] * ROUTE_LABEL;
     });
     return pen;
   }
 
   // The cheapest way between two boxes (A* over the squares; state = square and the way it's going).
   function autoroute(G, A, B, ia, ib, sa, sb, gap, wide = false) {
-    const { gx0, gy0, cols, rows, owner, sect, usedH, usedV } = G;
+    const { gx0, gy0, cols, rows, owner, sect, usedH, usedV, lab } = G;
     const col = x => Math.floor((x - gx0) / CELL), row = y => Math.floor((y - gy0) / CELL);
     const cxOf = c => gx0 + (c + 0.5) * CELL, cyOf = r => gy0 + (r + 0.5) * CELL;
     const m = wide ? 1e7 : 480;
@@ -1106,7 +1264,7 @@ export function createBoard(host, api) {
         if (!free(nk)) continue;
         let cost = 1 + (nd !== d ? ROUTE_TURN : 0);
         if (sect[nk] && sect[nk] !== sa && sect[nk] !== sb) cost += ROUTE_SOFT;
-        cost += nd & 1 ? usedH[nk] * ROUTE_CROSS + usedV[nk] * ROUTE_ALONG : usedV[nk] * ROUTE_CROSS + usedH[nk] * ROUTE_ALONG;
+        cost += (nd & 1 ? usedH[nk] * ROUTE_CROSS + usedV[nk] * ROUTE_ALONG : usedV[nk] * ROUTE_CROSS + usedH[nk] * ROUTE_ALONG) + lab[nk] * ROUTE_LABEL;
         const ns = sid(nc, nr, nd), ng = g + cost;
         if (ng < gs[ns]) { gs[ns] = ng; prev[ns] = st; push(ng + hOf(nc, nr), ns); }
       }
@@ -1179,7 +1337,7 @@ export function createBoard(host, api) {
     const parts = [];
     for (let i = 1; i < pts.length; i++) { const s = sag(pts[i - 1], pts[i]); parts.push(s); d += i === 1 ? s.d : ' ' + s.d.slice(s.d.indexOf('Q')); }
     const pins = pts.slice(1, -1).map(p => `<circle class="pinhead" cx="${f(p.x)}" cy="${f(p.y)}" r="5.5" style="fill:#9C968B"/>`).join('');
-    return { d, mid: parts[Math.floor((parts.length - 1) / 2)].mid, pts, mids: parts.map((s, i) => ({ ...s.mid, ins: i })), html: `<path class="wire wool" d="${d}"/><path class="wire twist" d="${d}"/>${pins}` };
+    return { d, line: parts.flatMap((s, i) => (i ? s.line.slice(1) : s.line)), mid: parts[Math.floor((parts.length - 1) / 2)].mid, pts, mids: parts.map((s, i) => ({ ...s.mid, ins: i })), html: `<path class="wire wool" d="${d}"/><path class="wire twist" d="${d}"/>${pins}` };
   }
 
   // ---------- All the strings, routed together ----------
@@ -1188,13 +1346,13 @@ export function createBoard(host, api) {
     const jobs = [];
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       const A = rectOf(r.id), B = rectOf(l.to);
-      if (A && B && r.id !== l.to) jobs.push({ k: `${r.id}|${l.to}`, from: r.id, to: l.to, A, B, via: viaOf(l) });
+      if (A && B && r.id !== l.to) jobs.push({ k: `${r.id}|${l.to}`, from: r.id, to: l.to, A, B, via: viaOf(l), label: l.label || '' });
     }
     return jobs;
   }
   function routeSig(jobs) {
     const R = b => [Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h)];
-    return look() + JSON.stringify([jobs.map(j => [j.k, R(j.A), R(j.B), j.via || 0]), obstacles.map(o => [o.id, ...R(o)]), (frameBoxes || []).map(o => [o.id, ...R(o)]), api.ownWire?.() || 0]);
+    return look() + JSON.stringify([jobs.map(j => [j.k, R(j.A), R(j.B), j.via || 0, j.label.length]), obstacles.map(o => [o.id, ...R(o)]), (frameBoxes || []).map(o => [o.id, ...R(o)]), api.ownWire?.() || 0]);
   }
   function computeRoutes(jobs) {
     const map = new Map(), G = routingGrid();
@@ -1218,7 +1376,16 @@ export function createBoard(host, api) {
       return r ? alongPts(r.pts, j.seed, j.seed) : s;
     };
     for (const j of auto) { const s = one(j); map.set(j.k, s); markRoute(G, s?.pts, 1); }
-    for (const j of auto) { markRoute(G, map.get(j.k)?.pts, -1); const s = one(j); map.set(j.k, s); markRoute(G, s?.pts, 1); }
+    // (0.7.7) Where the labels go with these routes: the second pass keeps other strings from under them.
+    if (jobs.some(j => j.label)) {
+      const list = placeLabels(jobs.filter(j => map.get(j.k)?.pts).map(j => ({ j, s: map.get(j.k), label: j.label })));
+      for (const it of list) if (it.at) { it.j.at = it.at; G.markLabel(it.at, 1); }
+    }
+    for (const j of auto) {
+      G.markLabel(j.at, -1); markRoute(G, map.get(j.k)?.pts, -1);   // (not its own label, or itself)
+      const s = one(j); map.set(j.k, s);
+      markRoute(G, s?.pts, 1); G.markLabel(j.at, 1);
+    }
     return map;
   }
 
@@ -1250,31 +1417,43 @@ export function createBoard(host, api) {
     }
     shown.clear();
     let handles = '';
-    const placedLabels = [];
+    // Every string first, then their labels (0.7.7: placed knowing where all the strings go)
+    const items = [];
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       if (!on.has(l.to)) continue;
       const id = `${r.id}|${esc(l.to)}`;
       const via = viaNow(r, l, id), s = wire(r.id, l.to, via);
       if (!s) continue;
-      if (l.label) s.mid = labelSpot(s, l.label, placedLabels);
-      junctions.set(id, s.mid);
+      const branches = (l.also || []).filter(c => on.has(c) && c !== r.id && c !== l.to);
+      items.push({ r, l, id, via, s, label: l.label, knot: !l.label && (branches.length > 0 || tieFrom === 'L:' + id), branches });
+    }
+    // (labels keep off arrowheads too, so a short string's arrow isn't hidden under its label)
+    const blocks = labelBlocks();
+    for (const it of items) blocks.push(...headZones(it.s, dirOf(it.l), L));
+    placeLabels(items, blocks);
+    for (const { r, l, id, via, s, at, branches } of items) {
+      const J = at || s.mid;
+      junctions.set(id, J);
       shown.set(id, s);
-      const sel = selString === id;
-      html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${sel ? `<path class="selglow" d="${s.d}"/>` : ''}${s.html}`;
+      const sel = selString === id, dir = DIRS.includes(l.dir) ? l.dir : null;
+      html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${sel ? `<path class="selglow" d="${s.d}"/>` : ''}${dir ? withArrows(s, dir, L) : s.html}`;
       if (sel) handles = shapeHandles(id, s, via);
       // Branches: more cards joined to this string where its label is, like a T junction.
-      let branched = false;
-      for (const c of l.also || []) {
-        if (!on.has(c) || c === r.id || c === l.to) continue;
-        const b = branchWire(s.mid, c, r.id + '>' + l.to);
+      const box = at ? { x: J.x - at.w / 2 - 2, y: J.y - at.h / 2 - 2, w: at.w + 4, h: at.h + 4 } : null;
+      for (const c of branches) {
+        const b = branchWire(J, c, r.id + '>' + l.to);
         if (!b) continue;
-        html += `<path class="wire hit" data-branch="${id}|${esc(c)}" d="${b.d}"/><g class="branch">${b.html}</g>`;
-        branched = true;
+        html += `<path class="wire hit" data-branch="${id}|${esc(c)}" d="${b.d}"/><g class="branch">${dir ? withArrows(b, dir, L, box ? outOf(b.line || b.pts || [], box) + 2 : 0) : b.html}</g>`;
       }
       const picked = tieFrom === 'L:' + id ? ' picked' : '';
-      if (l.label) labels.push(`<g class="slabel${picked}" data-link="${id}" ${s.lc || ''} transform="translate(${f(s.mid.x)} ${f(s.mid.y)})"><rect x="${-l.label.length * 3.6 - 8}" y="-11" width="${l.label.length * 7.2 + 16}" height="22" rx="${LABEL_RX[L]}"/><text text-anchor="middle" y="4">${esc(l.label)}</text></g>`);
+      // (a label beside its string: a dotted line back to it)
+      if (at?.anchor) {
+        const A = at.anchor, bx = clamp(A.x, J.x - at.w / 2, J.x + at.w / 2), by = clamp(A.y, J.y - at.h / 2, J.y + at.h / 2);
+        if (Math.hypot(A.x - bx, A.y - by) > 4) labels.push(`<path class="leader" ${s.lc || ''} d="M${f(A.x)} ${f(A.y)}L${f(bx)} ${f(by)}"/><circle class="ldot" ${s.lc || ''} cx="${f(A.x)}" cy="${f(A.y)}" r="2.6"/>`);
+      }
+      if (l.label) labels.push(`<g class="slabel${picked}" data-link="${id}" ${s.lc || ''} transform="translate(${f(J.x)} ${f(J.y)})"><rect x="${-l.label.length * 3.6 - 8}" y="-11" width="${l.label.length * 7.2 + 16}" height="22" rx="${LABEL_RX[L]}"/><text text-anchor="middle" y="4">${esc(l.label)}</text></g>`);
       // (no label: a knot where the branches meet, which works like a label)
-      else if (branched || picked) labels.push(`<circle class="junction${picked}" data-link="${id}" ${s.lc || ''} cx="${f(s.mid.x)}" cy="${f(s.mid.y)}" r="6"/>`);
+      else if (branches.length || picked) labels.push(`<circle class="junction${picked}" data-link="${id}" ${s.lc || ''} cx="${f(J.x)}" cy="${f(J.y)}" r="6"/>`);
     }
     let pins = '';
     // (a drawing on the board only gets a pin when a string is tied to it)
@@ -1963,6 +2142,7 @@ export function createBoard(host, api) {
     if (!l) return;
     popLink = { from, to };
     pop.querySelector('[data-s="auto"]').hidden = !viaOf(l);
+    showDir(l);
     if (selString !== link) { selString = link; drawLines(); }   // (its dots, to shape it by)
     const b = host.getBoundingClientRect();
     pop.hidden = false;
@@ -1985,6 +2165,13 @@ export function createBoard(host, api) {
     input.value = l.label || '';
     if (matchMedia('(pointer: fine)').matches) input.focus();
   }
+  // The string menu's arrow button, saying which way the string points now.
+  function showDir(l) {
+    if (!popLink) return;
+    const name = id => `“${short(api.titleOf(api.store.get(id) || { data: {} }))}”`, d = dirOf(l);
+    pop.querySelector('[data-s="dir"]').innerHTML = `<span class="dirico">${{ to: '→', from: '←', both: '↔', none: '—' }[d]}</span>` + esc(
+      d === 'to' ? `Points to ${name(popLink.to)}` : d === 'from' ? `Points to ${name(popLink.from)}` : d === 'both' ? 'Points both ways' : 'No arrows');
+  }
   async function saveString(remove) {
     if (!popLink) return;
     const { from, to } = popLink;
@@ -1999,6 +2186,16 @@ export function createBoard(host, api) {
   pop.addEventListener('click', async e => {
     const b = e.target.closest('[data-s]');
     if (!b) return;
+    if (b.dataset.s === 'dir') {
+      // (0.7.7) Which way it points: each tap the next of to → from → both → none
+      if (!popLink) return;
+      const { from, to } = popLink, links = api.store.get(from)?.data.links || [], l = links.find(x => x.to === to);
+      if (!l) return;
+      const next = { to: 'from', from: 'both', both: 'none', none: 'to' }[dirOf(l)];
+      await api.store.update(from, { links: links.map(x => (x.to === to ? { ...x, dir: next } : x)) });
+      showDir({ ...l, dir: next });
+      return;
+    }
     if (b.dataset.s === 'auto') {
       const link = popLink && `${popLink.from}|${popLink.to}`, typed = pop.querySelector('input').value.trim();
       if (!link) return;

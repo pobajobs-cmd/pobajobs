@@ -15,7 +15,7 @@ import { linkService } from './attach.js';
 import * as ex from './export.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.7.6';
+const VERSION = '0.7.7';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -834,7 +834,10 @@ function updateDetail(r) {
     for (const o of [...ends, ...also]) {
       if (o === r.id || !I.byId.has(o)) continue;
       const off = also.includes(r.id) ? r.id : also.includes(o) ? o : null;   // the branch × takes off
-      strings.push({ id: o, label: l.label, branch: !!off, untie: off ? `data-unbranch="${x.id}|${l.to}|${off}"` : `data-untie="${x.id}|${l.to}"` });
+      // (0.7.7) which way it points, from here: → to the other one, ← to this one (set in the string's menu on a board)
+      const toSide = id => id === x.id ? 'from' : 'to', dir = l.dir;
+      const arrow = !dir || dir === 'none' ? '' : dir === 'both' ? '↔' : (dir === toSide(o) || (dir === 'to' && also.includes(o))) ? '→' : (dir === toSide(r.id) || (dir === 'to' && also.includes(r.id))) ? '←' : '';
+      strings.push({ id: o, label: l.label, arrow, branch: !!off, untie: off ? `data-unbranch="${x.id}|${l.to}|${off}"` : `data-untie="${x.id}|${l.to}"` });
     }
   }
   $('.links', host).innerHTML = `
@@ -842,7 +845,7 @@ function updateDetail(r) {
     ${strings.length ? strings.map(x => { const o = I.byId.get(x.id); return `
       <div class="lrow" data-open="${x.id}" role="button" tabindex="0">
         <span class="ic t-${o.data.type}">${typeIcon(o.data.type)}</span>
-        <span class="name">${esc(titleOf(o))}</span>${x.label ? `<em>${esc(x.label)}</em>` : ''}${x.branch ? '<small class="via">branch</small>' : ''}
+        ${x.arrow ? `<span class="sdir" title="${x.arrow === '→' ? 'Points to it' : x.arrow === '←' ? 'Points here' : 'Points both ways'}">${x.arrow}</span>` : ''}<span class="name">${esc(titleOf(o))}</span>${x.label ? `<em>${esc(x.label)}</em>` : ''}${x.branch ? '<small class="via">branch</small>' : ''}
         <button class="untie" ${x.untie} aria-label="${x.branch ? 'Take off this string' : 'Cut this string'}">${ICON.close}</button>
       </div>`; }).join('') : '<p class="hint">Tie this to anything else in Brain Tree, here or by dragging from a card on a board.</p>'}`;
 

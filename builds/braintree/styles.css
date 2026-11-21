@@ -395,6 +395,7 @@ body[data-view="board"] #toasts { bottom: calc(76px + env(safe-area-inset-bottom
 .lrow:hover { background: var(--hover); }
 .lrow .ic { color: var(--string); display: grid; }
 .lrow .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .sdir { color: var(--string); font-weight: 700; flex-shrink: 0; }
 .lrow em { font-style: normal; font-size: 0.8rem; color: var(--string); background: var(--string-bg); padding: 0.1rem 0.45rem; border-radius: 6px; white-space: nowrap; }
 .lrow .via { font-size: 0.75rem; color: var(--soft); white-space: nowrap; }
 .lrow .untie { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--faint); }
@@ -470,6 +471,10 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .strings .pinhead { stroke: rgba(0, 0, 0, 0.35); stroke-width: 1.2; filter: drop-shadow(0 2px 1.5px rgba(0, 0, 0, 0.4)); }
 .strings .pinshine { fill: rgba(255, 255, 255, 0.7); }
 .strings .slabel { pointer-events: all; cursor: pointer; }
+/* 0.7.7 arrowheads on any look (a string set to point a way), and a label beside its string */
+.strings .shead { fill: var(--lc, var(--wire)); stroke: none; }
+.strings .leader { fill: none; stroke: var(--lc, var(--wire)); stroke-width: 1.4; stroke-dasharray: 2 3; stroke-linecap: round; opacity: 0.85; }
+.strings .ldot { fill: var(--lc, var(--wire)); }
 /* 0.7.6 shaping a string: it glows, with a big dot at each turn and a small one along each stretch */
 .strings .selglow { fill: none; stroke: var(--accent-ink); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; opacity: 0.22; }
 .strings .viah, .strings .addh { pointer-events: all; cursor: grab; touch-action: none; }
@@ -925,6 +930,8 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .boardbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 3px; flex-shrink: 0; }
 .stringpop { position: absolute; z-index: 7; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 8px; width: 310px; max-width: calc(100% - 16px); background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .stringpop .danger { margin-left: auto; }
+.stringpop .dirbtn { flex-basis: 100%; display: flex; align-items: center; gap: 6px; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+.stringpop .dirico { display: inline-block; width: 1.3em; font-size: 1.05rem; line-height: 1; text-align: center; }
 .stringpop .pophint { flex-basis: 100%; margin: 2px 2px 0; color: var(--soft); font-size: 0.78rem; line-height: 1.3; }
 .stringpop input { flex: 1 1 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; background: var(--bg); color: var(--ink); font-size: 16px; outline: none; }
 .stringpop button { font-size: 0.85rem; font-weight: 600; padding: 0.35rem 0.4rem; color: var(--accent-ink); white-space: nowrap; }

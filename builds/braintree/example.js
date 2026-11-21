@@ -16,6 +16,7 @@
 //   board           strings with labels, a branch off one (a T junction), a card made Large,
 //                   a drawing made on the board itself (star, highlighter, curved arrow: 0.7.2)
 //   notes checklist also points to Settings → Claude (0.7.3: Claude chats can block out projects)
+//   strings that point (0.7.7): "feeds into" and "pays for" are set to point to their far end
 //   notes checklist also covers the autorouter and shaping a string by hand (0.7.6; no shaped string
 //                   in the data itself, since the cards' spots are only worked out when the board opens)
 
@@ -46,7 +47,7 @@ export async function addExample(store, { makeLock } = {}) {
   const project = await make({
     type: 'project', title: EXAMPLE_TITLE, start: day(0), due: day(21),
     body: `<p>This is an example project, to show what Brain Tree can do. Have a look around, tick things off, change anything, then delete it with the bin at the top when you're done.</p>
-<ul class="checklist"><li data-checked="true">A project holds to-dos, notes, sections and smaller projects</li><li>Open its board (the Board button at the top) to see everything pinned up, with strings between related cards</li><li>On the board, tap String, then two cards, to tie them together. Tap a string to label it</li><li>Drag a string's label onto another card to branch it, like a T junction: “read from” goes to two cards</li><li>Strings find their own way round cards, turning corners like tracks on a circuit board (on Corkboard they're real string, so they cross)<li>Tap a string and drag it, or its dots, to shape it yourself: drag a small dot to add a turn, double-tap a big one to take it out. Auto in the string's menu hands it back</li><li>Tap Draw on the board to draw straight onto it, with pens, a highlighter, shapes and arrows. The star is a drawing like that: tap it to change it</li><li>Tidy lays the board out again in the order the work flows, keeping strings short and uncrossed. “Tidy inside sections” keeps the sections where you put them</li><li>Drag the bottom corner of a card to make it bigger or smaller: the thumbnail sketch is Large</li><li>+ Add on the board adds notes, to-dos, sections, YouTube clips, drawings, spreadsheets, files and links</li><li>“Write the script” is pinned to the top of the list. Hold it to unpin it</li><li>“Surprise ending” is locked. Its password is <b>${EXAMPLE_PASSWORD}</b></li><li>The share button at the top prints the list or the board, or saves it as a PDF, a picture or a spreadsheet</li><li>In the list, swipe a to-do left or right, or hold it for more (hold and drag to move it)</li><li>A project opens as its list or its board, whichever you looked at last</li><li>Settings → Claude connects Claude: then in any Claude chat, say “block this out in Brain Tree” and it makes a project like this one, with a link back to the chat</li><li>Settings (the cog at the top) has colour themes and a look for every board: try Circuit board or Neon</li></ul>`,
+<ul class="checklist"><li data-checked="true">A project holds to-dos, notes, sections and smaller projects</li><li>Open its board (the Board button at the top) to see everything pinned up, with strings between related cards</li><li>On the board, tap String, then two cards, to tie them together. Tap a string to label it</li><li>Drag a string's label onto another card to branch it, like a T junction: “read from” goes to two cards</li><li>Strings find their own way round cards, turning corners like tracks on a circuit board (on Corkboard they're real string, so they cross)<li>Tap a string and drag it, or its dots, to shape it yourself: drag a small dot to add a turn, double-tap a big one to take it out. Auto in the string's menu hands it back<li>A string can point one way, the other, both ways or neither: tap it, then the arrow line in its menu. “feeds into” points to “Write the script” on every look<li>Labels sit on their string where there's room, otherwise just beside it with a dotted line back, and Tidy leaves room for them between cards</li><li>Tap Draw on the board to draw straight onto it, with pens, a highlighter, shapes and arrows. The star is a drawing like that: tap it to change it</li><li>Tidy lays the board out again in the order the work flows, keeping strings short and uncrossed. “Tidy inside sections” keeps the sections where you put them</li><li>Drag the bottom corner of a card to make it bigger or smaller: the thumbnail sketch is Large</li><li>+ Add on the board adds notes, to-dos, sections, YouTube clips, drawings, spreadsheets, files and links</li><li>“Write the script” is pinned to the top of the list. Hold it to unpin it</li><li>“Surprise ending” is locked. Its password is <b>${EXAMPLE_PASSWORD}</b></li><li>The share button at the top prints the list or the board, or saves it as a PDF, a picture or a spreadsheet</li><li>In the list, swipe a to-do left or right, or hold it for more (hold and drag to move it)</li><li>A project opens as its list or its board, whichever you looked at last</li><li>Settings → Claude connects Claude: then in any Claude chat, say “block this out in Brain Tree” and it makes a project like this one, with a link back to the chat</li><li>Settings (the cog at the top) has colour themes and a look for every board: try Circuit board or Neon</li></ul>`,
   });
   const P = { parent: project };
 
@@ -126,14 +127,14 @@ export async function addExample(store, { makeLock } = {}) {
   if (makeLock) await store.update(secret, { lock: await makeLock(EXAMPLE_PASSWORD) });
 
   // Strings between related things (they show on the board, and under "Strings" in each item).
-  const tie = (from, to, label, also) => store.update(from, { links: [...(store.get(from).data.links || []),
-    { to, ...(label ? { label } : {}), ...(also ? { also } : {}) }] });
+  const tie = (from, to, label, also, dir) => store.update(from, { links: [...(store.get(from).data.links || []),
+    { to, ...(label ? { label } : {}), ...(also ? { also } : {}), ...(dir ? { dir } : {}) }] });
   await tie(pacing, rough, 'match this pace');
   await tie(script, voice, 'read from', [intro]);   // a branch: the intro reads from the script too
-  await tie(facts, script, 'feeds into');
+  await tie(facts, script, 'feeds into', null, 'to');     // (an arrow on every look: 0.7.7)
   await tie(shotPlan, script);
   await tie(sketch, thumb, 'first try');
-  await tie(budget, music, 'pays for');
+  await tie(budget, music, 'pays for', null, 'to');
 
   return project;
 }
