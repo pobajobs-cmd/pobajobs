@@ -15,7 +15,7 @@ import { linkService } from './attach.js';
 import * as ex from './export.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.7.2';
+const VERSION = '0.7.3';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -1551,6 +1551,10 @@ async function settingsModal() {
       <div class="lookpick">${Object.entries(theme.LOOKS).map(([id, l]) => `
         <button data-pick-look="${id}" class="${p.look === id ? 'on' : ''}">${lookPreview(id)}<span>${l.name}</span></button>`).join('')}</div>
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
+      <h3>Claude</h3>
+      <p class="hint">Connect Claude, and in any Claude chat you can say “block this out in Brain Tree”: it makes the project here, with its sections, to-dos, notes and strings, and links back to the chat. It can also add to projects and tick things off. It uses your Claude plan; nothing to pay here.</p>
+      <div class="kv"><span>Claude</span><b class="claudestate">${store.signedIn() ? 'Checking…' : 'Sign in to Brain Tree first'}</b></div>
+      <div class="claudebtns"></div>
       <h3>Getting started</h3>
       <button class="setbtn" data-s="example">Add an example project</button>
       <p class="hint">A small project that shows everything Brain Tree can do: dates, steps and repeats, sections, a board with strings and a branch, a clip, drawings (one made on the board), a photo, a spreadsheet, a file, a link, a pinned to-do and a locked project. Delete it whenever you like.</p>
@@ -1611,6 +1615,17 @@ async function settingsModal() {
       if (!b) return;
       const a = b.dataset.s;
       if (a === 'example') { closeModal(); showExample(); }
+      if (a === 'claude-connect') {
+        if (b.dataset.again && !confirm('Make a new connector address? The one Claude has now stops working, so you’ll paste the new one into Claude.')) return;
+        b.disabled = true;
+        try { const k = await store.claudeConnect(); claudeSheet(k.url); }
+        catch (err) { b.disabled = false; toast(navigator.onLine ? err.message : 'You’re offline. Connect Claude when you have signal.'); }
+      }
+      if (a === 'claude-off') {
+        if (!confirm('Switch Claude off? Claude chats won’t be able to reach Brain Tree until you connect it again.')) return;
+        try { await store.claudeOff(); toast('Claude switched off.'); const top = el.scrollTop; await settingsModal(); $('#modal .sheet').scrollTop = top; }
+        catch (err) { toast(err.message); }
+      }
       if (a === 'sync') { closeModal(); store.sync(); }
       if (a === 'export') downloadBackup();
       if (a === 'login') { closeModal(); showLogin(true); }
@@ -1621,11 +1636,44 @@ async function settingsModal() {
         closeModal(); await store.logout(true); showLogin(false);
       }
     });
+    // Claude: connected or not (asked of the server, which keeps the connector's key).
+    if (store.signedIn()) store.claudeStatus().then(c => {
+      const x = el.querySelector('.claudestate'), btns = el.querySelector('.claudebtns');
+      if (!x) return;
+      const when = iso => esc(fmtWhen(iso));
+      x.textContent = '';
+      x.innerHTML = c.connected ? `Connected${c.lastUsed ? `, last used ${when(c.lastUsed)}` : ', not used yet'}` : 'Not connected';
+      btns.innerHTML = c.connected
+        ? '<button class="setbtn" data-s="claude-connect" data-again="1">Make a new connector address…</button><button class="setbtn danger" data-s="claude-off">Switch Claude off</button>'
+        : '<button class="setbtn" data-s="claude-connect">Connect Claude…</button>';
+    }).catch(err => { const x = el.querySelector('.claudestate'); if (x) x.textContent = navigator.onLine ? err.message : 'Needs signal to check'; });
     if (store.signedIn()) store.serverStats().then(st => {
       const mb = b => (b / 1048576).toFixed(1) + ' MB';
       const x = el.querySelector('.stats');
       if (x) x.textContent = `${st.items} items (${mb(st.itemBytes)}), ${st.files} photos (${mb(st.fileBytes)})`;
     }).catch(err => { const x = el.querySelector('.stats'); if (x) x.textContent = err.message; });
+  });
+}
+
+// Connecting Claude: the connector's address (with its key in it, shown this once) and where it goes.
+function claudeSheet(url) {
+  modal(`
+    <div class="sethead"><button type="button" class="setdone" data-close>Done</button><h2>Connect Claude</h2></div>
+    <p>Do this once, in Claude on the web (claude.ai, on a computer or in Safari). After that it works in every chat, in the Claude app on your phone too.</p>
+    <ol class="steps">
+      <li>Go to <b>Customize → Connectors</b> (claude.ai/customize/connectors).</li>
+      <li>Tap <b>+ Add</b>, then <b>Add custom connector</b>.</li>
+      <li>Call it <b>Brain Tree</b>, and paste this as the <b>MCP server URL</b>:
+        <span class="copyrow"><input class="claudeurl" readonly value="${esc(url)}" aria-label="Connector address"><button type="button" class="setbtn" data-copy>Copy</button></span></li>
+      <li>Tap <b>Continue</b>, choose <b>No sign in</b>, then <b>Continue</b> and <b>Add</b>.</li>
+      <li>In a chat: <b>+</b> → <b>Connectors</b>, switch on <b>Brain Tree</b>, and say “block this out in Brain Tree”.</li>
+    </ol>
+    <p class="hint">Brain Tree shows this address only now, so copy it before you close this. Keep it to yourself: it works like a key. If it ever gets out, make a new one in Settings → Claude and the old one stops working.</p>`, el => {
+    const input = el.querySelector('.claudeurl');
+    el.querySelector('[data-copy]').addEventListener('click', async e => {
+      try { await navigator.clipboard.writeText(url); e.target.textContent = 'Copied'; }
+      catch (err) { input.focus(); input.select(); e.target.textContent = 'Selected: copy it'; }
+    });
   });
 }
 

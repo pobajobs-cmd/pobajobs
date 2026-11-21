@@ -34,6 +34,7 @@ export function fmtSize(n) {
 
 // Well-known places documents live, so a link says what it is.
 const SERVICES = [
+  [/^https:\/\/([a-z0-9-]+\.)?claude\.(ai|com)\//, 'Claude chat', '#D97757'],
   [/docs\.google\.com\/document/, 'Google Doc', '#4285F4'],
   [/docs\.google\.com\/spreadsheets/, 'Google Sheet', '#0F9D58'],
   [/docs\.google\.com\/presentation/, 'Google Slides', '#F4B400'],

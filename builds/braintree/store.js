@@ -233,6 +233,10 @@ async function api(path, opts = {}) {
 }
 
 export const serverStats = () => api('/stats');
+// Claude's connector (0.7.3): is it on, make it a new address (the old one stops working), switch it off.
+export const claudeStatus = () => api('/claude');
+export const claudeConnect = () => api('/claude', { method: 'POST' });
+export const claudeOff = () => api('/claude', { method: 'DELETE' });
 // A YouTube video's title and channel (needs signal and a sign-in; null otherwise).
 export const videoInfo = id => (meta.token ? api('/video?id=' + encodeURIComponent(id), { timeout: 8000 }).catch(() => null) : Promise.resolve(null));
 

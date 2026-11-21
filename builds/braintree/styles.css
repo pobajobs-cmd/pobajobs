@@ -362,6 +362,13 @@ body[data-view="board"] #toasts { bottom: calc(76px + env(safe-area-inset-bottom
 .setrow > span:first-child { color: var(--soft); }
 .settings .setbtn { display: block; width: 100%; margin-top: 0.2rem; padding: 0.65rem 0.8rem; border-radius: 10px; background: var(--accent-bg); color: var(--accent-ink); font-weight: 600; }
 .settings .setbtn:hover { background: color-mix(in srgb, var(--accent) 24%, var(--card)); }
+/* 0.7.3 Claude */
+.claudebtns { display: grid; gap: 0.4rem; margin-top: 0.5rem; }
+.settings .setbtn.danger { background: var(--string-bg, var(--hover)); color: var(--string); }
+.sheet ol.steps { margin: 0.6rem 0; padding-left: 1.3rem; display: grid; gap: 0.6rem; line-height: 1.45; }
+.copyrow { display: flex; gap: 0.4rem; margin-top: 0.45rem; }
+.copyrow input { flex: 1; min-width: 0; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: 0.8rem var(--mono, ui-monospace, monospace); }
+.copyrow .setbtn { flex: none; padding: 0.5rem 0.9rem; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .empty-nav .link { display: inline; font-size: inherit; text-align: left; }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 9px; background: var(--hover); }
 .seg button { padding: 0.3rem 0.6rem; border-radius: 7px; font-size: 0.85rem; color: var(--soft); }
