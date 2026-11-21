@@ -143,6 +143,15 @@ Claude chats can work on Brain Tree, using the user's Claude plan (a **custom co
 - **The chat link:** Claude can't see its own chat's address, so the server instructions tell it to ask the user for it (the browser address on the web, or a share link). It's stored as a link tile at the top of the project's notes ("The Claude chat this was planned in"); `attach.js` labels claude.ai links "Claude chat".
 - **Server text for Claude** (`MCP_INSTRUCTIONS`): how to block out a plan (sections for phases, to-dos with steps, notes, strings), not to invent dates, read before changing. Strings are pushed hard (the user found the first projects had few): tie anything that feeds into, needs, comes before or is based on another, about one string per two or three things, short labels. If a blocked-out project still comes back with fewer than one string per four things, the result says so and tells Claude to tie more with `add_items` (only a `strings` list, by title).
 
+## 0.7.4 Tidier busy boards
+
+From a 70-card board Claude blocked out, which came out messy on a phone:
+
+- **Tidy fits the screen it's on** (`smartLayout`): it lays out to the shape of the board area (`A` = width ÷ height), scoring how wide the board must be shown to fit (`max(W, H × A)`) plus string distances, so a phone gets a tall layout, mostly two columns, and a computer a wide one. On a tall screen, sections and blocks pack at most 2 cards across. Gaps between sections are 96 px, room for strings to pass. (Until something is moved, each device lays the board out for its own screen.)
+- **Strings go round sections they aren't in** (`findRoute`): crossing a card costs 5000, going through a section that has neither end in it costs 700, so it goes round unless that's much longer; section edges are among the ways past.
+- **Labels sit on a clear stretch** (`labelSpot`): halfway along unless that's over a card, then the nearest clear spot along the string (branches start there too).
+- **Faint string dots on touch screens** (opacity 0.28; full on the picked card and in String mode), so a zoomed-out board isn't covered in rings.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
