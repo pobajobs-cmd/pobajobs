@@ -173,6 +173,18 @@ The user wanted string routing to work like a circuit-board autorouter (taking e
 - **Shapes keep up**: dragging a section moves the shapes of strings with both ends inside it. Tidy moves a shape along if both its ends moved the same way, otherwise hands it back to the autorouter (Undo restores it). Sync merges shapes board by board (`mergeLinks`: mine where I changed it, theirs where I didn't). Duplicating a project copies them onto the copy's boards.
 - Example project: notes checklist lines for the autorouter and shaping (no shaped string in the data, since card spots are only worked out when the board opens).
 
+## 0.7.7 Room for labels, and strings that point
+
+The user found short strings with labels obscured (labels covering cards and each other), and asked for directions on strings.
+
+- **Labels are placed after all the strings** (`placeLabels`, `labelSpot`), shortest strings first, on every look. A label goes on a clear stretch of its string (not over a card, a section's name, another label or an arrowhead, and over as few other strings as possible); if the string has no room, it sits just beside it in the nearest clear space (beside the string, then further round, up to about 220 px), with a dotted line and dot back to the string (`.leader`, `.ldot`). Branches start from the label wherever it sits. A knot (branches, no label) stays on its string.
+- **The autorouter keeps strings from under labels**: after the first pass the labels are placed and marked on the grid (`G.lab`), and the second pass charges 14 a square for running under another string's label (`ROUTE_LABEL`).
+- **Tidy leaves room for labels** (`measureLabelRoom`, `gridOf`): between two cards side by side tied by a labelled string, that column gap is the label's width + 30 (+26 if it points, +48 both ways; at most 200); one above the other, that row gap is 50 (72 if it points). On the CNC test board, after Tidy every label fits on its own string.
+- **Strings can point**: `data.links[].dir` = `to` (arrowhead at the card it was tied to), `from`, `both` or `none`; unset is the look's own (an arrow at the far end on Blueprint, Hacker, Minimal, Whiteboard, Notebook and Chalkboard, none on the rest). The string's menu has an arrow line ("→ Points to “…”", "← Points to “…”", "↔ Points both ways", "— No arrows"); each tap moves to the next. Arrowheads are drawn the look's way (`arrowHead`: a vee in marker, pen, chalk or neon tube; a filled head on City, Circuit, Corkboard, Space; the usual arrow on Blueprint, Hacker, Minimal), clear of the end's dot, pad, station, star or pin. Branches follow their string. The item screen's Strings list shows → / ← / ↔.
+- Sync merges `dir` like a label (`mergeLinks`).
+- **Claude**: strings in `block_out_project` and `add_items`, and `tie_string`, take `arrow` (`to`, `from`, `both`, `none`; `tie_string` flips it if the string is stored the other way round). `get_project` lists which way each string points. The instructions ask for `arrow: "to"` where a link has a direction.
+- Example project: "feeds into" and "pays for" point to their far end; notes lines for arrows and label placement.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
