@@ -132,6 +132,17 @@ The sidebar shows how many to-dos in each project are due today (red if any are 
 
 **More drawing tools** (`draw.js`, in notes too): triangle, star, highlighter (see-through pen, `hl`), eraser (drag over things to rub them out), pen and highlighter sizes, text sizes (`z`: 1 small, 2 normal, 3 big), curved arrows (`cv`), and yellow ink. On a phone the tool bar wraps onto two rows.
 
+## 0.7.3 Claude connector
+
+Claude chats can work on Brain Tree, using the user's Claude plan (a **custom connector**, i.e. a remote MCP server, in `worker-braintree.js` under "Claude").
+
+- **Address:** `POST /api/braintree/mcp/<key>` (Streamable HTTP, plain JSON replies; GET gets 405, notifications 202). The key is in the address because Claude's "No sign in" connectors work on every plan, while request-header keys are a limited beta. An `Authorization: Bearer <key>` header works too.
+- **The key:** made in the app, Settings → Claude → *Connect Claude…* (`POST /api/braintree/claude`, signed in). It's shown once in a sheet with the steps (claude.ai → Customize → Connectors → + Add → Add custom connector → MCP server URL → No sign in). Only a SHA-256 hash is kept, in the new table `bt_keys` (name 'claude'). *Make a new connector address…* replaces it (the old one stops working); *Switch Claude off* deletes it (`DELETE /claude`). `GET /claude` gives connected / last used (updated at most hourly).
+- **Tools:** `list_projects`, `get_project`, `search` (read only); `block_out_project` (a whole project in one call: notes, `chat_url`, sections, to-dos with steps, notes with checklists and colours, smaller projects, strings by key or title; optional dates only if the user gave them); `add_items` (to a project, section, or to-do as steps); `update_item` (title, done, notes kept with their photos/drawings, append_notes, dates, colour, move_to, chat_url); `tie_string`; `remove_item` (Recently deleted; a section's contents move up, as in the app).
+- **Rules:** locked projects are off limits (Claude sees only that they exist and are locked); repeating to-dos must be ticked in the app; deleted things are skipped. Writes are ordinary saves (`device` = "Claude"), so devices pick them up on their next sync and the usual conflict handling applies.
+- **The chat link:** Claude can't see its own chat's address, so the server instructions tell it to ask the user for it (the browser address on the web, or a share link). It's stored as a link tile at the top of the project's notes ("The Claude chat this was planned in"); `attach.js` labels claude.ai links "Claude chat".
+- **Server text for Claude** (`MCP_INSTRUCTIONS`): how to block out a plan (sections for phases, to-dos with steps, notes, strings), not to invent dates, read before changing.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
