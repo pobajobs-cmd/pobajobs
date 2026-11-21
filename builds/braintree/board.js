@@ -89,7 +89,7 @@ export function createBoard(host, api) {
       <button data-b="fit" title="Fit everything on screen">Fit</button>
       <button data-b="in" aria-label="Zoom in">+</button>
     </div>
-    <div class="stringpop" hidden><input placeholder="Label (optional)" maxlength="40"><button data-s="save">Save</button><button data-s="branch" title="Join another card to this string">Branch</button><button data-s="remove" class="danger">Remove</button></div>
+    <div class="stringpop" hidden><input placeholder="Label (optional)" maxlength="40"><button data-s="save">Save</button><button data-s="branch" title="Join another card to this string">Branch</button><button data-s="auto" title="Let the autorouter find its way again" hidden>Auto</button><button data-s="remove" class="danger">Remove</button><p class="pophint">Drag the string or its dots to reshape it. Double-tap a big dot to take that turn out.</p></div>
     <div class="boardmenu" hidden></div>
     <p class="boardhint" hidden></p>`;
   const cork = host.querySelector('.cork');
@@ -117,6 +117,9 @@ export function createBoard(host, api) {
   let sketching = null;                // a drawing on the board being changed (its card is hidden meanwhile)
   const isSketch = r => !!r?.data.sketch;
   const junctions = new Map();         // 'from|to' -> where that string's label (and its branches) sit
+  const shown = new Map();             // (0.7.6) 'from|to' -> the string as drawn (its corners in .pts)
+  let selString = null;                // (0.7.6) the string showing its dots to shape it by
+  let viaDraft = null, lastViaTap = null;   // (the shape while it's being dragged; a tap on a dot, for double-taps)
   const look = () => (api.style() in WORDS ? api.style() : 'corkboard');
   const words = () => WORDS[look()];
   const isFrame = id => frameIds.has(id);
@@ -781,12 +784,13 @@ export function createBoard(host, api) {
     return out;
   }
 
-  function wire(fromId, toId) {
+  function wire(fromId, toId, via) {
+    if (via?.length) return viaWire(fromId, toId, via);   // (0.7.6: shaped by hand)
     if (look() === 'corkboard') {
       const a = pinPoint(fromId), b = pinPoint(toId);
       return a && b ? wool(a, b) : null;
     }
-    // (all the strings routed together, when nothing's being dragged: see routeAll)
+    // (all the strings routed together by the autorouter, when nothing's being dragged: see computeRoutes)
     const routed = routeMap?.get(fromId + '|' + toId);
     if (routed) return { ...routed };
     const A = rectOf(fromId), B = rectOf(toId);
@@ -805,7 +809,7 @@ export function createBoard(host, api) {
   }
   function wool(a, b) {
     const s = sag(a, b);
-    return { ...s, html: `<path class="wire wool" d="${s.d}"/><path class="wire twist" d="${s.d}"/>` };
+    return { ...s, pts: [a, b], mids: [{ ...s.mid, ins: 0 }], html: `<path class="wire wool" d="${s.d}"/><path class="wire twist" d="${s.d}"/>` };
   }
   const lineColour = (L, key) => (LINE_COLOURS[L] && !api.ownWire?.() ? `style="--lc:${LINE_COLOURS[L][hash(key) % LINE_COLOURS[L].length]}"` : '');
   const GAP_AT_END = { blueprint: 7, circuit: 9, city: 9, hacker: 8, minimal: 7, neon: 4, space: 2 };
@@ -845,7 +849,7 @@ export function createBoard(host, api) {
     }
     if (L === 'neon') { const d = cornered(pts, 40, true); return out(d, `<path class="wire tube glow" ${lc} d="${d}"/><path class="wire tube" ${lc} d="${d}"/>`); }
     const o = L === 'chalkboard' ? { amp: 2.2, head: 15, cls: 'chalk' } : L === 'whiteboard' ? { amp: 2.6, head: 15, cls: 'marker' } : { amp: 1.2, head: 11, cls: 'pen' };
-    return inkPath(bendPts(pts, 34, 14), hash(seedKey), o);
+    return { ...inkPath(bendPts(pts, 34, 14), hash(seedKey), o), pts };   // (pts: just the corners)
   }
 
   // ---------- Strings that go round cards (0.7.2) ----------
@@ -856,7 +860,7 @@ export function createBoard(host, api) {
   const ROUND_LOOKS = new Set(['whiteboard', 'blueprint', 'notebook', 'circuit', 'city', 'neon', 'minimal', 'hacker', 'chalkboard']);
   let obstacles = null;   // the cards (and the banner) to keep clear of, a little bigger than drawn
   let frameBoxes = null;  // (0.7.4) the sections: a string goes round one it isn't in, if that's not far
-  let routeMap = null;    // (0.7.5) every string's route, worked out together (see routeAll)
+  let routeMap = null;    // every string's route, worked out together (0.7.6: by the autorouter, see computeRoutes)
 
   function segHits(p, q, r) {
     let t0 = 0, t1 = 1;
@@ -973,48 +977,248 @@ export function createBoard(host, api) {
     return best && { pts: best, score: bestScore, pen: bestPen };
   }
 
-  // (0.7.5) All the strings on the board routed together, so they keep out of each other's way:
-  // each is routed once with the ones before it in mind, then again with all the others. A
-  // string the look draws its own way (a curve, a straight line) keeps that unless going round
-  // is clearly tidier. Worked out again only when something on the board has moved.
-  let routeCache = null;
-  function routeAll() {
-    const L = look(), gap = GAP_AT_END[L] ?? 5;
+  // ---------- The autorouter (0.7.6) ----------
+  // Like a circuit-board autorouter. The board is a grid of 16 px squares; a string can't go
+  // through a card, and finds the cheapest way from its card to the other: each square costs 1,
+  // each turn 3, a square inside a section it isn't in 1.5 more, crossing another string 20 and
+  // running along on top of one 4 a square. So it takes extra turns to get round things rather
+  // than cross them (unless that's a long way round), and strings routed side by side keep a
+  // square apart, like tracks. Strings go one after another (shortest first), then each again
+  // with all the others in place. A string a look draws its own way (a curve, a straight line)
+  // keeps that if it gets through cleanly. Shaped strings (data.links[].via, see below) keep their
+  // shape, and the others go round them. It's worked out just after a redraw, once nothing's moving.
+  const CELL = 16, ROUTE_TURN = 3, ROUTE_SOFT = 1.5, ROUTE_CROSS = 20, ROUTE_ALONG = 4;
+  const ORTHO_LOOKS = new Set(['blueprint', 'hacker']), OCTO_LOOKS = new Set(['circuit', 'city']);   // (right angles; right angles and 45°)
+  const polyLen = pts => { let n = 0; for (let i = 1; i < (pts || []).length; i++) n += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return n; };
+
+  function routingGrid() {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const o of [...obstacles, ...(frameBoxes || [])]) { x0 = Math.min(x0, o.x); y0 = Math.min(y0, o.y); x1 = Math.max(x1, o.x + o.w); y1 = Math.max(y1, o.y + o.h); }
+    if (x0 === Infinity) return null;
+    const gx0 = Math.floor((x0 - 320) / CELL) * CELL, gy0 = Math.floor((y0 - 320) / CELL) * CELL;
+    const cols = Math.ceil((x1 + 320 - gx0) / CELL), rows = Math.ceil((y1 + 320 - gy0) / CELL), N = cols * rows;
+    const G = { gx0, gy0, cols, rows, owner: new Int32Array(N), sect: new Int32Array(N), usedH: new Uint8Array(N), usedV: new Uint8Array(N), obsIndex: new Map(), secIndex: new Map() };
+    // (the squares whose middle is inside a box)
+    const cover = (o, fn) => {
+      const c0 = Math.max(0, Math.ceil((o.x - gx0) / CELL - 0.5)), c1 = Math.min(cols - 1, Math.floor((o.x + o.w - gx0) / CELL - 0.5));
+      const r0 = Math.max(0, Math.ceil((o.y - gy0) / CELL - 0.5)), r1 = Math.min(rows - 1, Math.floor((o.y + o.h - gy0) / CELL - 0.5));
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) fn(r * cols + c);
+    };
+    obstacles.forEach((o, i) => { G.obsIndex.set(o.id, i + 1); cover(o, k => { G.owner[k] = G.owner[k] ? -1 : i + 1; }); });
+    // (smaller sections over bigger ones)
+    (frameBoxes || []).map((fr, j) => [fr, j]).sort((a, b) => b[0].w * b[0].h - a[0].w * a[0].h)
+      .forEach(([fr, j]) => { G.secIndex.set(fr.id, j + 1); cover(fr, k => { G.sect[k] = j + 1; }); });
+    return G;
+  }
+  const cellAt = (G, x, y) => { const c = Math.floor((x - G.gx0) / CELL), r = Math.floor((y - G.gy0) / CELL); return c >= 0 && r >= 0 && c < G.cols && r < G.rows ? r * G.cols + c : -1; };
+  // The squares along a path, each with whether the path runs across (flat) or up and down there.
+  function walkCells(G, pts, fn) {
+    let last = -1;
+    for (let i = 1; i < (pts || []).length; i++) {
+      const p = pts[i - 1], q = pts[i], steps = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / (CELL / 2)));
+      const flat = Math.abs(q.x - p.x) >= Math.abs(q.y - p.y);
+      for (let s = 0; s <= steps; s++) {
+        const k = cellAt(G, p.x + (q.x - p.x) * s / steps, p.y + (q.y - p.y) * s / steps);
+        if (k >= 0 && k !== last) { last = k; fn(k, flat); }
+      }
+    }
+  }
+  // Mark (n = 1) or unmark (n = -1) the squares a string runs through, for the strings after it.
+  const markRoute = (G, pts, n) => walkCells(G, pts, (k, flat) => { const a = flat ? G.usedH : G.usedV; a[k] = Math.max(0, Math.min(255, a[k] + n)); });
+  // What a path costs as it is (a look's own curve or line): cards it goes through, sections, strings.
+  function pathPenalty(G, pts, ia, ib, sa, sb) {
+    let pen = 0;
+    walkCells(G, pts, (k, flat) => {
+      const o = G.owner[k];
+      if (o && o !== ia && o !== ib) pen += 1000;
+      if (G.sect[k] && G.sect[k] !== sa && G.sect[k] !== sb) pen += ROUTE_SOFT;
+      pen += (flat ? G.usedV[k] : G.usedH[k]) * ROUTE_CROSS + (flat ? G.usedH[k] : G.usedV[k]) * ROUTE_ALONG;
+    });
+    return pen;
+  }
+
+  // The cheapest way between two boxes (A* over the squares; state = square and the way it's going).
+  function autoroute(G, A, B, ia, ib, sa, sb, gap, wide = false) {
+    const { gx0, gy0, cols, rows, owner, sect, usedH, usedV } = G;
+    const col = x => Math.floor((x - gx0) / CELL), row = y => Math.floor((y - gy0) / CELL);
+    const cxOf = c => gx0 + (c + 0.5) * CELL, cyOf = r => gy0 + (r + 0.5) * CELL;
+    const m = wide ? 1e7 : 480;
+    const wx0 = Math.max(0, col(Math.min(A.x, B.x) - m)), wx1 = Math.min(cols - 1, col(Math.max(A.x + A.w, B.x + B.w) + m));
+    const wy0 = Math.max(0, row(Math.min(A.y, B.y) - m)), wy1 = Math.min(rows - 1, row(Math.max(A.y + A.h, B.y + B.h) + m));
+    const W = wx1 - wx0 + 1, H = wy1 - wy0 + 1;
+    const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];   // right, down, left, up
+    const free = k => owner[k] === 0;
+    // Where a string can leave a card, or arrive at one: the squares just outside each side, not
+    // too near the corners, a little dearer the further from the point facing the other card.
+    const sides = (X, other, leaving) => {
+      if (!X.w && !X.h) { const c = col(X.x), r = row(X.y); return [0, 1, 2, 3].map(d => ({ c, r, d, at: { x: X.x, y: X.y }, cost: 0 })).filter(s => s.c >= wx0 && s.c <= wx1 && s.r >= wy0 && s.r <= wy1); }
+      const out = [], g = leaving ? 0 : gap;
+      const R = Math.floor((X.x + X.w + 6 - gx0) / CELL - 0.5) + 1, Lc = Math.ceil((X.x - 6 - gx0) / CELL - 0.5) - 1;
+      const Bt = Math.floor((X.y + X.h + 6 - gy0) / CELL - 0.5) + 1, T = Math.ceil((X.y - 6 - gy0) / CELL - 0.5) - 1;
+      const aimY = clamp(other.y + other.h / 2, X.y + X.h * 0.2, X.y + X.h * 0.8), aimX = clamp(other.x + other.w / 2, X.x + X.w * 0.2, X.x + X.w * 0.8);
+      for (let r = row(X.y + X.h * 0.15); r <= row(X.y + X.h * 0.85); r++) {
+        const cost = Math.abs(cyOf(r) - aimY) / CELL * 0.3;
+        out.push({ c: R, r, d: leaving ? 0 : 2, at: { x: X.x + X.w + g, y: cyOf(r) }, cost }, { c: Lc, r, d: leaving ? 2 : 0, at: { x: X.x - g, y: cyOf(r) }, cost });
+      }
+      for (let c = col(X.x + X.w * 0.15); c <= col(X.x + X.w * 0.85); c++) {
+        const cost = Math.abs(cxOf(c) - aimX) / CELL * 0.3;
+        out.push({ c, r: Bt, d: leaving ? 1 : 3, at: { x: cxOf(c), y: X.y + X.h + g }, cost }, { c, r: T, d: leaving ? 3 : 1, at: { x: cxOf(c), y: X.y - g }, cost });
+      }
+      return out.filter(s => s.c >= wx0 && s.c <= wx1 && s.r >= wy0 && s.r <= wy1 && free(s.r * cols + s.c));
+    };
+    const goals = new Map();
+    for (const s of sides(B, A, false)) { const k = s.r * cols + s.c; if (!goals.has(k)) goals.set(k, []); goals.get(k).push(s); }
+    if (!goals.size) return wide ? null : autoroute(G, A, B, ia, ib, sa, sb, gap, true);
+    const bx0 = col(B.x), bx1 = col(B.x + B.w), by0 = row(B.y), by1 = row(B.y + B.h);
+    const hOf = (c, r) => Math.max(0, bx0 - c, c - bx1) + Math.max(0, by0 - r, r - by1);
+    const gs = new Float32Array(W * H * 4).fill(Infinity), prev = new Int32Array(W * H * 4).fill(-1);
+    const heapF = [], heapS = [];
+    const push = (f, s) => {
+      let i = heapF.length; heapF.push(f); heapS.push(s);
+      while (i > 0) { const p = (i - 1) >> 1; if (heapF[p] <= f) break; heapF[i] = heapF[p]; heapS[i] = heapS[p]; i = p; }
+      heapF[i] = f; heapS[i] = s;
+    };
+    const pop = () => {
+      const f = heapF[0], s = heapS[0], lf = heapF.pop(), ls = heapS.pop(), n = heapF.length;
+      if (n) {
+        let i = 0;
+        for (;;) { const l = 2 * i + 1, r = l + 1; let m2 = i, mf = lf; if (l < n && heapF[l] < mf) { m2 = l; mf = heapF[l]; } if (r < n && heapF[r] < mf) { m2 = r; } if (m2 === i) break; heapF[i] = heapF[m2]; heapS[i] = heapS[m2]; i = m2; }
+        heapF[i] = lf; heapS[i] = ls;
+      }
+      return [f, s];
+    };
+    const sid = (c, r, d) => (((r - wy0) * W + (c - wx0)) << 2) | d;
+    const seeds = new Map();
+    for (const s of sides(A, B, true)) { const st = sid(s.c, s.r, s.d); if (s.cost < gs[st]) { gs[st] = s.cost; seeds.set(st, s); push(s.cost + hOf(s.c, s.r), st); } }
+    let end = null, bestCost = Infinity, n = 0;
+    while (heapF.length) {
+      const [fv, st] = pop();
+      if (fv >= bestCost || ++n > 80000) break;
+      const g = gs[st], d = st & 3, cell = st >> 2, c = wx0 + cell % W, r = wy0 + ((cell / W) | 0);
+      if (g + hOf(c, r) < fv - 1e-3) continue;   // (an old entry: a cheaper way here was found since)
+      const k = r * cols + c, gl = goals.get(k);
+      if (gl) for (const s of gl) { const tot = g + s.cost + (d !== s.d ? ROUTE_TURN : 0); if (tot < bestCost) { bestCost = tot; end = { st, s }; } }
+      for (let nd = 0; nd < 4; nd++) {
+        if (nd === ((d + 2) & 3)) continue;
+        const nc = c + DX[nd], nr = r + DY[nd];
+        if (nc < wx0 || nc > wx1 || nr < wy0 || nr > wy1) continue;
+        const nk = nr * cols + nc;
+        if (!free(nk)) continue;
+        let cost = 1 + (nd !== d ? ROUTE_TURN : 0);
+        if (sect[nk] && sect[nk] !== sa && sect[nk] !== sb) cost += ROUTE_SOFT;
+        cost += nd & 1 ? usedH[nk] * ROUTE_CROSS + usedV[nk] * ROUTE_ALONG : usedV[nk] * ROUTE_CROSS + usedH[nk] * ROUTE_ALONG;
+        const ns = sid(nc, nr, nd), ng = g + cost;
+        if (ng < gs[ns]) { gs[ns] = ng; prev[ns] = st; push(ng + hOf(nc, nr), ns); }
+      }
+    }
+    if (!end) return wide ? null : autoroute(G, A, B, ia, ib, sa, sb, gap, true);
+    // Back along the way it came, keeping only the corners.
+    const path = [];
+    for (let st = end.st; st >= 0; st = prev[st]) path.push(st);
+    path.reverse();
+    const pts = [seeds.get(path[0]).at];
+    path.forEach((st, i) => {
+      const cell = st >> 2, p = { x: cxOf(wx0 + cell % W), y: cyOf(wy0 + ((cell / W) | 0)) };
+      if (i === 0 || i === path.length - 1 || (path[i + 1] & 3) !== (st & 3)) pts.push(p);
+    });
+    pts.push(end.s.at);
+    const out = [pts[0]];
+    for (const p of pts.slice(1)) { const q = out[out.length - 1]; if (Math.abs(p.x - q.x) > 0.5 || Math.abs(p.y - q.y) > 0.5) out.push(p); }
+    for (let i = out.length - 2; i > 0; i--) { const p = out[i - 1], q = out[i], r = out[i + 1]; if ((Math.abs(p.x - q.x) < 0.5 && Math.abs(q.x - r.x) < 0.5) || (Math.abs(p.y - q.y) < 0.5 && Math.abs(q.y - r.y) < 0.5)) out.splice(i, 1); }
+    return { pts: out, cost: bestCost };
+  }
+
+  // ---------- Shaped strings (0.7.6) ----------
+  // A string you've shaped by hand keeps its turns: data.links[].via = [[x, y], …] on the board.
+  // Its ends still follow the cards (leaving from the side facing its first turn); on a look with
+  // right-angle strings (blueprint, hacker) each stretch turns a corner if needed (circuit traces and
+  // city lines a 45° one), and on Corkboard the wool hangs between pins at the turns.
+  const viaPts = via => (via || []).map(v => (Array.isArray(v) ? { x: v[0], y: v[1] } : { x: v.x, y: v.y }));
+  function viaWire(fromId, toId, via) {
+    const P = viaPts(via), seed = fromId + '>' + toId;
+    if (look() === 'corkboard') { const a = pinPoint(fromId), b = pinPoint(toId); return a && b ? woolThrough([a, ...P, b]) : null; }
+    const A = rectOf(fromId), B = rectOf(toId);
+    if (!A || !B) return null;
+    const L = look(), dot = p => ({ x: p.x, y: p.y, w: 0, h: 0 });
+    const fa = facing(A, dot(P[0]), 0), fb = facing(dot(P[P.length - 1]), B, GAP_AT_END[L] ?? 5);
+    let pts = [fa.p0, ...P, fb.p3];
+    if (ORTHO_LOOKS.has(L)) pts = orthoThrough(pts, fa.horiz);
+    else if (OCTO_LOOKS.has(L)) pts = octoThrough(pts, fa.horiz);
+    return alongPts(pts, seed, seed);
+  }
+  // The same with 45° turns: straight on the way it was going, then a diagonal to the next point.
+  function octoThrough(pts, horiz) {
+    const out = [pts[0]];
+    let h = horiz;
+    for (const q of pts.slice(1)) {
+      const p = out[out.length - 1], dx = q.x - p.x, dy = q.y - p.y, ax = Math.abs(dx), ay = Math.abs(dy);
+      if (ax > 0.5 && ay > 0.5 && Math.abs(ax - ay) > 0.5) {
+        if (ax > ay) out.push(h ? { x: q.x - Math.sign(dx) * ay, y: p.y } : { x: p.x + Math.sign(dx) * ay, y: q.y }); 
+        else out.push(h ? { x: q.x, y: p.y + Math.sign(dy) * ax } : { x: p.x, y: q.y - Math.sign(dy) * ax });
+      }
+      h = Math.abs(q.y - out[out.length - 1].y) < 0.5;
+      out.push(q);
+    }
+    return out;
+  }
+  // Points joined by straight runs that turn at right angles: each stretch goes the other way to the last.
+  function orthoThrough(pts, horiz) {
+    const out = [pts[0]];
+    let h = horiz;
+    for (const q of pts.slice(1)) {
+      const p = out[out.length - 1];
+      if (Math.abs(p.x - q.x) > 0.5 && Math.abs(p.y - q.y) > 0.5) out.push(h ? { x: q.x, y: p.y } : { x: p.x, y: q.y });
+      else h = Math.abs(p.y - q.y) > 0.5;
+      out.push(q);
+    }
+    return out;
+  }
+  // Corkboard wool through pins at its turns, hanging between each.
+  function woolThrough(pts) {
+    let d = '';
+    const parts = [];
+    for (let i = 1; i < pts.length; i++) { const s = sag(pts[i - 1], pts[i]); parts.push(s); d += i === 1 ? s.d : ' ' + s.d.slice(s.d.indexOf('Q')); }
+    const pins = pts.slice(1, -1).map(p => `<circle class="pinhead" cx="${f(p.x)}" cy="${f(p.y)}" r="5.5" style="fill:#9C968B"/>`).join('');
+    return { d, mid: parts[Math.floor((parts.length - 1) / 2)].mid, pts, mids: parts.map((s, i) => ({ ...s.mid, ins: i })), html: `<path class="wire wool" d="${d}"/><path class="wire twist" d="${d}"/>${pins}` };
+  }
+
+  // ---------- All the strings, routed together ----------
+  let routeCache = null, routeTimer = 0, routeNow = false;
+  function routeJobs() {
     const jobs = [];
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       const A = rectOf(r.id), B = rectOf(l.to);
-      if (A && B && r.id !== l.to) jobs.push({ k: `${r.id}|${l.to}`, from: r.id, to: l.to, A, B });
+      if (A && B && r.id !== l.to) jobs.push({ k: `${r.id}|${l.to}`, from: r.id, to: l.to, A, B, via: viaOf(l) });
     }
+    return jobs;
+  }
+  function routeSig(jobs) {
     const R = b => [Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h)];
-    const sig = L + JSON.stringify([jobs.map(j => [j.k, R(j.A), R(j.B)]), obstacles.map(o => [o.id, ...R(o)]), (frameBoxes || []).map(o => [o.id, ...R(o)]), api.ownWire?.() || 0]);
-    if (routeCache?.sig === sig) return routeCache.map;
-    const len = pts => { let n = 0; for (let i = 1; i < (pts || []).length; i++) n += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return n; };
-    const segsOf = pts => { const out = []; for (let i = 1; i < (pts || []).length; i++) out.push({ p: pts[i - 1], q: pts[i] }); return out; };
-    for (const j of jobs) { j.seed = j.from + '>' + j.to; j.own = shape(j.A, j.B, j.seed); j.ownLen = len(j.own?.pts); }
-    jobs.sort((a, b) => a.ownLen - b.ownLen);
-    const map = new Map();
-    const one = (j, others) => {
+    return look() + JSON.stringify([jobs.map(j => [j.k, R(j.A), R(j.B), j.via || 0]), obstacles.map(o => [o.id, ...R(o)]), (frameBoxes || []).map(o => [o.id, ...R(o)]), api.ownWire?.() || 0]);
+  }
+  function computeRoutes(jobs) {
+    const map = new Map(), G = routingGrid();
+    if (!G) return map;
+    const gap = GAP_AT_END[look()] ?? 5;
+    const secOf = X => { const k = cellAt(G, X.x + X.w / 2, X.y + X.h / 2); return k >= 0 ? G.sect[k] : 0; };
+    // (shaped strings first: they stay as they are, and the others keep clear of them)
+    for (const j of jobs) if (j.via?.length) { const s = viaWire(j.from, j.to, j.via); map.set(j.k, s); markRoute(G, s?.pts, 1); }
+    const auto = jobs.filter(j => !j.via?.length);
+    for (const j of auto) {
+      j.seed = j.from + '>' + j.to; j.own = shape(j.A, j.B, j.seed); j.ownLen = polyLen(j.own?.pts);
+      j.ia = G.obsIndex.get(j.from) || 0; j.ib = G.obsIndex.get(j.to) || 0;
+      j.sa = G.secIndex.get(j.from) || secOf(j.A); j.sb = G.secIndex.get(j.to) || secOf(j.B);
+    }
+    auto.sort((a, b) => a.ownLen - b.ownLen);
+    const one = j => {
       const s = j.own;
       if (!s?.pts || holds(j.A, j.B) || holds(j.B, j.A)) return s;
-      const skip = new Set([j.from, j.to]);
-      const obs = obstacles.filter(o => !skip.has(o.id));
-      const ca = { x: j.A.x + j.A.w / 2, y: j.A.y + j.A.h / 2 }, cb = { x: j.B.x + j.B.w / 2, y: j.B.y + j.B.h / 2 };
-      const soft = (frameBoxes || []).filter(fr => !skip.has(fr.id) && !inRect(fr, ca) && !inRect(fr, cb));
-      // what the look's own way crosses
-      let pen = 0;
-      for (let i = 1; i < s.pts.length; i++) {
-        const p = s.pts[i - 1], q = s.pts[i];
-        for (const o of obs) if (segHits(p, q, o)) pen += 5000;
-        for (const o of soft) if (segHits(p, q, o)) pen += 700;
-        pen += stringCost(p, q, others);
-      }
-      if (!pen) return s;
-      const r = findRoute(j.A, j.B, obs, gap, soft, others);
-      return r && r.score < j.ownLen + pen - 30 ? alongPts(r.pts, j.seed, j.seed) : s;
+      if (pathPenalty(G, s.pts, j.ia, j.ib, j.sa, j.sb) < 8) return s;   // (the look's own way gets through cleanly)
+      const r = autoroute(G, j.A, j.B, j.ia, j.ib, j.sa, j.sb, gap);
+      return r ? alongPts(r.pts, j.seed, j.seed) : s;
     };
-    for (const j of jobs) { const others = []; for (const s of map.values()) others.push(...segsOf(s?.pts)); map.set(j.k, one(j, others)); }
-    for (const j of jobs) { const others = []; for (const [k, s] of map) if (k !== j.k) others.push(...segsOf(s?.pts)); map.set(j.k, one(j, others)); }
-    routeCache = { sig, map };
+    for (const j of auto) { const s = one(j); map.set(j.k, s); markRoute(G, s?.pts, 1); }
+    for (const j of auto) { markRoute(G, map.get(j.k)?.pts, -1); const s = one(j); map.set(j.k, s); markRoute(G, s?.pts, 1); }
     return map;
   }
 
@@ -1029,16 +1233,35 @@ export function createBoard(host, api) {
     obstacles = ROUND_LOOKS.has(L) ? [key, ...cards.filter(r => !isSketch(r)).map(r => r.id)].map(id => { const b = rectOf(id); return b && { id, x: b.x - 6, y: b.y - 6, w: b.w + 12, h: b.h + 12 }; }).filter(Boolean) : null;
     // (while a card or section is being dragged, each string just finds its own way: quicker)
     const dragging = gesture && ['move', 'scale', 'resize'].includes(gesture.kind);
-    routeMap = ROUND_LOOKS.has(L) && !dragging ? routeAll() : null;
+    // (0.7.6) The autorouter's routes, once worked out (just after this, if anything's changed)
+    routeMap = null;
+    if (ROUND_LOOKS.has(L) && !dragging) {
+      const jobs = routeJobs(), sig = routeSig(jobs);
+      if (routeCache?.sig === sig) routeMap = routeCache.map;
+      else if (routeNow) { routeCache = { sig, map: computeRoutes(jobs) }; routeMap = routeCache.map; }
+      else {
+        clearTimeout(routeTimer);
+        routeTimer = setTimeout(() => {
+          if (!lines.isConnected || (gesture && ['move', 'scale', 'resize'].includes(gesture.kind))) return;
+          routeNow = true;
+          try { drawLines(); } finally { routeNow = false; }
+        }, 40);
+      }
+    }
+    shown.clear();
+    let handles = '';
     const placedLabels = [];
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       if (!on.has(l.to)) continue;
-      const s = wire(r.id, l.to);
+      const id = `${r.id}|${esc(l.to)}`;
+      const via = viaNow(r, l, id), s = wire(r.id, l.to, via);
       if (!s) continue;
       if (l.label) s.mid = labelSpot(s, l.label, placedLabels);
-      const id = `${r.id}|${esc(l.to)}`;
       junctions.set(id, s.mid);
-      html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${s.html}`;
+      shown.set(id, s);
+      const sel = selString === id;
+      html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${sel ? `<path class="selglow" d="${s.d}"/>` : ''}${s.html}`;
+      if (sel) handles = shapeHandles(id, s, via);
       // Branches: more cards joined to this string where its label is, like a T junction.
       let branched = false;
       for (const c of l.also || []) {
@@ -1062,7 +1285,109 @@ export function createBoard(host, api) {
       const a = pinPoint(r.id);
       if (a) pins += `<circle class="pinhead" cx="${a.x}" cy="${a.y}" r="8" style="fill:${PINS[hash(r.id) % PINS.length]}"/><circle class="pinshine" cx="${a.x - 2.5}" cy="${a.y - 2.5}" r="2.4"/>`;
     }
-    lines.innerHTML = html + pins + labels.join('');
+    lines.innerHTML = html + pins + labels.join('') + handles;
+  }
+
+  // ---------- Shaping a string by hand (0.7.6) ----------
+  // Tap a string and it shows dots: a big one at each turn (drag to move it, double-tap to take it
+  // out), a small one along each stretch (drag to put in a new turn). Or just pull the string: on a
+  // right-angle look that moves the stretch you grabbed, otherwise it puts a turn where you grabbed.
+  // The shape is kept for this board (data.links[].via[board]); the string's menu has Auto to hand
+  // it back to the autorouter.
+  const viaOf = l => (Array.isArray(l?.via?.[key]) && l.via[key].length ? l.via[key] : null);
+  // (what a string's shape is right now: while it's being shaped, or carried along with both its ends)
+  function viaNow(r, l, id) {
+    if (viaDraft?.k === id) return viaDraft.via;
+    const v = viaOf(l), g = gesture;
+    if (!v || g?.kind !== 'move' || !g.moved) return v;
+    const a = g.starts.get(r.id), b = g.starts.get(l.to), p = pos.get(r.id);
+    if (!a || !b || !p) return v;
+    const dx = p.x - a.x, dy = p.y - a.y;
+    return dx || dy ? v.map(([x, y]) => [x + dx, y + dy]) : v;
+  }
+  // The turns to shape from: the string's own (shaped before), or the corners of its route (unless
+  // it's a curve, which starts from none).
+  function shapeBase(s, via) {
+    if (via?.length) return viaPts(via);
+    const D = s.pts || [];
+    return D.length <= 8 ? D.slice(1, -1).map(p => ({ x: p.x, y: p.y })) : [];
+  }
+  // Where a new turn on stretch j of a drawn string (D) goes in its list of turns (C).
+  const sameAt = (a, b) => Math.abs(a.x - b.x) < 0.6 && Math.abs(a.y - b.y) < 0.6;
+  function insertAt(D, C, j) {
+    let n = 0;
+    for (let i = 1; i <= j && i < D.length; i++) if (C.some(c => sameAt(c, D[i]))) n++;
+    return Math.min(n, C.length);
+  }
+  function shapeHandles(id, s, via) {
+    const C = shapeBase(s, via), D = s.pts || [];
+    const dot = (cls, attr, p, r) => `<g class="${cls}" ${attr} transform="translate(${f(p.x)} ${f(p.y)})"><g class="hz"><circle class="hhit" r="18"/><circle class="hdot" r="${r}"/></g></g>`;
+    const mids = s.mids || (!via?.length && D.length > 8 ? [{ ...alongMid(D), ins: 0 }]
+      : D.slice(1).map((q, j) => { const p = D[j]; return Math.hypot(q.x - p.x, q.y - p.y) > 44 ? { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, ins: insertAt(D, C, j) } : null; }).filter(Boolean));
+    let h = '';
+    for (const m of mids) h += dot('addh', `data-addvia="${id}|${m.ins}"`, m, 4.5);
+    C.forEach((c, i) => { h += dot('viah', `data-via="${id}|${i}"`, c, 6.5); });
+    return h;
+  }
+  const splitHandle = v => { const parts = v.split('|'), n = +parts.pop(); return [parts.join('|'), n]; };
+  const segDist = (p, a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy, t = L2 ? clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / L2, 0, 1) : 0;
+    return Math.hypot(p.x - a.x - dx * t, p.y - a.y - dy * t);
+  };
+  // Starting to shape: from a dot (el), or from pulling the string itself (id, grabbed at a point on the board).
+  function startShape(el, id, at) {
+    let n = 0, add = false;
+    if (el) { add = el.dataset.addvia != null; [id, n] = splitHandle(el.dataset.via ?? el.dataset.addvia); }
+    const s = shown.get(id), l = linkOf(id);
+    if (!s || !l) return null;
+    const C = shapeBase(s, viaOf(l)), D = s.pts || [];
+    const g = { kind: 'via', id, idx: n, seg: null, axis: null, grab: at, sx: 0, sy: 0, moved: !el, add, had: !!viaOf(l) };
+    if (!el) {
+      // (the stretch grabbed: on a right-angle look, a straight stretch between two turns moves as one)
+      let j = 0, best = Infinity;
+      for (let i = 1; i < D.length; i++) { const d = segDist(at, D[i - 1], D[i]); if (d < best) { best = d; j = i - 1; } }
+      const ia = C.findIndex(c => sameAt(c, D[j])), ib = D[j + 1] ? C.findIndex(c => sameAt(c, D[j + 1])) : -1;
+      const L = look(), flat = D[j + 1] && Math.abs(D[j].y - D[j + 1].y) < 0.5, upright = D[j + 1] && Math.abs(D[j].x - D[j + 1].x) < 0.5;
+      if ((ORTHO_LOOKS.has(L) || OCTO_LOOKS.has(L)) && ia >= 0 && ib >= 0 && (flat || upright)) { g.seg = [ia, ib]; g.axis = flat ? 'y' : 'x'; }
+      else { g.idx = s.mids || (!viaOf(l) && D.length > 8) ? (s.mids ? Math.min(j, C.length) : 0) : insertAt(D, C, j); C.splice(g.idx, 0, { x: at.x, y: at.y }); }
+    } else if (add) C.splice(n, 0, { x: at.x, y: at.y });
+    g.start = C.map(p => ({ ...p }));
+    g.via = g.start;
+    return g;
+  }
+  // Following the finger: snapped to an 8 px grid, and level with the turn either side if it's close.
+  function moveShape(g, at) {
+    const dx = at.x - g.grab.x, dy = at.y - g.grab.y, snap = v => Math.round(v / 8) * 8;
+    const via = g.start.map(p => ({ ...p }));
+    if (g.seg) for (const i of g.seg) { if (g.axis === 'y') via[i].y = snap(g.start[i].y + dy); else via[i].x = snap(g.start[i].x + dx); }
+    else {
+      const p = { x: snap(g.start[g.idx].x + dx), y: snap(g.start[g.idx].y + dy) };
+      const ends = shown.get(g.id)?.pts || [];
+      for (const q of [via[g.idx - 1] || ends[0], via[g.idx + 1] || ends[ends.length - 1]]) {
+        if (!q) continue;
+        if (Math.abs(p.x - q.x) < 10) p.x = q.x;
+        if (Math.abs(p.y - q.y) < 10) p.y = q.y;
+      }
+      via[g.idx] = p;
+    }
+    g.via = via;
+    viaDraft = { k: g.id, via: via.map(p => [p.x, p.y]) };
+    drawLines();
+  }
+  async function saveVia(id, via, quiet) {
+    const [from, to] = id.split('|'), r = api.store.get(from);
+    if (!r) return;
+    const links = r.data.links || [], pts = (via || []).map(p => (Array.isArray(p) ? p : [p.x, p.y]).map(Math.round));
+    const next = links.map(l => {
+      if (l.to !== to) return l;
+      const v = { ...(l.via || {}) };
+      if (pts.length) v[key] = pts; else delete v[key];
+      const n = { ...l, via: v };
+      if (!Object.keys(v).length) delete n.via;
+      return n;
+    });
+    await api.store.update(from, { links: next });
+    if (!quiet) api.toast(pts.length ? 'String reshaped.' : 'String handed back to the autorouter.', 'Undo', () => api.store.update(from, { links }));
   }
 
   function applyView() {
@@ -1115,6 +1440,16 @@ export function createBoard(host, api) {
     pop.hidden = true; menuEl.hidden = true;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) { startPinch(); return; }
+    // (0.7.6) A dot on a string being shaped: move that turn, or put in a new one
+    const dotEl = e.target.closest('[data-via], [data-addvia]');
+    if (dotEl) {
+      e.preventDefault(); capture(e.pointerId);
+      gesture = startShape(dotEl, null, toWorld(e.clientX, e.clientY));
+      if (gesture) { gesture.sx = e.clientX; gesture.sy = e.clientY; busy = true; }
+      return;
+    }
+    // (anything but that string lets go of it)
+    if (selString && e.target.closest('[data-link]')?.dataset.link !== selString) { selString = null; drawLines(); }
     if (e.target.closest('[data-tick], [data-ci], [data-openboard], [data-play], [data-big], [data-mclose], [data-mbig], [data-docopen], [data-linkopen]')) return;   // their own tap
     const link = e.target.closest('[data-link], [data-branch]');
     // A string's label (or the knot where its branches meet): tap to edit, drag onto a card to branch.
@@ -1221,6 +1556,18 @@ export function createBoard(host, api) {
       for (const c of host.querySelectorAll('.target')) c.classList.remove('target');
       const over = targetAt(e.clientX, e.clientY);
       if (over && canBranch(g.link, over)) elOf(over)?.classList.add('target');
+    } else if (g.kind === 'tap-line') {
+      // (0.7.6) Pulling a string reshapes it (not a branch, or in String mode)
+      if (tying || !g.line.dataset.link || Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 7) return;
+      const s2 = startShape(null, g.line.dataset.link, toWorld(g.sx, g.sy));
+      if (!s2) return;
+      s2.sx = g.sx; s2.sy = g.sy;
+      gesture = s2; selString = s2.id;
+      moveShape(s2, toWorld(e.clientX, e.clientY));
+    } else if (g.kind === 'via') {
+      if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 5) return;
+      g.moved = true;
+      moveShape(g, toWorld(e.clientX, e.clientY));
     }
   });
   // The dashed string that follows your finger while you tie or branch.
@@ -1274,6 +1621,16 @@ export function createBoard(host, api) {
       drawLines();
     } else if (g.kind === 'tap-line' && up && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 8) {
       await tapLine(g.line, e.clientX, e.clientY);
+    } else if (g.kind === 'via') {
+      viaDraft = null;
+      selString = g.id;
+      if (g.moved) await saveVia(g.id, g.via, g.had);
+      else if (up && !g.add) {
+        // (a turn's dot tapped twice: that turn comes out)
+        const now = Date.now();
+        if (lastViaTap?.k === g.id && lastViaTap.i === g.idx && now - lastViaTap.t < 450) { lastViaTap = null; await saveVia(g.id, g.start.filter((_, i) => i !== g.idx)); }
+        else { lastViaTap = { k: g.id, i: g.idx, t: now }; drawLines(); }
+      } else drawLines();
     } else if (g.kind === 'label') {
       for (const c of host.querySelectorAll('.target')) c.classList.remove('target');
       if (g.moved) {
@@ -1340,7 +1697,7 @@ export function createBoard(host, api) {
   // From the string's own menu: the next card you tap joins it.
   // (just the one: once it's joined, String mode ends again)
   function startBranch(link) {
-    tying = true; tieFrom = 'L:' + link; tieOnce = true;
+    tying = true; tieFrom = 'L:' + link; tieOnce = true; selString = null;
     host.classList.add('tying');
     render();
   }
@@ -1466,6 +1823,15 @@ export function createBoard(host, api) {
         if (p && (!s || s.x !== p.x || s.y !== p.y || (p.w && (s.w !== p.w || s.h !== p.h)))) spot(r.id, p);
       }
       for (const id of g.starts.keys()) spot(id, pos.get(id));
+      // (0.7.6) A string shaped by hand between two things moved together (in a section) moves with them.
+      for (const r of [...frames, ...cards]) {
+        const ls = r.data.links || [], a = g.starts.get(r.id), p = pos.get(r.id);
+        if (!a || !p || !ls.some(viaOf)) continue;
+        const dx = p.x - a.x, dy = p.y - a.y;
+        if (!dx && !dy) continue;
+        const next = ls.map(l => (viaOf(l) && g.starts.get(l.to) ? { ...l, via: { ...l.via, [key]: viaOf(l).map(([x, y]) => [x + dx, y + dy]) } } : l));
+        add(r.id, { links: next });
+      }
       const before = new Map(), moves = [];
       const reparent = (id, to) => {
         const r = api.store.get(id);
@@ -1531,7 +1897,7 @@ export function createBoard(host, api) {
   // String mode: the first tap picks a card, the second ties it to another. It stays on for more
   // until you tap the button again or the empty board.
   function setTying(on) {
-    tying = on; tieFrom = null; tieOnce = false;
+    tying = on; tieFrom = null; tieOnce = false; selString = null;
     host.classList.toggle('tying', on);
     render();
   }
@@ -1596,10 +1962,25 @@ export function createBoard(host, api) {
     const l = (api.store.get(from)?.data.links || []).find(x => x.to === to);
     if (!l) return;
     popLink = { from, to };
+    pop.querySelector('[data-s="auto"]').hidden = !viaOf(l);
+    if (selString !== link) { selString = link; drawLines(); }   // (its dots, to shape it by)
     const b = host.getBoundingClientRect();
     pop.hidden = false;
-    pop.style.left = clamp(cx - b.left - 150, 8, b.width - pop.offsetWidth - 8) + 'px';
-    pop.style.top = clamp(cy - b.top + 12, 8, b.height - 60) + 'px';
+    // (0.7.6) Below where you tapped, or above, or to one side: wherever it covers least of the
+    // string and its dots, so they can still be dragged.
+    const pw = pop.offsetWidth, ph = pop.offsetHeight, pts = [];
+    const glow = lines.querySelector('.selglow'), m = glow?.getScreenCTM();
+    if (glow && m) { const L = glow.getTotalLength(); for (let i = 0; i <= 40; i++) { const q = glow.getPointAtLength(L * i / 40); pts.push(new DOMPoint(q.x, q.y).matrixTransform(m)); } }
+    for (const d of lines.querySelectorAll('.viah .hdot, .addh .hdot')) { const r = d.getBoundingClientRect(); for (let i = 0; i < 3; i++) pts.push({ x: r.left + r.width / 2, y: r.top + r.height / 2 }); }
+    const spots = [[cx - pw / 2, cy + 16], [cx - pw / 2, cy - ph - 16], [cx + 28, cy - ph / 2], [cx - pw - 28, cy - ph / 2]]
+      .map(([x, y]) => [clamp(x - b.left, 8, b.width - pw - 8), clamp(y - b.top, 8, b.height - ph - 8)]);
+    let best = spots[0], fewest = Infinity;
+    for (const [x, y] of spots) {
+      const n = pts.filter(p => p.x > b.left + x - 12 && p.x < b.left + x + pw + 12 && p.y > b.top + y - 12 && p.y < b.top + y + ph + 12).length;
+      if (n < fewest) { fewest = n; best = [x, y]; }
+    }
+    pop.style.left = best[0] + 'px';
+    pop.style.top = best[1] + 'px';
     const input = pop.querySelector('input');
     input.value = l.label || '';
     if (matchMedia('(pointer: fine)').matches) input.focus();
@@ -1618,7 +1999,14 @@ export function createBoard(host, api) {
   pop.addEventListener('click', async e => {
     const b = e.target.closest('[data-s]');
     if (!b) return;
-    if (b.dataset.s !== 'branch') { saveString(b.dataset.s === 'remove'); return; }
+    if (b.dataset.s === 'auto') {
+      const link = popLink && `${popLink.from}|${popLink.to}`, typed = pop.querySelector('input').value.trim();
+      if (!link) return;
+      if (typed !== (linkOf(link)?.label || '')) await saveString(false); else { pop.hidden = true; popLink = null; }
+      await saveVia(link, []);
+      return;
+    }
+    if (b.dataset.s !== 'branch') { if (b.dataset.s === 'remove') selString = null; saveString(b.dataset.s === 'remove'); return; }
     const link = popLink && `${popLink.from}|${popLink.to}`;
     if (!link) return;
     const typed = pop.querySelector('input').value.trim(), was = linkOf(link)?.label || '';
@@ -1802,6 +2190,28 @@ export function createBoard(host, api) {
     const ids = [...out.keys()].filter(id => api.store.get(id));
     const before = new Map(ids.map(id => [id, api.store.get(id).data.cork]));
     const proj = api.store.get(key), banner = proj?.data.cork;
+    // (0.7.6) Strings shaped by hand: moved along if both ends moved the same way, otherwise handed
+    // back to the autorouter (the shape was for where things were).
+    const shapedBefore = new Map(), shapedNext = new Map();
+    for (const r of [...frames, ...cards]) {
+      const ls = r.data.links || [];
+      if (!ls.some(viaOf)) continue;
+      const d = id => { const a = pos.get(id), b = out.get(id); return a && b ? [Math.round(b.x - a.x), Math.round(b.y - a.y)] : [0, 0]; };
+      let changed = false;
+      const next = ls.map(l => {
+        const v = viaOf(l);
+        if (!v) return l;
+        const [ax, ay] = d(r.id), [bx, by] = d(l.to);
+        if (!ax && !ay && !bx && !by) return l;
+        changed = true;
+        const via = { ...l.via };
+        if (ax === bx && ay === by) via[key] = v.map(([x, y]) => [x + ax, y + ay]); else delete via[key];
+        const n = { ...l, via };
+        if (!Object.keys(via).length) delete n.via;
+        return n;
+      });
+      if (changed) { shapedBefore.set(r.id, ls); shapedNext.set(r.id, next); }
+    }
     busy = true;
     try {
       for (const id of ids) {
@@ -1809,12 +2219,14 @@ export function createBoard(host, api) {
         const spot = isFrame(id) ? { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: Math.round(p.h) } : { x: Math.round(p.x), y: Math.round(p.y), ...(s ? { s } : {}) };
         await api.store.update(id, { cork: { ...(r.data.cork || {}), [key]: spot } });
       }
+      for (const [id, links] of shapedNext) await api.store.update(id, { links });
       // (the banner goes back over the middle of it all)
       if (mode !== 'inside' && banner?.banner) { const c = { ...banner }; delete c.banner; await api.store.update(key, { cork: Object.keys(c).length ? c : undefined }); }
     } finally { busy = false; }
     needsFit = mode !== 'inside'; render();
     api.toast(mode === 'inside' ? 'Tidied inside the sections.' : 'Board tidied.', 'Undo', async () => {
       for (const [id, c] of before) await api.store.update(id, { cork: c });
+      for (const [id, links] of shapedBefore) await api.store.update(id, { links });
       if (mode !== 'inside' && banner?.banner) await api.store.update(key, { cork: banner });
     });
   }
@@ -1830,6 +2242,9 @@ export function createBoard(host, api) {
     const savedView = { ...view };
     host.classList.add('exporting');
     view = { x: 0, y: 0, z: 1 }; applyView();
+    // (every string routed, and none showing its shaping dots)
+    selString = null; pop.hidden = true; routeNow = true;
+    try { drawLines(); } finally { routeNow = false; }
     try {
       const cb = cork.getBoundingClientRect(), ox = cb.left, oy = cb.top;
       // Pictures go inside the file (as data), so it stands on its own.
@@ -1963,6 +2378,8 @@ export function createBoard(host, api) {
     },
     refresh: render,
     redrawStrings: drawLines,
+    routeStrings: () => { routeCache = null; routeNow = true; try { drawLines(); } finally { routeNow = false; } },
+    shownStrings: () => shown,
     get key() { return key; },
   };
 }

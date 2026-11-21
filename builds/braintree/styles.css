@@ -470,6 +470,13 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .strings .pinhead { stroke: rgba(0, 0, 0, 0.35); stroke-width: 1.2; filter: drop-shadow(0 2px 1.5px rgba(0, 0, 0, 0.4)); }
 .strings .pinshine { fill: rgba(255, 255, 255, 0.7); }
 .strings .slabel { pointer-events: all; cursor: pointer; }
+/* 0.7.6 shaping a string: it glows, with a big dot at each turn and a small one along each stretch */
+.strings .selglow { fill: none; stroke: var(--accent-ink); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; opacity: 0.22; }
+.strings .viah, .strings .addh { pointer-events: all; cursor: grab; touch-action: none; }
+.strings .hz { transform: scale(var(--iz, 1)); }
+.strings .hhit { fill: transparent; }
+.strings .viah .hdot { fill: var(--card); stroke: var(--accent-ink); stroke-width: 2.5; }
+.strings .addh .hdot { fill: var(--accent-ink); stroke: var(--card); stroke-width: 1.5; opacity: 0.8; }
 /* 0.7.1 branches: a string's label (or this knot, when it has none) is where its branches meet */
 .strings .junction { pointer-events: all; cursor: pointer; fill: var(--lc, var(--wire)); stroke: rgba(0, 0, 0, 0.3); stroke-width: 1.2; }
 .strings .slabel.picked rect { stroke-width: 3; stroke-dasharray: 5 3; }
@@ -916,8 +923,10 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .boardbar button.on { background: var(--accent-bg); color: var(--accent-ink); }
 @media (max-width: 600px) { .boardbar [data-b=in], .boardbar [data-b=out], .boardbar .sep, .boardbar .long { display: none; } .boardbar button { padding: 0.45rem 0.34rem; font-size: 0.84rem; } }
 .boardbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 3px; flex-shrink: 0; }
-.stringpop { position: absolute; z-index: 7; display: flex; gap: 4px; align-items: center; padding: 8px; width: 310px; max-width: calc(100% - 16px); background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
-.stringpop input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; background: var(--bg); color: var(--ink); font-size: 16px; outline: none; }
+.stringpop { position: absolute; z-index: 7; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 8px; width: 310px; max-width: calc(100% - 16px); background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.stringpop .danger { margin-left: auto; }
+.stringpop .pophint { flex-basis: 100%; margin: 2px 2px 0; color: var(--soft); font-size: 0.78rem; line-height: 1.3; }
+.stringpop input { flex: 1 1 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; background: var(--bg); color: var(--ink); font-size: 16px; outline: none; }
 .stringpop button { font-size: 0.85rem; font-weight: 600; padding: 0.35rem 0.4rem; color: var(--accent-ink); white-space: nowrap; }
 .stringpop button.danger { color: var(--string); }
 .boardhint { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 6; margin: 0; padding: 0.45rem 0.9rem; border-radius: 14px; background: var(--card); color: var(--soft); font-size: 0.85rem; box-shadow: var(--shadow); width: max-content; max-width: calc(100% - 24px); text-align: center; pointer-events: none; }

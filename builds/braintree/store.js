@@ -398,6 +398,13 @@ function mergeLinks(was = [], mine = [], other = []) {
     const also = new Set((o.also || []).filter(c => !(wa.has(c) && !la.has(c))));
     for (const c of la) if (!wa.has(c)) also.add(c);
     if (also.size) m.also = [...also]; else delete m.also;
+    // (0.7.6) a string's shape on each board (via): mine where I changed it, theirs where I didn't
+    const lv = l.via || {}, wv = w.via || {}, via = { ...(o.via || {}) };
+    for (const b of new Set([...Object.keys(lv), ...Object.keys(wv)])) {
+      if (JSON.stringify(lv[b] || null) === JSON.stringify(wv[b] || null)) continue;
+      if (lv[b]) via[b] = lv[b]; else delete via[b];
+    }
+    if (Object.keys(via).length) m.via = via; else delete m.via;
     out.set(k, m);
   }
   return [...out.values()];

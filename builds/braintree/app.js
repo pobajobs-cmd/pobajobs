@@ -15,7 +15,7 @@ import { linkService } from './attach.js';
 import * as ex from './export.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.7.5';
+const VERSION = '0.7.6';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -983,6 +983,9 @@ async function duplicate(id) {
     if (ls.length) await store.update(ids.get(x.id), { links: ls.map(l => {
       const y = { ...l, to: ids.get(l.to), also: (l.also || []).map(c => ids.get(c)).filter(Boolean) };
       if (!y.also.length) delete y.also;
+      // (a string's shape, for the copied boards)
+      const via = Object.fromEntries(Object.entries(l.via || {}).filter(([b]) => ids.get(b)).map(([b, v]) => [ids.get(b), v]));
+      if (Object.keys(via).length) y.via = via; else delete y.via;
       return y;
     }) });
   }
