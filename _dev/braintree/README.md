@@ -112,6 +112,26 @@ The sidebar shows how many to-dos in each project are due today (red if any are 
 
 **Example project** rebuilt to show everything (see `example.js`; its header lists what's in it). **Keep it up to date: every new feature gets an example there and a line in the project's notes.** It now has a pinned to-do with a PDF attached (made with `listPDF`), a photo note drawn on a canvas and shown Large, a spreadsheet with a formula, a link tile, a branch off "read from", and a locked sub-project (password `tree`). `addExample(store, { makeLock })`.
 
+## 0.7.2
+
+**Settings from anywhere.** A cog at the top right of every list and every board (as well as the sidebar). Settings has a Done button that stays at the top while you scroll; changes are saved as you make them.
+
+**Each project remembers list or board** (`bt-proj-view` in localStorage, per device): opening it from the sidebar goes to whichever you used last. Board button / "Open its board" / an item's board button remember board; List view remembers list.
+
+**Minimal look:** the board is a shade darker than the cards in light mode, the cards a shade lighter than the board in dark.
+
+**Card sizes don't change the handles:** the string dot (or pin) and the size handle are scaled back (`scale: calc(1 / var(--s))`), so a Large card's handles are the usual size.
+
+**Tidy and Fit ask first** (a small menu over the button). Tidy keeps drawings made on the board where they are.
+
+**Strings route round cards** (`board.js` "Strings that go round cards"): on every look but Corkboard (wool crosses things) and Space (constellations are straight). A string leaves its card anywhere along the facing side (`facing()`: level where the two cards overlap, otherwise aimed at the other card, 20–80% along the side). If the look's usual path crosses another card (cards and the banner, 6 px clearance; not drawings on the board), `findRoute()` tries straight runs with up to two turns (then three) from any side, using the gaps beside the cards in the way, scoring length + turns + 5000 per card crossed, and the look draws that route its own way (`alongPts`: cut corners for traces, rounded for city lines and neon, hand-drawn wobble for marker/pen/chalk). About 1 ms to redraw a board's strings, so it runs live while dragging.
+
+**Smarter layout (Tidy, and any board nothing's been placed on yet)** (`smartLayout()`): each section is packed with its cards in an order that puts strung-together ones side by side; loose cards strung into a section are placed on their own next to it; loose cards strung only to each other stay a group; unstrung ones go in one block. Each of those goes, in order of how strung-together they are, into the free spot (beside something already placed) nearest what it's strung to, keeping the whole thing compact and about screen-shaped.
+
+**Drawing straight on the board.** The board's **Draw** button (or + Add → Drawing): the drawing editor opens over the board, see-through, and the board moves with it (`openDrawing({stage})`: `getView`/`setView` map the editor's view to the board's). Done makes a note with `data.sketch`, its drawing in board coordinates, placed so it sits exactly where it was drawn (`drawingBox(d, true)`: the card's spot is the drawing's box, its size `s` = box width / 220). On the board it has no card at all (`.pcard.sketch`), in an ink that suits the board (`--sketch-ink`, light on dark looks). Tap it to change it on the board (`moveDrawing` puts it back in board coordinates first, allowing for moves and resizes); rubbing everything out removes it (Undo). It can be moved, sized and strung like any card; on Corkboard it only gets a pin when strung.
+
+**More drawing tools** (`draw.js`, in notes too): triangle, star, highlighter (see-through pen, `hl`), eraser (drag over things to rub them out), pen and highlighter sizes, text sizes (`z`: 1 small, 2 normal, 3 big), curved arrows (`cv`), and yellow ink. On a phone the tool bar wraps onto two rows.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
