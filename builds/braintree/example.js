@@ -13,10 +13,11 @@
 //                   a spreadsheet with a formula, a file (a PDF made here), a link to a web page
 //   sections        Research, Shoot, Edit (headings in the list, labelled frames on the board)
 //   sub-projects    Thumbnail (its own board), Surprise ending (locked, password "tree")
-//   board           strings with labels, a branch off one (a T junction), a card made Large
+//   board           strings with labels, a branch off one (a T junction), a card made Large,
+//                   a drawing made on the board itself (star, highlighter, curved arrow: 0.7.2)
 
 import { clipDivHTML } from './media.js';
-import { drawDivHTML } from './draw.js';
+import { drawDivHTML, drawingBox } from './draw.js';
 import { sheetDivHTML } from './sheet.js';
 import { docDivHTML, linkDivHTML } from './attach.js';
 import { listPDF } from './export.js';
@@ -42,7 +43,7 @@ export async function addExample(store, { makeLock } = {}) {
   const project = await make({
     type: 'project', title: EXAMPLE_TITLE, start: day(0), due: day(21),
     body: `<p>This is an example project, to show what Brain Tree can do. Have a look around, tick things off, change anything, then delete it with the bin at the top when you're done.</p>
-<ul class="checklist"><li data-checked="true">A project holds to-dos, notes, sections and smaller projects</li><li>Open its board (the Board button at the top) to see everything pinned up, with strings between related cards</li><li>On the board, tap String, then two cards, to tie them together. Tap a string to label it</li><li>Drag a string's label onto another card to branch it, like a T junction: “read from” goes to two cards</li><li>Drag the bottom corner of a card to make it bigger or smaller: the thumbnail sketch is Large</li><li>+ Add on the board adds notes, to-dos, sections, YouTube clips, drawings, spreadsheets, files and links</li><li>“Write the script” is pinned to the top of the list. Hold it to unpin it</li><li>“Surprise ending” is locked. Its password is <b>${EXAMPLE_PASSWORD}</b></li><li>The share button at the top prints the list or the board, or saves it as a PDF, a picture or a spreadsheet</li><li>In the list, swipe a to-do left or right, or hold it for more (hold and drag to move it)</li><li>Settings has colour themes and a look for every board: try Circuit board or Neon</li></ul>`,
+<ul class="checklist"><li data-checked="true">A project holds to-dos, notes, sections and smaller projects</li><li>Open its board (the Board button at the top) to see everything pinned up, with strings between related cards</li><li>On the board, tap String, then two cards, to tie them together. Tap a string to label it</li><li>Drag a string's label onto another card to branch it, like a T junction: “read from” goes to two cards</li><li>Strings find their own way round cards (on Corkboard they're real string, so they cross)</li><li>Tap Draw on the board to draw straight onto it, with pens, a highlighter, shapes and arrows. The star is a drawing like that: tap it to change it</li><li>Tidy lays the board out again, with strung-together cards next to each other</li><li>Drag the bottom corner of a card to make it bigger or smaller: the thumbnail sketch is Large</li><li>+ Add on the board adds notes, to-dos, sections, YouTube clips, drawings, spreadsheets, files and links</li><li>“Write the script” is pinned to the top of the list. Hold it to unpin it</li><li>“Surprise ending” is locked. Its password is <b>${EXAMPLE_PASSWORD}</b></li><li>The share button at the top prints the list or the board, or saves it as a PDF, a picture or a spreadsheet</li><li>In the list, swipe a to-do left or right, or hold it for more (hold and drag to move it)</li><li>A project opens as its list or its board, whichever you looked at last</li><li>Settings (the cog at the top) has colour themes and a look for every board: try Circuit board or Neon</li></ul>`,
   });
   const P = { parent: project };
 
@@ -82,9 +83,20 @@ export async function addExample(store, { makeLock } = {}) {
       { id: 'check', k: 'diamond', x: 210, y: 120, w: 170, h: 96, t: 'Under 60 s?', f: 'pink', c: 'ink' },
       { id: 'l1', k: 'line', a: 'hook', b: 'points', t: '', c: 'ink', e: 'arrow', d: 0 },
       { id: 'l2', k: 'line', a: 'points', b: 'end', t: '', c: 'ink', e: 'arrow', d: 0 },
-      { id: 'l3', k: 'line', a: 'points', b: 'check', t: 'time it', c: 'red', e: 'arrow', d: 1 },
+      { id: 'l3', k: 'line', a: 'points', b: 'check', t: 'time it', c: 'red', e: 'arrow', d: 1, cv: 1 },
       { id: 'note', k: 'text', x: 420, y: 128, w: 170, h: 52, t: 'Cut anything that drags', f: '', c: 'red' },
+      { id: 'best', k: 'star', x: 560, y: -40, w: 44, h: 42, t: '', f: 'yellow', c: 'orange' },
     ] }) });
+  // A drawing made on the board itself: no card, just what was drawn (tap it on the board to change it).
+  const doodle = { v: 1, s: [
+    { id: 'mark', k: 'pen', p: [96, 46, 180, 44, 262, 47], c: 'yellow', w: 16, hl: 1 },
+    { id: 'star', k: 'star', x: 0, y: 0, w: 74, h: 70, t: '', f: 'yellow', c: 'orange' },
+    { id: 'say', k: 'text', x: 84, y: 10, w: 200, h: 32, t: 'Start with the script!', f: '', c: 'ink' },
+    { id: 'go', k: 'line', a: [196, 58], b: [140, 128], t: '', c: 'red', e: 'arrow', d: 0, cv: 1 },
+  ] };
+  // (a drawing on the board is exactly as big as it was drawn: 1 drawing unit = 1 board pixel)
+  await make({ ...P, type: 'note', title: 'Drawing', sketch: true, cork: { [project]: { s: Math.round(drawingBox(doodle, true).w / 220 * 1000) / 1000 } },
+    body: drawDivHTML(doodle) });
   const intro = await make({ parent: shoot, type: 'task', title: 'Film the intro', due: day(3) });
   const voice = await make({ parent: shoot, type: 'task', title: 'Record the voiceover', due: day(5) });
 

@@ -293,6 +293,11 @@ button.navrow { width: 100%; text-align: left; }
 #modal { position: fixed; inset: 0; z-index: 50; background: rgba(20, 15, 5, 0.4); display: grid; place-items: center; padding: 1rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 .sheet { width: min(520px, 100%); max-height: 90dvh; overflow-y: auto; background: var(--card); border-radius: 16px; box-shadow: var(--shadow); padding: 1.2rem; }
 .sheet h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+/* 0.7.2 Settings: Done stays at the top while you scroll */
+.sheet:has(> .sethead) { padding-top: 0; }
+.sethead { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 0.8rem; margin: 0 -1.2rem 0.5rem; padding: 0.85rem 1.2rem 0.7rem; background: var(--card); border-bottom: 1px solid var(--line); }
+.sethead h2 { margin: 0; }
+.sethead .setdone { padding: 0.45rem 1.1rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .mbtns { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 .mbtns.col { flex-direction: column; align-items: stretch; }
 .mbtns button { padding: 0.7rem 1rem; border-radius: 10px; background: var(--hover); font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
@@ -491,6 +496,8 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .boardsize .seg { flex: 1; min-width: 240px; }
 /* A card's size on the board (its corner handle): it grows from its top-left corner. */
 .pcard.scaled { scale: var(--s, 1); transform-origin: 0 0; }
+/* (0.7.2: the string dot or pin and the size handle stay their usual size on a bigger or smaller card) */
+.pcard.scaled > .pin, .pcard.scaled > .csize { scale: calc(1 / var(--s, 1)); }
 .pcard .csize { position: absolute; right: -6px; bottom: -6px; width: 16px; height: 16px; z-index: 3; cursor: nwse-resize; touch-action: none; opacity: 0; transition: opacity 0.15s;
   border-right: 3px solid var(--accent); border-bottom: 3px solid var(--accent); border-radius: 0 0 7px 0; transform: scale(var(--iz, 1)); transform-origin: 100% 100%; }
 .pcard .csize::before { content: ""; position: absolute; inset: -12px; }
@@ -776,8 +783,11 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 
 /* Minimal: no edges. Flat cards on a plain board, thin grey lines, quiet labels. */
 :root[data-look="minimal"] { --paper-ink: var(--ink); --paper-soft: var(--soft); --paper-note: var(--card); --paper-task: var(--card); --paper-proj: var(--card); }
-:root[data-look="minimal"] .cork { background-color: color-mix(in srgb, var(--side) 70%, var(--bg)); background-image: none; }
-:root[data-look="minimal"] .pcard { transform: none; border: 0; border-radius: 14px; padding: 16px 16px 14px; background: var(--card); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); --faint: var(--soft); }
+/* (0.7.2: the board a shade darker than the cards in light, the cards a shade lighter than it in dark, so they stand apart) */
+:root[data-look="minimal"] .cork { background-color: color-mix(in srgb, var(--bg) 92%, var(--ink) 8%); background-image: none; }
+:root[data-look="minimal"][data-mode="dark"] .cork { background-color: color-mix(in srgb, var(--bg) 72%, #000); }
+:root[data-look="minimal"] .pcard { transform: none; border: 0; border-radius: 14px; padding: 16px 16px 14px; background: var(--card); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.07), 0 2px 8px rgba(0, 0, 0, 0.04); --faint: var(--soft); }
+:root[data-look="minimal"][data-mode="dark"] .pcard:not([class*=" c-"]) { background: color-mix(in srgb, var(--card) 90%, var(--ink) 10%); }
 :root[data-look="minimal"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 26%, var(--card)); }
 :root[data-look="minimal"] .pcard.t-task { border-top: 0; padding-top: 16px; }
 :root[data-look="minimal"] .pcard .ptitle { font-weight: 600; }
@@ -960,17 +970,34 @@ svg.drawing { display: block; width: 100%; height: auto; fill: none; stroke: non
 #drawpad .dwrap { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none;
   background-color: #FFFEFA; background-image: radial-gradient(circle, rgba(60, 50, 30, 0.22) 1.2px, transparent 1.7px); }
 #drawpad .dcanvas { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: none; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+/* 0.7.2 drawing straight onto a board: the editor is see-through over it, framed in the main colour */
+#drawpad.onboard { background: none; }
+#drawpad.onboard .dhead { background: var(--card); }
+#drawpad.onboard .dwrap { background: color-mix(in srgb, var(--bg) 10%, transparent); background-image: none; box-shadow: inset 0 0 0 3px var(--accent); }
+#drawpad.onboard .dtext { background: color-mix(in srgb, var(--card) 94%, transparent); color: var(--ink); }
+
+/* Drawings made on a board: no card, just the drawing, in an ink that shows on that board */
+:root { --sketch-ink: #26292E; --sketch-paper: #FFFEFA; }
+:root[data-mode="dark"], :root[data-look="blueprint"], :root[data-look="circuit"], :root[data-look="neon"], :root[data-look="hacker"], :root[data-look="chalkboard"], :root[data-look="space"] { --sketch-ink: #F2F1EC; --sketch-paper: rgba(16, 16, 20, 0.88); }
+:root[data-look] .pcard.sketch { padding: 0 !important; border: 0 !important; border-radius: 0; background: none !important; box-shadow: none !important; transform: none !important; color: var(--sketch-ink); }
+:root[data-look] .pcard.sketch::before, :root[data-look] .pcard.sketch::after { display: none !important; }
+.pcard.sketch .pdraw { margin: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+.pcard.sketch .pdraw svg { display: block; width: 100%; height: auto; max-height: none; overflow: visible; }
+.pcard.sketch:hover, .pcard.sketch.on { outline: 1.5px dashed color-mix(in srgb, var(--sketch-ink) 40%, transparent); outline-offset: 3px; }
+.pcard.sketching { visibility: hidden; }
+.exporting .pcard.sketch { outline: none; }
 #drawpad .dsel { fill: none; stroke: var(--accent); }
 #drawpad .dhandle { fill: #FFF; stroke: var(--accent); cursor: nwse-resize; }
 #drawpad .dtext { position: absolute; z-index: 2; margin: 0; padding: 4px 6px; border: 0; border-radius: 4px; outline: 2px solid var(--accent); background: rgba(255, 254, 250, 0.94); resize: none; overflow: hidden; text-align: center; font-family: -apple-system, 'Segoe UI', system-ui, sans-serif; }
 #drawpad .dhint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); margin: 0; padding: 0.35rem 0.8rem; border-radius: 12px; background: rgba(255, 255, 255, 0.92); color: #555; font-size: 0.82rem; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); pointer-events: none; }
-#drawpad .dtools { display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card); overflow-x: auto; scrollbar-width: none; }
+#drawpad .dtools { display: flex; align-items: center; justify-content: safe center; gap: 2px; padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card); overflow-x: auto; scrollbar-width: none; }
 #drawpad .dtools button { width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; color: var(--soft); }
 #drawpad .dtools button:hover { background: var(--hover); color: var(--ink); }
 #drawpad .dtools button.on { background: var(--accent-bg); color: var(--accent-ink); }
 #drawpad .dtools button:disabled { opacity: 0.35; }
 #drawpad .dtools .sep { width: 1px; height: 24px; margin: 0 4px; flex-shrink: 0; background: var(--line); }
-@media (max-width: 420px) { #drawpad .dtools { gap: 1px; padding-left: 0.25rem; padding-right: 0.25rem; } #drawpad .dtools button { width: 30px; height: 40px; } #drawpad .dtools .sep { margin: 0 2px; } }
+/* (0.7.2: on a phone the tools wrap onto two rows, so none hide off the edge) */
+@media (max-width: 560px) { #drawpad .dtools { flex-wrap: wrap; justify-content: center; gap: 2px 1px; padding-left: 0.25rem; padding-right: 0.25rem; } #drawpad .dtools button { width: 40px; height: 40px; } #drawpad .dtools .sep { display: none; } }
 #drawpad .dpal { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 3; display: grid; gap: 0.5rem; max-width: calc(100% - 16px); padding: 0.65rem 0.75rem; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
 #drawpad .drow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
 #drawpad .drow span { width: 3.3rem; font-size: 0.78rem; color: var(--soft); }

@@ -15,7 +15,7 @@ import { linkService } from './attach.js';
 import * as ex from './export.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.7.1';
+const VERSION = '0.7.2';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -184,6 +184,18 @@ function fmtWhen(iso) {
 const unlocked = new Set();
 const isLocked = p => !!p?.data.lock && !unlocked.has(p.id);
 
+// Each project opens the way you last looked at it on this device: its list or its board (0.7.2).
+const projView = readLocal('bt-proj-view', {});
+function rememberView(id, v) {
+  if (!id || (projView[id] || 'list') === v) return;
+  if (v === 'board') projView[id] = 'board'; else delete projView[id];
+  writeLocal('bt-proj-view', projView);
+}
+function goProject(id) {
+  if (projView[id] === 'board' && !isLocked(I.byId.get(id)) && !I.hiddenIn?.get(id)) go({ view: 'board', board: id, project: null, item: null });
+  else go({ project: id, view: null, board: null, item: null });
+}
+
 function buildIndex() {
   const byId = new Map(), kids = new Map(), trashed = [];
   for (const r of store.all()) if (!r.deleted && r.data.type !== 'pref') byId.set(r.id, r);
@@ -319,7 +331,7 @@ const boardApi = {
   index: () => I,
   locked: r => isLocked(r),
   open: id => go({ item: id }),
-  openBoard: id => go({ view: 'board', board: id, project: null, item: null }),
+  openBoard: id => { rememberView(id, 'board'); go({ view: 'board', board: id, project: null, item: null }); },
   selected: () => route.item,
   today: () => today(),
   fmtDay: s => fmtDay(s),
@@ -1277,7 +1289,7 @@ function itemMenu(id) {
       if (!b) return;
       const m = b.dataset.m;
       closeModal();
-      if (m === 'open') type === 'project' && !route.project && route.view !== 'board' ? go({ project: id, view: null, item: null }) : openItem(id);
+      if (m === 'open') type === 'project' && !route.project && route.view !== 'board' ? goProject(id) : openItem(id);
       else if (m === 'rename') renameSheet(id);
       else if (m === 'done') toggleDone(id);
       else if (m === 'board') go({ view: 'board', board: id, project: null, item: null });
@@ -1523,8 +1535,9 @@ async function settingsModal() {
   const dark = document.documentElement.dataset.mode === 'dark';
   const th = theme.THEMES.find(t => t.id === p.theme) || theme.THEMES[0];
   const seg = (k, options) => `<div class="seg" role="group">${Object.entries(options).map(([v, label]) => `<button data-k="${k}" data-v="${v}" class="${p[k] === v ? 'on' : ''}">${label}</button>`).join('')}</div>`;
+  // (changes are saved as you make them; Done, which stays at the top, just closes)
   modal(`
-    <h2>Brain Tree</h2>
+    <div class="sethead"><button type="button" class="setdone" data-close>Done</button><h2>Settings</h2></div>
     <div class="settings">
       <h3>Appearance</h3>
       <div class="themepick">${theme.THEMES.map(t => `
@@ -1540,7 +1553,7 @@ async function settingsModal() {
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
       <h3>Getting started</h3>
       <button class="setbtn" data-s="example">Add an example project</button>
-      <p class="hint">A small project that shows everything Brain Tree can do: dates, steps and repeats, sections, a board with strings and a branch, a clip, a drawing, a photo, a spreadsheet, a file, a link, a pinned to-do and a locked project. Delete it whenever you like.</p>
+      <p class="hint">A small project that shows everything Brain Tree can do: dates, steps and repeats, sections, a board with strings and a branch, a clip, drawings (one made on the board), a photo, a spreadsheet, a file, a link, a pinned to-do and a locked project. Delete it whenever you like.</p>
       <details><summary>Handy shortcuts</summary>
         <p><b>Swipe</b> a to-do, note or project left to delete it, or right for Done, Date and More.</p>
         <p><b>Hold</b> one for everything you can do to it (on a computer, right-click). Hold and <b>drag</b> to put it in order, or into a section. Projects in the sidebar drag too.</p>
@@ -1564,7 +1577,6 @@ async function settingsModal() {
       <button class="primary" data-s="sync">Sync now</button>
       <button data-s="export">Download a backup (JSON)</button>
       ${store.signedIn() ? '<button data-s="logout">Sign out</button><button class="danger" data-s="erase">Sign out and wipe this device’s copy</button>' : '<button class="primary" data-s="login">Sign in</button>'}
-      <button data-close>Close</button>
     </div>`, el => {
     el.querySelector('.devname').addEventListener('change', e => store.setDevice(e.target.value));
     // Appearance changes show straight away and are saved (and synced) as you go.
@@ -2028,7 +2040,7 @@ document.addEventListener('click', async e => {
     renderNav();
     return;
   }
-  if ((x = el('[data-project]'))) { search = ''; $('#search').value = ''; go({ project: x.dataset.project, view: null, item: null }); return; }
+  if ((x = el('[data-project]'))) { search = ''; $('#search').value = ''; goProject(x.dataset.project); return; }
   if ((x = el('#smart [data-view], #lower a, #projects a.navrow'))) {
     // The link's own address does the rest; clicking the list you're already on just clears the search.
     const wasSearching = !!search;
@@ -2062,11 +2074,11 @@ document.addEventListener('click', async e => {
     else if (a === 'export-list') exportSheet({ project: route.project && !search ? route.project : null, view: route.project ? null : route.view || 'today' });
     else if (a === 'export-board') exportSheet({ project: route.board, board: true });
     else if (a === 'empty-trash') { if (confirm(`Delete all ${I.trashed.length} item(s) in Recently deleted for good, on every device?`)) purge(I.trashed.map(r => r.id)); }
-    else if (a === 'board-list') go(route.board ? { view: null, project: route.board, item: null } : { view: 'today', item: null });
-    else if (a === 'open-board' && route.project) go({ view: 'board', board: route.project, project: null, item: null });
+    else if (a === 'board-list') { rememberView(route.board, 'list'); go(route.board ? { view: null, project: route.board, item: null } : { view: 'today', item: null }); }
+    else if (a === 'open-board' && route.project) { rememberView(route.project, 'board'); go({ view: 'board', board: route.project, project: null, item: null }); }
     else if (id && a === 'board') {
       const r = I.byId.get(id), bp = r && (r.data.type === 'project' ? r : I.project(r));
-      if (bp) go({ view: 'board', board: bp.id, project: null, item: null });
+      if (bp) { rememberView(bp.id, 'board'); go({ view: 'board', board: bp.id, project: null, item: null }); }
     }
     else if (id && a === 'tie') {
       const links = store.get(id)?.data.links || [];
@@ -2167,6 +2179,7 @@ if (['127.0.0.1', 'localhost'].includes(location.hostname)) window.btApp = { get
   $('#nav .brand').insertAdjacentHTML('beforeend', `<button class="iconbtn" data-act="settings" aria-label="Settings">${ICON.gear}</button>`);
   $('#newProject').innerHTML = ICON.plus;
   $('#newBtn').innerHTML = ICON.plus;
+  $('#setBtn').innerHTML = ICON.gear;
   $('#boardBtn').innerHTML = ICON.board + '<span>Board</span>';
   $('#exportBtn').innerHTML = ICON.share;
   $('#listBack').innerHTML = ICON.back + '<span>Lists</span>';

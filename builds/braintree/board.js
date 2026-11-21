@@ -19,7 +19,7 @@
 
 import { sanitize, escHtml as esc } from './editor.js';
 import { clipOf, clipFaceHTML, iframeHTML, clipDivHTML } from './media.js';
-import { cleanDrawing, drawingSVG, drawDivHTML } from './draw.js';
+import { cleanDrawing, drawingSVG, drawDivHTML, drawingBox, moveDrawing, openDrawing } from './draw.js';
 import { cleanSheet, sheetTableHTML, sheetDivHTML } from './sheet.js';
 import { docInfo, linkInfo, docTileHTML, linkTileHTML, docDivHTML, linkDivHTML } from './attach.js';
 
@@ -65,6 +65,7 @@ export function createBoard(host, api) {
       <h2></h2>
       <button class="iconbtn bexport" data-act="export-board" aria-label="Print or export the board" title="Print or export"><svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button>
       <button class="tolist" data-act="board-list">List view</button>
+      <button class="iconbtn bsettings" data-act="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </header>
     <div class="cork" tabindex="0" aria-label="Board. Drag to move around, pinch or Ctrl+scroll to zoom.">
       <div class="world">
@@ -80,6 +81,7 @@ export function createBoard(host, api) {
     <div class="boardbar">
       <button data-b="add" class="addbtn" title="Add a note, to-do, section, YouTube clip or drawing">+ Add</button>
       <button data-b="tie" title="Tap one card, then another, to connect them">String</button>
+      <button data-b="draw" title="Draw straight onto the board">Draw</button>
       <span class="sep"></span>
       <button data-b="tidy" title="Lay everything out neatly again">Tidy</button>
       <span class="sep"></span>
@@ -112,6 +114,8 @@ export function createBoard(host, api) {
   let tying = false, tieFrom = null;   // "String" mode: tap one card, then the one to tie it to
                                        // (tieFrom 'L:from|to' = a string picked, to branch it to a card)
   let tieOnce = false;                 // String mode just for one branch (from a string's Branch button)
+  let sketching = null;                // a drawing on the board being changed (its card is hidden meanwhile)
+  const isSketch = r => !!r?.data.sketch;
   const junctions = new Map();         // 'from|to' -> where that string's label (and its branches) sit
   const look = () => (api.style() in WORDS ? api.style() : 'corkboard');
   const words = () => WORDS[look()];
@@ -175,6 +179,18 @@ export function createBoard(host, api) {
       if (where === home) out.set(c.id, { x: p.x, y: p.y });
     }
 
+    // Nothing of this project's own placed yet (a new board, or one just tidied): laid out by what's
+    // strung to what (0.7.2). Cards brought in from elsewhere keep their spots; this goes under them.
+    // (drawings on the board don't count: they stay where they were drawn, and the rest is laid out as usual)
+    const sketchIds = new Set(cards.filter(isSketch).map(r => r.id));
+    if (![...out.keys()].some(id => !guests.has(id) && !sketchIds.has(id)) && (cards.length || frames.length)) {
+      let gx = Infinity, gy = -Infinity;
+      for (const [id, p] of out) if (guests.has(id)) { gx = Math.min(gx, p.x); gy = Math.max(gy, p.y + h(id)); }
+      const sm = smartLayout(h, order, pack, kidsOf, cards.filter(c => !out.has(c.id)));
+      const dx = gx === Infinity ? 0 : gx, dy = gy === -Infinity ? 0 : gy + 90;
+      for (const [id, p] of sm) out.set(id, { ...p, x: p.x + dx, y: p.y + dy });
+    }
+
     // Sections already on the board: new things go under what's in them.
     for (const s of frames) {
       const f = out.get(s.id);
@@ -233,6 +249,102 @@ export function createBoard(host, api) {
     return out;
   }
 
+  // Laying out a whole board from scratch, by its strings. Each section is packed with its cards,
+  // in an order that puts strung-together cards side by side. Loose cards strung only to each
+  // other stay together as a group; ones strung into a section are placed on their own, next to
+  // it; ones strung to nothing are packed in one block. Then each of those goes, one at a time,
+  // in the free spot nearest to what it's strung to, keeping the whole thing compact and about
+  // the shape of a screen.
+  function smartLayout(h, order, pack, kidsOf, todo) {
+    const G = 64;
+    const rec = new Map([...frames, ...todo].map(r => [r.id, r]));
+    const adj = new Map();
+    const tie = (a, b) => {
+      if (a === b || !rec.has(a) || !rec.has(b)) return;
+      for (const [x, y] of [[a, b], [b, a]]) { if (!adj.has(x)) adj.set(x, new Map()); adj.get(x).set(y, (adj.get(x).get(y) || 0) + 1); }
+    };
+    for (const r of rec.values()) for (const l of r.data.links || []) { tie(r.id, l.to); for (const c of l.also || []) { tie(r.id, c); tie(l.to, c); } }
+    const wt = (a, b) => adj.get(a)?.get(b) || 0;
+    const degree = id => { let n = 0; for (const v of adj.get(id)?.values() || []) n += v; return n; };
+    // One after another, each the one strung most to those already taken (else the best connected left).
+    const chain = (list, w, deg) => {
+      const left = [...list], out = [];
+      while (left.length) {
+        let bi = 0, bs = 0;
+        for (let i = 0; i < left.length; i++) { let s = 0; for (const x of out) s += w(left[i], x); if (s > bs) { bs = s; bi = i; } }
+        if (!bs) { let bd = -1; for (let i = 0; i < left.length; i++) { const d = deg(left[i]); if (d > bd) { bd = d; bi = i; } } }
+        out.push(left.splice(bi, 1)[0]);
+      }
+      return out;
+    };
+    const cardChain = list => chain(list, (a, b) => wt(a.id, b.id), r => degree(r.id));
+    const block = (list, maxCols) => {
+      const b = pack(list, Math.min(maxCols, Math.max(1, Math.ceil(Math.sqrt(list.length)))));
+      return { ids: list.map(r => r.id), w: b.w, h: b.h, place: new Map([...b.at].map(([id, p]) => [id, { x: p.x, y: p.y }])) };
+    };
+
+    const units = [];
+    for (const s of frames) {
+      const kids = cardChain(kidsOf(s).filter(k => rec.has(k.id)).sort(order));
+      const b = pack(kids, Math.min(3, Math.max(1, Math.ceil(Math.sqrt(kids.length)))));
+      const w = Math.max(320, b.w + 2 * PAD), hh = Math.max(220, HEAD + PAD + b.h + PAD);
+      const place = new Map([[s.id, { x: 0, y: 0, w, h: hh }]]);
+      for (const [id, p] of b.at) place.set(id, { x: PAD + p.x, y: HEAD + PAD + p.y });
+      units.push({ ids: [s.id, ...kids.map(k => k.id)], w, h: hh, place });
+    }
+    const inSection = id => frameIds.has(id) || frameIds.has(rec.get(id)?.data.parent);
+    const loose = todo.filter(c => !frameIds.has(c.data.parent)).sort(order);
+    const toSection = c => [...(adj.get(c.id)?.keys() || [])].some(inSection);
+    for (const c of loose.filter(toSection)) units.push({ ids: [c.id], w: cw(c.id), h: h(c.id), place: new Map([[c.id, { x: 0, y: 0 }]]) });
+    const rest = loose.filter(c => !toSection(c)), seen = new Set(), single = [];
+    for (const c of rest) {
+      if (seen.has(c.id)) continue;
+      const group = [], stack = [c];
+      seen.add(c.id);
+      while (stack.length) {
+        const x = stack.pop();
+        group.push(x);
+        for (const y of adj.get(x.id)?.keys() || []) { const r = rest.find(z => z.id === y); if (r && !seen.has(y)) { seen.add(y); stack.push(r); } }
+      }
+      if (group.length > 1) units.push(block(cardChain(group.sort(order)), 3)); else single.push(c);
+    }
+    if (single.length) units.push(block(single, 4));
+
+    // Placing them.
+    const uw = (U, V) => { let n = 0; for (const a of U.ids) for (const b of V.ids) n += wt(a, b); return n; };
+    const udeg = U => { let n = 0; for (const a of U.ids) for (const [b, v] of adj.get(a) || []) if (!U.ids.includes(b)) n += v; return n; };
+    const placed = [];
+    let bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
+    for (const u of chain(units, uw, udeg)) {
+      let best = null, bestS = Infinity;
+      if (!placed.length) best = [0, 0];
+      else {
+        const cand = [];
+        for (const p of placed) cand.push(
+          [p.x + p.u.w + G, p.y], [p.x, p.y + p.u.h + G], [p.x - u.w - G, p.y], [p.x, p.y - u.h - G],
+          [p.x + p.u.w + G, p.y + p.u.h - u.h], [p.x + p.u.w - u.w, p.y + p.u.h + G]);
+        const area = (bx1 - bx0) * (by1 - by0);
+        for (const [x, y] of cand) {
+          if (placed.some(p => x < p.x + p.u.w + G - 1 && x + u.w + G - 1 > p.x && y < p.y + p.u.h + G - 1 && y + u.h + G - 1 > p.y)) continue;
+          const cx = x + u.w / 2, cy = y + u.h / 2;
+          let s = 0;
+          for (const p of placed) { const w = uw(u, p.u); if (w) s += w * Math.hypot(cx - (p.x + p.u.w / 2), cy - (p.y + p.u.h / 2)); }
+          const W = Math.max(bx1, x + u.w) - Math.min(bx0, x), H = Math.max(by1, y + u.h) - Math.min(by0, y);
+          s += (W * H - area) / 300;                                              // grow as little as possible
+          s += Math.max(0, W / H - 2) * 600 + Math.max(0, H / W - 0.85) * 600;    // about the shape of a screen
+          if (s < bestS) { bestS = s; best = [x, y]; }
+        }
+        if (!best) best = [bx1 + G, by0];
+      }
+      const [x, y] = best;
+      placed.push({ u, x, y });
+      bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x + u.w); by1 = Math.max(by1, y + u.h);
+    }
+    const out = new Map();
+    for (const { u, x, y } of placed) for (const [id, p] of u.place) out.set(id, { ...p, x: Math.round(x - bx0 + p.x), y: Math.round(y - by0 + p.y) });
+    return out;
+  }
+
   // ---------- Drawing ----------
 
   function render() {
@@ -244,7 +356,8 @@ export function createBoard(host, api) {
     ({ cardList: cards, frameList: frames, guestIds: guests } = members(I));
     frameIds = new Set(frames.map(f => f.id));
     scales.clear();
-    for (const r of cards) { const v = +r.data.cork?.[key]?.s; if (v && Math.abs(v - 1) > 0.01) scales.set(r.id, clamp(v, 0.5, 3)); }
+    // (a drawing on the board can be any size: it's as big as it was drawn)
+    for (const r of cards) { const v = +r.data.cork?.[key]?.s; if (v && Math.abs(v - 1) > 0.01) scales.set(r.id, isSketch(r) ? clamp(v, 0.15, 8) : clamp(v, 0.5, 3)); }
     const t = api.today(), sel = api.selected();
     host.querySelector('.boardhead h2').textContent = api.titleOf(proj);
     framesEl.innerHTML = frames.map(r => frameHTML(r, I, sel)).join('');
@@ -294,6 +407,16 @@ export function createBoard(host, api) {
 
   function cardHTML(r, I, t, sel) {
     const d = r.data, type = d.type || 'note';
+    // A drawing made on the board: just the drawing, see-through, exactly as big as it was drawn.
+    if (d.sketch) {
+      const m = cardBody(d.body).media;
+      if (m?.kind === 'draw' && m.d) return `
+      <div class="pcard t-note sketch ${sel === r.id ? 'on' : ''} ${tieFrom === r.id ? 'tiefrom' : ''} ${scales.has(r.id) ? 'scaled' : ''} ${sketching === r.id ? 'sketching' : ''}" data-card="${r.id}" style="--pin:${PINS[hash(r.id) % PINS.length]}${scales.has(r.id) ? ';--s:' + sc(r.id) : ''}">
+        <span class="pin" data-pin="${r.id}" title="Drag onto another card to connect"></span>
+        <div class="pdraw">${drawingSVG(m.d, { bare: true })}</div>
+        <span class="csize" data-csize="${r.id}" title="Drag to make it bigger or smaller"></span>
+      </div>`;
+    }
     // A locked project shows only its name until it's unlocked (its notes are part of what's hidden).
     const locked = type === 'project' && !!api.locked?.(r);
     const { html: body, media, more } = locked ? {} : cardBody(d.body);
@@ -384,20 +507,27 @@ export function createBoard(host, api) {
     return { d: `M${a.x} ${a.y} Q${mx} ${my} ${b.x} ${b.y}`, mid: { x: mx, y: (a.y + b.y) / 4 + my / 2 } };
   }
 
-  // The sides of two boxes that face each other.
+  // The sides of two boxes that face each other, and where on them a string leaves and arrives.
+  // (0.7.2) Anywhere along the side, not only its middle: level where the two cards overlap,
+  // otherwise aimed at the other card, keeping clear of the corners.
   function facing(A, B, gap) {
     const ac = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, bc = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
     const dx = bc.x - ac.x, dy = bc.y - ac.y;
+    const along = (a0, al, b0, bl, toB, toA) => {
+      const lo = Math.max(a0 + al * 0.2, b0 + bl * 0.2), hi = Math.min(a0 + al * 0.8, b0 + bl * 0.8);
+      if (lo <= hi) { const m = Math.round((lo + hi) / 2); return [m, m]; }
+      return [clamp(toB, a0 + al * 0.2, a0 + al * 0.8), clamp(toA, b0 + bl * 0.2, b0 + bl * 0.8)];
+    };
     if (Math.abs(dx) * (A.h + B.h) > Math.abs(dy) * (A.w + B.w)) {
-      const s = Math.sign(dx) || 1;
-      return { horiz: true, p0: { x: s > 0 ? A.x + A.w : A.x, y: ac.y }, n0: { x: s, y: 0 }, p3: { x: s > 0 ? B.x - gap : B.x + B.w + gap, y: bc.y }, n3: { x: -s, y: 0 } };
+      const s = Math.sign(dx) || 1, [ya, yb] = along(A.y, A.h, B.y, B.h, bc.y, ac.y);
+      return { horiz: true, p0: { x: s > 0 ? A.x + A.w : A.x, y: ya }, n0: { x: s, y: 0 }, p3: { x: s > 0 ? B.x - gap : B.x + B.w + gap, y: yb }, n3: { x: -s, y: 0 } };
     }
-    const s = Math.sign(dy) || 1;
-    return { horiz: false, p0: { x: ac.x, y: s > 0 ? A.y + A.h : A.y }, n0: { x: 0, y: s }, p3: { x: bc.x, y: s > 0 ? B.y - gap : B.y + B.h + gap }, n3: { x: 0, y: -s } };
+    const s = Math.sign(dy) || 1, [xa, xb] = along(A.x, A.w, B.x, B.w, bc.x, ac.x);
+    return { horiz: false, p0: { x: xa, y: s > 0 ? A.y + A.h : A.y }, n0: { x: 0, y: s }, p3: { x: xb, y: s > 0 ? B.y - gap : B.y + B.h + gap }, n3: { x: 0, y: -s } };
   }
 
-  // Whiteboard marker and notebook pen: a curve drawn by hand (a little wobble, open arrowhead).
-  function inked(A, B, seed, { amp, head, cls }) {
+  // Whiteboard marker, notebook pen and chalk: a curve drawn by hand.
+  function inked(A, B, seed, opts) {
     const { p0, n0, p3, n3 } = facing(A, B, 5);
     const dist = Math.hypot(p3.x - p0.x, p3.y - p0.y);
     const k = Math.max(40, dist * 0.4);
@@ -405,6 +535,11 @@ export function createBoard(host, api) {
     const N = Math.max(12, Math.min(40, Math.round(dist / 14)));
     const raw = [];
     for (let i = 0; i <= N; i++) raw.push(cubic(p0, p1, p2, p3, i / N));
+    return inkPath(raw, seed, opts);
+  }
+  // Hand-drawn along a line of points: a little wobble (none at the ends), an open arrowhead.
+  function inkPath(raw, seed, { amp, head, cls }) {
+    const N = raw.length - 1;
     const rnd = rng(seed);
     const f1 = 1.1 + rnd() * 1.3, f2 = 2.8 + rnd() * 2.4, s1 = rnd() * 6.28, s2 = rnd() * 6.28;
     const pts = raw.map((p, i) => {
@@ -419,7 +554,7 @@ export function createBoard(host, api) {
     const ang = Math.atan2(tip.y - back.y, tip.x - back.x), spread = 0.47;
     const hd = `M${f(tip.x - head * Math.cos(ang - spread))} ${f(tip.y - head * Math.sin(ang - spread))}L${f(tip.x)} ${f(tip.y)}L${f(tip.x - head * Math.cos(ang + spread))} ${f(tip.y - head * Math.sin(ang + spread))}`;
     const d = smooth(pts);
-    return { d, mid: pts[Math.round(N / 2)], html: `<path class="wire ${cls}" d="${d}"/><path class="wire ${cls}" d="${hd}"/>` };
+    return { d, mid: pts[Math.round(N / 2)], pts: raw, html: `<path class="wire ${cls}" d="${d}"/><path class="wire ${cls}" d="${hd}"/>` };
   }
 
   // Corners of a route: straight runs that turn at right angles, or (city lines, traces) run at 45°
@@ -446,15 +581,35 @@ export function createBoard(host, api) {
     const z = pts[pts.length - 1];
     return d + `L${f(z.x)} ${f(z.y)}`;
   }
-  const midOf = pts => { const i = Math.floor((pts.length - 1) / 2); return { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 }; };
-
-  // Blueprint: straight ruled lines that turn at right angles, a dot where they start.
-  function ruled(A, B) {
-    const { p0, p3, horiz } = facing(A, B, 7);
-    let d, mid;
-    if (horiz) { const mx = Math.round((p0.x + p3.x) / 2); d = `M${p0.x} ${p0.y}H${mx}V${p3.y}H${p3.x}`; mid = { x: mx, y: (p0.y + p3.y) / 2 }; }
-    else { const my = Math.round((p0.y + p3.y) / 2); d = `M${p0.x} ${p0.y}V${my}H${p3.x}V${p3.y}`; mid = { x: (p0.x + p3.x) / 2, y: my }; }
-    return { d, mid, html: `<path class="wire rule" d="${d}" marker-end="url(#bt-arrow)"/><circle class="wire-dot" cx="${p0.x}" cy="${p0.y}" r="3.5"/>` };
+  // Halfway along a route (where its label goes).
+  function alongMid(pts) {
+    let half = 0;
+    for (let i = 1; i < pts.length; i++) half += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    half /= 2;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], l = Math.hypot(b.x - a.x, b.y - a.y);
+      if (l > 0 && l >= half) return { x: a.x + (b.x - a.x) * half / l, y: a.y + (b.y - a.y) * half / l };
+      half -= l;
+    }
+    return pts[0];
+  }
+  // A route with its corners rounded, as points every few pixels (for the hand-drawn looks).
+  function bendPts(pts, r, step) {
+    const out = [pts[0]];
+    const lineTo = (a, b) => { const n = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / step)); for (let i = 1; i <= n; i++) out.push({ x: a.x + (b.x - a.x) * i / n, y: a.y + (b.y - a.y) * i / n }); };
+    let cur = pts[0];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1], p = pts[i], b = pts[i + 1];
+      const la = Math.hypot(p.x - a.x, p.y - a.y), lb = Math.hypot(b.x - p.x, b.y - p.y), k = Math.min(r, la / 2, lb / 2);
+      if (k < 0.5) continue;
+      const p1 = { x: p.x - (p.x - a.x) / la * k, y: p.y - (p.y - a.y) / la * k }, p2 = { x: p.x + (b.x - p.x) / lb * k, y: p.y + (b.y - p.y) / lb * k };
+      lineTo(cur, p1);
+      const n = Math.max(3, Math.round(k * 1.6 / step));
+      for (let j = 1; j <= n; j++) { const t = j / n, u = 1 - t; out.push({ x: u * u * p1.x + 2 * u * t * p.x + t * t * p2.x, y: u * u * p1.y + 2 * u * t * p.y + t * t * p2.y }); }
+      cur = p2;
+    }
+    lineTo(cur, pts[pts.length - 1]);
+    return out;
   }
 
   function wire(fromId, toId) {
@@ -463,57 +618,156 @@ export function createBoard(host, api) {
       return a && b ? wool(a, b) : null;
     }
     const A = rectOf(fromId), B = rectOf(toId);
-    return A && B ? shape(A, B, fromId + '>' + toId) : null;
+    if (!A || !B) return null;
+    const seed = fromId + '>' + toId;
+    return dodge(shape(A, B, seed), A, B, new Set([fromId, toId]), seed, seed);
   }
   // A branch: from where a string's label sits (J) to another card, drawn like the look's strings
   // (from a point instead of a card) and, for city lines and neon, in the same colour as the string.
   function branchWire(J, toId, stringKey) {
     if (look() === 'corkboard') { const b = pinPoint(toId); return b ? wool(J, b) : null; }
     const B = rectOf(toId);
-    return B ? shape({ x: J.x, y: J.y, w: 0, h: 0 }, B, stringKey + '+' + toId, stringKey) : null;
+    if (!B) return null;
+    const A = { x: J.x, y: J.y, w: 0, h: 0 }, seed = stringKey + '+' + toId;
+    return dodge(shape(A, B, seed, stringKey), A, B, new Set([toId]), seed, stringKey);
   }
   function wool(a, b) {
     const s = sag(a, b);
     return { ...s, html: `<path class="wire wool" d="${s.d}"/><path class="wire twist" d="${s.d}"/>` };
   }
+  const lineColour = (L, key) => (LINE_COLOURS[L] && !api.ownWire?.() ? `style="--lc:${LINE_COLOURS[L][hash(key) % LINE_COLOURS[L].length]}"` : '');
+  const GAP_AT_END = { blueprint: 7, circuit: 9, city: 9, hacker: 8, minimal: 7, neon: 4, space: 2 };
+
   // The look's string between two boxes; seedKey picks its wobble, colourKey its colour.
   function shape(A, B, seedKey, colourKey = seedKey) {
-    const L = look();
-    if (L === 'blueprint') return ruled(A, B);
-    const lc = LINE_COLOURS[L] && !api.ownWire?.() ? `style="--lc:${LINE_COLOURS[L][hash(colourKey) % LINE_COLOURS[L].length]}"` : '';
-    if (L === 'circuit') {
-      // Copper: 45° bends, a round pad at each end.
-      const pts = routePts(A, B, 9, true), d = cornered(pts, 14, false), a = pts[0], z = pts[pts.length - 1];
-      return { d, mid: midOf(pts), html: `<path class="wire trace" d="${d}"/><circle class="pad" cx="${f(a.x)}" cy="${f(a.y)}" r="5"/><circle class="pad" cx="${f(z.x)}" cy="${f(z.y)}" r="5"/>` };
-    }
-    if (L === 'city') {
-      // A transit line: straight, 45° and rounded corners, a station at each end.
-      const pts = routePts(A, B, 9, true), d = cornered(pts, 26, true), a = pts[0], z = pts[pts.length - 1];
-      return { d, mid: midOf(pts), lc, html: `<path class="wire metro" ${lc} d="${d}"/><circle class="station" ${lc} cx="${f(a.x)}" cy="${f(a.y)}" r="6.5"/><circle class="station" ${lc} cx="${f(z.x)}" cy="${f(z.y)}" r="6.5"/>` };
-    }
-    if (L === 'hacker') {
-      const pts = routePts(A, B, 8, false), d = cornered(pts, 0, false);
-      return { d, mid: midOf(pts), html: `<path class="wire pipe" d="${d}" marker-end="url(#bt-arrow)"/>` };
-    }
-    if (L === 'minimal') {
-      const { p0, p3 } = facing(A, B, 7), d = `M${f(p0.x)} ${f(p0.y)}L${f(p3.x)} ${f(p3.y)}`;
-      return { d, mid: { x: (p0.x + p3.x) / 2, y: (p0.y + p3.y) / 2 }, html: `<path class="wire thin" d="${d}" marker-end="url(#bt-arrow)"/>` };
-    }
+    const L = look(), gap = GAP_AT_END[L] ?? 5;
+    if (L === 'blueprint' || L === 'hacker') return alongPts(routePts(A, B, gap, false), seedKey, colourKey);
+    if (L === 'circuit' || L === 'city') return alongPts(routePts(A, B, gap, true), seedKey, colourKey);
+    if (L === 'minimal' || L === 'space') { const { p0, p3 } = facing(A, B, gap); return alongPts([p0, p3], seedKey, colourKey); }
     if (L === 'neon') {
       // A glass tube bent in one smooth curve.
-      const { p0, n0, p3, n3 } = facing(A, B, 4), k = Math.max(40, Math.hypot(p3.x - p0.x, p3.y - p0.y) * 0.45);
+      const lc = lineColour(L, colourKey);
+      const { p0, n0, p3, n3 } = facing(A, B, gap), k = Math.max(40, Math.hypot(p3.x - p0.x, p3.y - p0.y) * 0.45);
       const p1 = { x: p0.x + n0.x * k, y: p0.y + n0.y * k }, p2 = { x: p3.x + n3.x * k, y: p3.y + n3.y * k };
       const d = `M${f(p0.x)} ${f(p0.y)}C${f(p1.x)} ${f(p1.y)} ${f(p2.x)} ${f(p2.y)} ${f(p3.x)} ${f(p3.y)}`;
-      return { d, mid: cubic(p0, p1, p2, p3, 0.5), lc, html: `<path class="wire tube glow" ${lc} d="${d}"/><path class="wire tube" ${lc} d="${d}"/>` };
-    }
-    if (L === 'space') {
-      // A constellation: a fine straight line, a star at each end.
-      const { p0, p3 } = facing(A, B, 2), d = `M${f(p0.x)} ${f(p0.y)}L${f(p3.x)} ${f(p3.y)}`;
-      const star = p => `<circle class="star halo" cx="${f(p.x)}" cy="${f(p.y)}" r="7"/><circle class="star" cx="${f(p.x)}" cy="${f(p.y)}" r="3"/>`;
-      return { d, mid: { x: (p0.x + p3.x) / 2, y: (p0.y + p3.y) / 2 }, html: `<path class="wire starline" d="${d}"/>${star(p0)}${star(p3)}` };
+      const pts = [];
+      for (let i = 0; i <= 14; i++) pts.push(cubic(p0, p1, p2, p3, i / 14));
+      return { d, mid: cubic(p0, p1, p2, p3, 0.5), pts, lc, html: `<path class="wire tube glow" ${lc} d="${d}"/><path class="wire tube" ${lc} d="${d}"/>` };
     }
     if (L === 'chalkboard') return inked(A, B, hash(seedKey), { amp: 2.2, head: 15, cls: 'chalk' });
     return inked(A, B, hash(seedKey), L === 'whiteboard' ? { amp: 2.6, head: 15, cls: 'marker' } : { amp: 1.2, head: 11, cls: 'pen' });
+  }
+
+  // A string along a route (a list of corners), drawn the look's way.
+  function alongPts(pts, seedKey, colourKey) {
+    const L = look(), lc = lineColour(L, colourKey), a = pts[0], z = pts[pts.length - 1];
+    const out = (d, html) => ({ d, mid: alongMid(pts), pts, lc, html });
+    if (L === 'blueprint') { const d = cornered(pts, 0, false); return out(d, `<path class="wire rule" d="${d}" marker-end="url(#bt-arrow)"/><circle class="wire-dot" cx="${f(a.x)}" cy="${f(a.y)}" r="3.5"/>`); }
+    if (L === 'circuit') { const d = cornered(pts, 14, false); return out(d, `<path class="wire trace" d="${d}"/><circle class="pad" cx="${f(a.x)}" cy="${f(a.y)}" r="5"/><circle class="pad" cx="${f(z.x)}" cy="${f(z.y)}" r="5"/>`); }
+    if (L === 'city') { const d = cornered(pts, 26, true); return out(d, `<path class="wire metro" ${lc} d="${d}"/><circle class="station" ${lc} cx="${f(a.x)}" cy="${f(a.y)}" r="6.5"/><circle class="station" ${lc} cx="${f(z.x)}" cy="${f(z.y)}" r="6.5"/>`); }
+    if (L === 'hacker') { const d = cornered(pts, 0, false); return out(d, `<path class="wire pipe" d="${d}" marker-end="url(#bt-arrow)"/>`); }
+    if (L === 'minimal') { const d = cornered(pts, 14, true); return out(d, `<path class="wire thin" d="${d}" marker-end="url(#bt-arrow)"/>`); }
+    if (L === 'space') {
+      const d = cornered(pts, 0, false), star = p => `<circle class="star halo" cx="${f(p.x)}" cy="${f(p.y)}" r="7"/><circle class="star" cx="${f(p.x)}" cy="${f(p.y)}" r="3"/>`;
+      return out(d, `<path class="wire starline" d="${d}"/>${star(a)}${star(z)}`);
+    }
+    if (L === 'neon') { const d = cornered(pts, 40, true); return out(d, `<path class="wire tube glow" ${lc} d="${d}"/><path class="wire tube" ${lc} d="${d}"/>`); }
+    const o = L === 'chalkboard' ? { amp: 2.2, head: 15, cls: 'chalk' } : L === 'whiteboard' ? { amp: 2.6, head: 15, cls: 'marker' } : { amp: 1.2, head: 11, cls: 'pen' };
+    return inkPath(bendPts(pts, 34, 14), hash(seedKey), o);
+  }
+
+  // ---------- Strings that go round cards (0.7.2) ----------
+  // On every look but Corkboard (wool crosses things, like the real thing) and Space (a
+  // constellation is a straight line), a string whose usual way would cross another card takes
+  // the shortest tidy way round instead: out of whichever side of its card suits, then straight
+  // runs with right-angle turns (rounded or cut the look's way), keeping clear of the cards between.
+  const ROUND_LOOKS = new Set(['whiteboard', 'blueprint', 'notebook', 'circuit', 'city', 'neon', 'minimal', 'hacker', 'chalkboard']);
+  let obstacles = null;   // the cards (and the banner) to keep clear of, a little bigger than drawn
+
+  function segHits(p, q, r) {
+    let t0 = 0, t1 = 1;
+    const dx = q.x - p.x, dy = q.y - p.y;
+    for (const [pp, qq] of [[-dx, p.x - r.x], [dx, r.x + r.w - p.x], [-dy, p.y - r.y], [dy, r.y + r.h - p.y]]) {
+      if (pp === 0) { if (qq <= 0) return false; continue; }
+      const t = qq / pp;
+      if (pp < 0) { if (t >= t1) return false; if (t > t0) t0 = t; }
+      else { if (t <= t0) return false; if (t < t1) t1 = t; }
+    }
+    return t1 - t0 > 1e-6;
+  }
+  const crosses = (pts, obs) => { for (let i = 1; i < pts.length; i++) for (const o of obs) if (segHits(pts[i - 1], pts[i], o)) return true; return false; };
+  const holds = (A, B) => A.w && B.x >= A.x && B.y >= A.y && B.x + B.w <= A.x + A.w && B.y + B.h <= A.y + A.h;
+
+  function dodge(s, A, B, skip, seedKey, colourKey) {
+    if (!s?.pts || !obstacles || !ROUND_LOOKS.has(look()) || holds(A, B) || holds(B, A)) return s;
+    const obs = obstacles.filter(o => !skip.has(o.id));
+    if (!crosses(s.pts, obs)) return s;
+    const pts = findRoute(A, B, obs, GAP_AT_END[look()] ?? 5);
+    return pts ? alongPts(pts, seedKey, colourKey) : s;
+  }
+
+  function findRoute(A, B, obs, gap) {
+    const M = 16, BEND = 40, CROSS = 5000;
+    const ca = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, cb = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
+    // Where a string may leave (or reach) a card: any side but the one facing right away, at the
+    // point along it nearest the other card.
+    const ports = (X, to) => {
+      if (!X.w && !X.h) return [{ p: { x: X.x, y: X.y }, n: null }];
+      const ay = clamp(to.y, X.y + X.h * 0.2, X.y + X.h * 0.8), ax = clamp(to.x, X.x + X.w * 0.2, X.x + X.w * 0.8);
+      return [
+        { p: { x: X.x + X.w, y: ay }, n: { x: 1, y: 0 } }, { p: { x: X.x, y: ay }, n: { x: -1, y: 0 } },
+        { p: { x: ax, y: X.y + X.h }, n: { x: 0, y: 1 } }, { p: { x: ax, y: X.y }, n: { x: 0, y: -1 } },
+      ].filter(q => (to.x - q.p.x) * q.n.x + (to.y - q.p.y) * q.n.y > -Math.max(X.w, X.h) * 0.3);
+    };
+    const pa = ports(A, cb), pb = ports(B, ca);
+    // The cards at either end: only the first and last bit of the string may touch them.
+    const ends = [A, B].filter(X => X.w || X.h).map(X => ({ x: X.x + 2, y: X.y + 2, w: X.w - 4, h: X.h - 4 }));
+    const x0 = Math.min(A.x, B.x) - 260, x1 = Math.max(A.x + A.w, B.x + B.w) + 260, y0 = Math.min(A.y, B.y) - 260, y1 = Math.max(A.y + A.h, B.y + B.h) + 260;
+    const near = obs.filter(o => o.x < x1 && o.x + o.w > x0 && o.y < y1 && o.y + o.h > y0);
+    const xs = new Set(), ys = new Set();
+    for (const o of [...near, ...ends]) { xs.add(Math.round(o.x - M)); xs.add(Math.round(o.x + o.w + M)); ys.add(Math.round(o.y - M)); ys.add(Math.round(o.y + o.h + M)); }
+    let best = null, bestScore = Infinity;
+    const tryRoute = (a, b, S, T, mid) => {
+      const raw = [a.p, S, ...mid, T, b.e];
+      const pts = [raw[0]];
+      for (const p of raw.slice(1)) { const q = pts[pts.length - 1]; if (Math.abs(p.x - q.x) > 0.5 || Math.abs(p.y - q.y) > 0.5) pts.push(p); }
+      for (let i = 1; i < pts.length; i++) if (Math.abs(pts[i].x - pts[i - 1].x) > 0.5 && Math.abs(pts[i].y - pts[i - 1].y) > 0.5) return;   // straight runs only
+      for (let i = pts.length - 2; i > 0; i--) { const p = pts[i - 1], q = pts[i], r = pts[i + 1]; if ((Math.abs(p.x - q.x) < 0.5 && Math.abs(q.x - r.x) < 0.5) || (Math.abs(p.y - q.y) < 0.5 && Math.abs(q.y - r.y) < 0.5)) pts.splice(i, 1); }
+      let len = 0;
+      for (let i = 1; i < pts.length; i++) len += Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
+      let score = len + (pts.length - 2) * BEND;
+      if (score >= bestScore) return;
+      for (let i = 1; i < pts.length && score < bestScore; i++) {
+        const p = pts[i - 1], q = pts[i];
+        for (const o of near) if (segHits(p, q, o)) score += CROSS;
+        // (the cards at the ends: not crossed except by the bit leaving or reaching them)
+        if (i > 1 && i < pts.length - 1) for (const o of ends) if (segHits(p, q, o)) score += CROSS;
+      }
+      if (score < bestScore) { bestScore = score; best = pts; }
+    };
+    const startOf = a => (a.n ? { x: a.p.x + a.n.x * M, y: a.p.y + a.n.y * M } : a.p);
+    for (const a of pa) a.S = startOf(a);
+    for (const b of pb) { b.S = startOf(b); b.e = b.n ? { x: b.p.x + b.n.x * gap, y: b.p.y + b.n.y * gap } : b.p; }
+    // Up to two turns between the ends.
+    for (const a of pa) for (const b of pb) {
+      const S = a.S, T = b.S;
+      tryRoute(a, b, S, T, []);
+      tryRoute(a, b, S, T, [{ x: T.x, y: S.y }]);
+      tryRoute(a, b, S, T, [{ x: S.x, y: T.y }]);
+      for (const x of [...xs, Math.round((S.x + T.x) / 2)]) tryRoute(a, b, S, T, [{ x, y: S.y }, { x, y: T.y }]);
+      for (const y of [...ys, Math.round((S.y + T.y) / 2)]) tryRoute(a, b, S, T, [{ x: S.x, y }, { x: T.x, y }]);
+    }
+    // Still crossing something: one more turn, using the closest ways past.
+    if (bestScore >= CROSS) {
+      const mx = (ca.x + cb.x) / 2, my = (ca.y + cb.y) / 2;
+      const cx = [...xs].sort((p, q) => Math.abs(p - mx) - Math.abs(q - mx)).slice(0, 8);
+      const cy = [...ys].sort((p, q) => Math.abs(p - my) - Math.abs(q - my)).slice(0, 8);
+      for (const a of pa) for (const b of pb) for (const x of cx) for (const y of cy) {
+        tryRoute(a, b, a.S, b.S, [{ x, y: a.S.y }, { x, y }, { x: b.S.x, y }]);
+        tryRoute(a, b, a.S, b.S, [{ x: a.S.x, y }, { x, y }, { x, y: b.S.y }]);
+      }
+    }
+    return best;
   }
 
   function drawLines() {
@@ -522,6 +776,8 @@ export function createBoard(host, api) {
     let html = '';
     const labels = [];
     junctions.clear();
+    // (not drawings on the board: strings may cross those, like anything drawn on it)
+    obstacles = ROUND_LOOKS.has(L) ? [key, ...cards.filter(r => !isSketch(r)).map(r => r.id)].map(id => { const b = rectOf(id); return b && { id, x: b.x - 6, y: b.y - 6, w: b.w + 12, h: b.h + 12 }; }).filter(Boolean) : null;
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       if (!on.has(l.to)) continue;
       const s = wire(r.id, l.to);
@@ -544,7 +800,11 @@ export function createBoard(host, api) {
       else if (branched || picked) labels.push(`<circle class="junction${picked}" data-link="${id}" ${s.lc || ''} cx="${f(s.mid.x)}" cy="${f(s.mid.y)}" r="6"/>`);
     }
     let pins = '';
+    // (a drawing on the board only gets a pin when a string is tied to it)
+    const strung = new Set();
+    for (const r of [...frames, ...cards]) for (const l of r.data.links || []) if (on.has(l.to)) { strung.add(r.id); strung.add(l.to); for (const c of l.also || []) strung.add(c); }
     if (L === 'corkboard') for (const r of [...frames, ...cards]) {
+      if (r.id === sketching || (isSketch(r) && !strung.has(r.id))) continue;
       const a = pinPoint(r.id);
       if (a) pins += `<circle class="pinhead" cx="${a.x}" cy="${a.y}" r="8" style="fill:${PINS[hash(r.id) % PINS.length]}"/><circle class="pinshine" cx="${a.x - 2.5}" cy="${a.y - 2.5}" r="2.4"/>`;
     }
@@ -676,7 +936,7 @@ export function createBoard(host, api) {
     } else if (g.kind === 'scale') {
       // Bigger or smaller from the top-left corner: as far as the drag goes across and down, on average.
       const byW = (g.w0 + (e.clientX - g.sx) / view.z) / g.w0, byH = (g.h0 + (e.clientY - g.sy) / view.z) / g.h0;
-      const s2 = clamp(Math.round(g.s0 * (byW + byH) / 2 * 20) / 20, 0.5, 3);
+      const s2 = isSketch(api.store.get(g.id)) ? clamp(Math.round(g.s0 * (byW + byH) / 2 * 100) / 100, 0.15, 8) : clamp(Math.round(g.s0 * (byW + byH) / 2 * 20) / 20, 0.5, 3);
       g.s = s2;
       if (Math.abs(s2 - 1) > 0.01) scales.set(g.id, s2); else scales.delete(g.id);
       g.el.classList.toggle('scaled', scales.has(g.id));
@@ -746,6 +1006,7 @@ export function createBoard(host, api) {
       if (g.moved) await settle(g);
       else if (up && tying) { if (g.id !== key) await tieTap(g.id); }
       else if (up && g.line) await tapLine(g.line, e.clientX, e.clientY);
+      else if (up && isSketch(api.store.get(g.id))) drawOnBoard(g.id);    // a drawing on the board: change it there
       else if (up) { const sub = g.down?.closest?.('[data-sub]'); api.open(sub ? sub.dataset.sub : g.id); }
     } else if (g.kind === 'scale') {
       if (g.s != null && g.s !== g.s0) await setScale(g.id, g.s);
@@ -1152,11 +1413,45 @@ export function createBoard(host, api) {
     if (!c || c === 'remove') return;
     await api.newItem('note', key, { title: c.title || 'YouTube clip', body: clipDivHTML(c), cork: { [key]: at } });
   }
-  async function addDrawing() {
-    const at = freeSpot(CARD_W, 200, viewCentre());
-    const dr = await api.draw(null, 'New drawing');
-    if (!dr || dr === 'remove' || !dr.s.length) return;
-    await api.newItem('note', key, { title: 'Drawing', body: drawDivHTML(dr), cork: { [key]: at } });
+  // Drawing straight onto the board (0.7.2): the drawing editor opens over the board, see-through,
+  // and moves with it. Done makes (or changes) a drawing card exactly where and as big as you drew:
+  // a note with data.sketch, its drawing in board coordinates, its spot and size on this board.
+  // Tapping one opens it here again; rubbing everything out removes it.
+  async function drawOnBoard(id = null) {
+    if (tying) setTying(false);
+    menuEl.hidden = true; pop.hidden = true;
+    const r = id && api.store.get(id);
+    let start = null;
+    if (r) {
+      const m = cardBody(r.data.body).media;
+      if (m?.kind !== 'draw' || !m.d) { api.open(id); return; }
+      // Where it is now (it may have been moved or made bigger): back into board coordinates.
+      const box = drawingBox(m.d, true), p = pos.get(id), k = cw(id) / box.w;
+      start = p ? moveDrawing(m.d, k, p.x - box.x * k, p.y - box.y * k) : m.d;
+      sketching = id; render();
+    }
+    const cs = getComputedStyle(cork);
+    const dr = await openDrawing({ drawing: start, title: r ? 'Change the drawing' : 'Draw on the board', stage: {
+      ink: cs.getPropertyValue('--sketch-ink').trim() || '#26292E',
+      paper: cs.getPropertyValue('--sketch-paper').trim() || '#FFFEFA',
+      rect: host.getBoundingClientRect(),
+      getView: svgRect => { const c = cork.getBoundingClientRect(); return { z: view.z, x: view.x + c.left - svgRect.left, y: view.y + c.top - svgRect.top }; },
+      setView: (v, svgRect) => { const c = cork.getBoundingClientRect(); view = { z: v.z, x: v.x + svgRect.left - c.left, y: v.y + svgRect.top - c.top }; applyView(); },
+    } });
+    sketching = null;
+    saveView();
+    if (!dr) { render(); return; }
+    if (!dr.s.length) {
+      if (r) {
+        await api.store.update(id, { trashed: new Date().toISOString() });
+        api.toast('Drawing rubbed out.', 'Undo', () => api.store.update(id, { trashed: undefined }));
+      } else render();
+      return;
+    }
+    const box = drawingBox(dr, true), s = Math.round(box.w / CARD_W * 1000) / 1000;
+    const spot = { x: Math.round(box.x), y: Math.round(box.y), ...(Math.abs(s - 1) > 0.01 ? { s } : {}) };
+    if (r) await api.store.update(id, { body: drawDivHTML(dr), cork: { ...(r.data.cork || {}), [key]: spot } });
+    else await api.newItem('note', frameAt({ x: box.x + box.w / 2, y: box.y + box.h / 2 }) || key, { title: 'Drawing', sketch: true, body: drawDivHTML(dr), cork: { [key]: spot } });
   }
 
   async function addSheet() {
@@ -1203,7 +1498,15 @@ export function createBoard(host, api) {
     const a = b.dataset.b;
     if (a === 'in') { zoomAt(w, h, 1.25); saveView(); }
     else if (a === 'out') { zoomAt(w, h, 0.8); saveView(); }
-    else if (a === 'fit') fit();
+    // Tidy and Fit ask first (0.7.2), so a stray tap doesn't rearrange or move the board.
+    else if (a === 'fit' || a === 'tidy') {
+      if (!menuEl.hidden) { menuEl.hidden = true; return; }
+      if (tying) setTying(false);
+      const r = b.getBoundingClientRect();
+      menu(r.left + 10, r.top, a === 'fit'
+        ? [{ label: 'Fit everything on screen', fn: () => fit() }]
+        : [{ label: 'Tidy: lay every card out again', fn: () => tidy() }], true);
+    }
     else if (a === 'add') {
       if (!menuEl.hidden) { menuEl.hidden = true; return; }
       if (tying) setTying(false);
@@ -1214,7 +1517,7 @@ export function createBoard(host, api) {
         { label: 'To-do', icon: ic('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/>'), fn: () => addAt('task') },
         { label: 'Section', icon: ic('<path d="M4 9V6a1 1 0 0 1 1-1h3M16 5h3a1 1 0 0 1 1 1v3M20 15v3a1 1 0 0 1-1 1h-3M8 19H5a1 1 0 0 1-1-1v-3"/>'), fn: () => addSection() },
         { label: 'YouTube clip', icon: ic('<rect x="2.5" y="5.5" width="19" height="13" rx="3.5"/><path d="M10 9v6l5-3z"/>'), fn: () => addClip() },
-        { label: 'Drawing', icon: ic('<rect x="3" y="4" width="7" height="5" rx="1"/><circle cx="17" cy="17" r="3.5"/><path d="M6.5 9v4.5a3 3 0 0 0 3 3H13"/>'), fn: () => addDrawing() },
+        { label: 'Drawing (on the board)', icon: ic('<rect x="3" y="4" width="7" height="5" rx="1"/><circle cx="17" cy="17" r="3.5"/><path d="M6.5 9v4.5a3 3 0 0 0 3 3H13"/>'), fn: () => drawOnBoard() },
         { label: 'Spreadsheet', icon: ic('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M3 15h18M9 4v16M15 4v16"/>'), fn: () => addSheet() },
         { label: 'File (PDF, Word, Excel…)', icon: ic('<path d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.6 1.6 0 0 1-2.3-2.3L15 7.3"/>'), fn: () => addFiles() },
         { label: 'Link to a document or page', icon: ic('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'), fn: () => addWebLink() },
@@ -1222,21 +1525,24 @@ export function createBoard(host, api) {
       ], true);
     }
     else if (a === 'tie') setTying(!tying);
-    else if (a === 'tidy') {
-      // Cards brought in from elsewhere keep their spot (that's what keeps them here); the rest are laid out again.
-      const I = api.index();
-      const slot = r => (r.id === key ? 'banner' : key);
-      const mine = [I.byId.get(key), ...frames, ...cards.filter(r => !guests.has(r.id))].filter(r => r?.data.cork?.[slot(r)]);
-      const before = new Map(mine.map(r => [r.id, r.data.cork]));
-      busy = true;
-      try {
-        // (a card keeps its size)
-        for (const r of mine) { const c = { ...r.data.cork }, sz = c[slot(r)]?.s; if (sz) c[slot(r)] = { s: sz }; else delete c[slot(r)]; await api.store.update(r.id, { cork: Object.keys(c).length ? c : undefined }); }
-      } finally { busy = false; }
-      needsFit = true; render();
-      api.toast('Board tidied.', 'Undo', async () => { for (const [id, c] of before) await api.store.update(id, { cork: c }); });
-    }
+    else if (a === 'draw') drawOnBoard();
   });
+
+  async function tidy() {
+    // Cards brought in from elsewhere keep their spot (that's what keeps them here), and so do
+    // drawings made on the board (they were drawn where they are); the rest are laid out again.
+    const I = api.index();
+    const slot = r => (r.id === key ? 'banner' : key);
+    const mine = [I.byId.get(key), ...frames, ...cards.filter(r => !guests.has(r.id) && !(isSketch(r) && Number.isFinite(r.data.cork?.[key]?.x)))].filter(r => r?.data.cork?.[slot(r)]);
+    const before = new Map(mine.map(r => [r.id, r.data.cork]));
+    busy = true;
+    try {
+      // (a card keeps its size)
+      for (const r of mine) { const c = { ...r.data.cork }, sz = c[slot(r)]?.s; if (sz) c[slot(r)] = { s: sz }; else delete c[slot(r)]; await api.store.update(r.id, { cork: Object.keys(c).length ? c : undefined }); }
+    } finally { busy = false; }
+    needsFit = true; render();
+    api.toast('Board tidied.', 'Undo', async () => { for (const [id, c] of before) await api.store.update(id, { cork: c }); });
+  }
 
   // ---------- The board as a picture (for export and print) ----------
   // Drawn from what's on screen: for a moment the board is shown flat (no tilt) at 100%, and each
@@ -1381,6 +1687,7 @@ export function createBoard(host, api) {
       render();
     },
     refresh: render,
+    redrawStrings: drawLines,
     get key() { return key; },
   };
 }
