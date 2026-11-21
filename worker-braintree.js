@@ -284,7 +284,7 @@ async function rpc(m, ctx) {
 
 const MCP_INSTRUCTIONS = `Brain Tree is the user's own planner (projects, to-dos, notes and boards), on their phone and computer.
 When the user asks to put a plan from this chat into Brain Tree ("block it out"), call block_out_project once with the whole thing: sections for the phases or areas of work, to-dos for actions (with steps for the smaller actions inside one), notes for reference material and decisions, and strings.
-Strings are what make the board useful, so always include them. Tie a string wherever one thing feeds into, needs, comes before, is based on or is for another, across sections as well as inside them: from research and notes to the to-dos that use them, from each step of the work to the next, from a decision to what it affects. Most to-dos and notes should be on at least one string; as a guide, about one string for every two or three things. Give every item you'll tie a key, and give each string a short label (one to three words) saying how they're linked, like "feeds into", "needs", "before", "based on" or "for".
+Strings are what make the board useful, so always include them. Tie a string wherever one thing feeds into, needs, comes before, is based on or is for another, across sections as well as inside them: from research and notes to the to-dos that use them, from each step of the work to the next, from a decision to what it affects. Most to-dos and notes should be on at least one string; as a guide, about one string for every two or three things. Give every item you'll tie a key, and give each string a short label (one to three words) saying how they're linked, like "feeds into", "needs", "before", "based on" or "for". Where the link has a direction (one thing comes before, feeds into or is needed by the other), set arrow "to" so the board shows an arrowhead pointing from → to; leave it out for plain links.
 Before blocking a project out, ask the user for this chat's link so the project can link back to it: on the web it's the address in the browser bar (claude.ai/chat/...), which only they can open; Share → Copy link makes a public copy instead. Pass it as chat_url. If they'd rather not, carry on without it.
 Don't make up dates; only use ones the user gave. Keep titles short and clear, put detail in notes.
 To change an existing project, read it first with get_project (or find things with search) and use the ids it gives. remove_item only moves things to Recently deleted, where the user can restore them.
@@ -305,7 +305,10 @@ const ITEM_FIELDS = {
 const ITEM = { type: 'object', properties: ITEM_FIELDS, required: ['title'] };
 const ITEM_WITH_KIDS = { type: 'object', properties: { ...ITEM_FIELDS, items: { type: 'array', items: ITEM, description: 'For a smaller project: what goes in it.' } }, required: ['title'] };
 const SECTION = { type: 'object', properties: { key: ITEM_FIELDS.key, title: { type: 'string' }, color: { type: 'string', enum: COLOURS }, items: { type: 'array', items: ITEM_WITH_KIDS } }, required: ['title'] };
-const STRINGS = { type: 'array', description: 'Strings between things, shown on the board: include plenty (about one for every two or three things), wherever one thing feeds into, needs, comes before or is based on another, across sections too. from/to: a key or the exact title of something in this call (or, with add_items, something already in the project).', items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, label: { type: 'string', description: 'One to three words saying how they link, like "feeds into", "needs", "before".' } }, required: ['from', 'to'] } };
+// (0.7.7) Which way a string points on the board (data.links[].dir); left out, the board's look decides.
+const ARROWS = ['to', 'from', 'both', 'none'];
+const ARROW = { type: 'string', enum: ARROWS, description: 'Optional: which end gets an arrowhead on the board. "to" points at the to end (right for "feeds into", "before", "needs"-style links read from → to), "from" at the from end, "both", or "none" for a plain link. Leave it out to let the board\'s look decide.' };
+const STRINGS = { type: 'array', description: 'Strings between things, shown on the board: include plenty (about one for every two or three things), wherever one thing feeds into, needs, comes before or is based on another, across sections too. from/to: a key or the exact title of something in this call (or, with add_items, something already in the project).', items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, label: { type: 'string', description: 'One to three words saying how they link, like "feeds into", "needs", "before".' }, arrow: ARROW }, required: ['from', 'to'] } };
 
 const MCP_TOOLS = [
   { name: 'list_projects', title: 'List projects', description: 'All the projects in Brain Tree (with their smaller projects), with ids and how many to-dos are done.',
@@ -334,8 +337,8 @@ const MCP_TOOLS = [
       color: { type: 'string', enum: COLOURS }, move_to: { type: 'string', description: 'Id of the project, section or to-do to move it into.' },
       chat_url: { type: 'string' },
     }, required: ['id'] } },
-  { name: 'tie_string', title: 'Tie a string', description: 'Tie a string between two things (it shows on the board, and under Strings on each). Tying two already tied changes the label.',
-    inputSchema: { type: 'object', properties: { from_id: { type: 'string' }, to_id: { type: 'string' }, label: { type: 'string' } }, required: ['from_id', 'to_id'] } },
+  { name: 'tie_string', title: 'Tie a string', description: 'Tie a string between two things (it shows on the board, and under Strings on each). Tying two already tied changes its label and/or arrow.',
+    inputSchema: { type: 'object', properties: { from_id: { type: 'string' }, to_id: { type: 'string' }, label: { type: 'string' }, arrow: ARROW }, required: ['from_id', 'to_id'] } },
   { name: 'remove_item', title: 'Move to Recently deleted', description: 'Move a to-do, note, project or section to Recently deleted (the user can restore it). Removing a section keeps what was in it.',
     inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }, annotations: { destructiveHint: true } },
 ];
@@ -495,7 +498,7 @@ function planItems(T, parentId, { sections = [], items = [], strings = [] }, pla
     const find = v => plan.named.get('key:' + String(v || '').toLowerCase()) || plan.named.get(String(v || '').toLowerCase()) || (T.get(v) ? String(v) : null);
     const from = find(st?.from), to = find(st?.to);
     if (!from || !to || from === to) { plan.skipped.push(`${st?.from} → ${st?.to}`); continue; }
-    plan.strings.push({ from, to, label: text(st.label, 40) });
+    plan.strings.push({ from, to, label: text(st.label, 40), dir: ARROWS.includes(st.arrow) ? st.arrow : null });
   }
 }
 
@@ -506,7 +509,7 @@ async function savePlan(env, T, plan) {
     let data = mine.get(s.from);
     if (!data) { if (!touched.has(s.from)) touched.set(s.from, structuredClone(T.get(s.from).data)); data = touched.get(s.from); }
     const links = (data.links || []).filter(l => l.to !== s.to);
-    links.push({ to: s.to, ...(s.label ? { label: s.label } : {}) });
+    links.push({ to: s.to, ...(s.label ? { label: s.label } : {}), ...(s.dir ? { dir: s.dir } : {}) });
     data.links = links;
   }
   for (const x of plan.items) await saveItem(env, x.id, x.data);
@@ -588,7 +591,8 @@ const TOOL_FNS = {
     for (const id of here) for (const l of T.get(id)?.data.links || []) {
       if (!T.get(l.to)) continue;
       const also = (l.also || []).map(c => T.get(c)).filter(Boolean).map(titleOf);
-      strings.push(`- ${titleOf(T.get(id))} → ${titleOf(T.get(l.to))}${l.label ? ` “${l.label}”` : ''}${also.length ? ` (branches to ${also.join(', ')})` : ''}`);
+      const arrow = l.dir === 'to' ? `, points to ${titleOf(T.get(l.to))}` : l.dir === 'from' ? `, points to ${titleOf(T.get(id))}` : l.dir === 'both' ? ', points both ways' : l.dir === 'none' ? ', no arrows' : '';
+      strings.push(`- ${titleOf(T.get(id))} → ${titleOf(T.get(l.to))}${l.label ? ` “${l.label}”` : ''}${also.length ? ` (branches to ${also.join(', ')})` : ''}${arrow}`);
     }
     if (strings.length) L.push('Strings:\n' + strings.join('\n'));
     return { text: L.join('\n'), data: { id: p.id, title: titleOf(p), url: linkTo(ctx, p.id) } };
@@ -689,11 +693,15 @@ const TOOL_FNS = {
     const back = (to.data.links || []).find(l => l.to === from.id);
     const [owner, other] = back ? [to, from] : [from, to];
     const d = structuredClone(owner.data), label = text(a.label, 40);
+    // (the arrow as Claude means it, from from_id to to_id; flipped if the string is stored the other way round)
+    let dir = ARROWS.includes(a.arrow) ? a.arrow : null;
+    if (dir && back) dir = { to: 'from', from: 'to' }[dir] || dir;
     const links = d.links || [];
     const had = links.find(l => l.to === other.id);
-    d.links = had ? links.map(l => (l.to === other.id ? { ...l, ...(label ? { label } : {}) } : l)) : [...links, { to: other.id, ...(label ? { label } : {}) }];
+    const extra = { ...(label ? { label } : {}), ...(dir ? { dir } : {}) };
+    d.links = had ? links.map(l => (l.to === other.id ? { ...l, ...extra } : l)) : [...links, { to: other.id, ...extra }];
     await saveItem(ctx.env, owner.id, d);
-    return { text: `${had ? 'Relabelled the string' : 'Tied a string'} between “${titleOf(from)}” and “${titleOf(to)}”${label ? ` (“${label}”)` : ''}.`, data: { from: from.id, to: to.id } };
+    return { text: `${had ? 'Changed the string' : 'Tied a string'} between “${titleOf(from)}” and “${titleOf(to)}”${label ? ` (“${label}”)` : ''}${dir ? `, ${a.arrow === 'both' ? 'pointing both ways' : a.arrow === 'none' ? 'with no arrows' : `pointing to “${titleOf(a.arrow === 'to' ? to : from)}”`}` : ''}.`, data: { from: from.id, to: to.id } };
   },
 
   async remove_item(a, ctx) {
