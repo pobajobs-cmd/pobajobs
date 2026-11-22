@@ -15,7 +15,7 @@ import { linkService } from './attach.js';
 import * as ex from './export.js';
 import * as theme from './theme.js';
 
-const VERSION = '0.7.7';
+const VERSION = '0.7.8';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [

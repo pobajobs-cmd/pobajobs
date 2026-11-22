@@ -259,7 +259,9 @@ export function createBoard(host, api) {
   //  - strings cross each other, and cards that aren't theirs, as little as possible
   //  - the whole board is about the shape of the screen it's tidied on
   // It starts from the flow order, then tries swapping sections, swapping cards within sections
-  // and making sections narrower or wider, keeping each change that scores tidier.
+  // and making sections narrower or wider, keeping each change that scores tidier. (0.7.8: scored
+  // with strings where they're really drawn, from a few starts; then, on looks that route, with the
+  // strings routed by the autorouter, like a circuit board's autoplacer: see routedUntidiness.)
   //   tidyAll(todo):  everything laid out from scratch (Tidy everything, and a board nothing's been placed on)
   //   tidyInside():   sections stay where they are; the cards in each are rearranged
 
@@ -282,6 +284,19 @@ export function createBoard(host, api) {
     return out;
   }
 
+  // (0.7.8) The strings among these things as they're drawn: from → to, with any branches.
+  function stringsAmong(ids) {
+    const out = [];
+    for (const r of [...frames, ...cards]) {
+      if (!ids.has(r.id)) continue;
+      for (const l of r.data.links || []) {
+        if (!ids.has(l.to) || l.to === r.id) continue;
+        out.push({ a: r.id, b: l.to, also: (l.also || []).filter(c => ids.has(c) && c !== r.id && c !== l.to) });
+      }
+    }
+    return out;
+  }
+
   // Do two straight lines cross (not just meet at an end)?
   function segsCross(a, b, c, d) {
     const o = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
@@ -289,30 +304,112 @@ export function createBoard(host, api) {
   }
 
   // How hard an arrangement is to read, as one number: lower is tidier. pos: id -> {x, y, w?, h?}.
-  function untidiness(pos, ties, A) {
+  // (0.7.8) Each string is judged where it's really drawn: from the side of its card facing the other
+  // (not the middle), and a branch from halfway along its string (where the label and knot go) to its
+  // card. So two strings from the same card that would cross (one leaving above the other, then
+  // passing under it) count as crossing, and Tidy moves a card to stop it if it can.
+  // (rough: the quicker, smoother 0.7.5 way, middle to middle, where strings from the same card never
+  // count as crossing: a good start for the search, which is then finished the drawn way)
+  function untidiness(pos, strs, A, rough = false) {
     const box = id => { const p = pos.get(id); return p && { x: p.x, y: p.y, w: p.w ?? cw(id), h: p.h ?? hOf(id) }; };
     const mid = id => { const b = box(id); return b && { x: b.x + b.w / 2, y: b.y + (isFrame(id) ? HEAD / 2 : b.h / 2) }; };
+    const side = id => { const b = box(id); return b && (isFrame(id) ? { ...b, h: HEAD } : b); };   // (a section's strings go to its name)
+    const back = (p, q) => q.y < p.y - 80 || (Math.abs(q.y - p.y) <= 80 && q.x < p.x - 80);
     let s = 0;
-    const segs = [];
-    for (const [a, b] of ties) {
-      const p = mid(a), q = mid(b);
-      if (!p || !q) continue;
-      s += Math.hypot(q.x - p.x, q.y - p.y);                                                  // short strings
-      if (q.y < p.y - 80 || (Math.abs(q.y - p.y) <= 80 && q.x < p.x - 80)) s += 800;         // ones running backwards
-      segs.push([p, q, a, b]);
+    const segs = [];   // [p, q, which string, the cards it's tied to]
+    if (rough) {
+      let n = 0;
+      for (const t of strs) for (const c of [t.b, ...t.also]) {
+        const p = mid(t.a), q = mid(c);
+        if (!p || !q) continue;
+        s += Math.hypot(q.x - p.x, q.y - p.y);
+        if (back(p, q)) s += 800;
+        segs.push([p, q, n++, new Set([t.a, c])]);
+      }
     }
+    else strs.forEach((t, n) => {
+      const A0 = side(t.a), B0 = side(t.b);
+      if (!A0 || !B0) return;
+      const { p0, p3 } = facing(A0, B0, 0), tied = new Set([t.a, t.b, ...t.also]);
+      s += Math.hypot(p3.x - p0.x, p3.y - p0.y);                                                // short strings
+      if (back(mid(t.a), mid(t.b))) s += 800;                                                    // ones running backwards
+      segs.push([p0, p3, n, tied]);
+      if (!t.also.length) return;
+      const J = { x: (p0.x + p3.x) / 2, y: (p0.y + p3.y) / 2 };
+      for (const c of t.also) {
+        const C = side(c);
+        if (!C) continue;
+        const q = facing({ x: J.x, y: J.y, w: 0, h: 0 }, C, 0).p3;
+        s += Math.hypot(q.x - J.x, q.y - J.y);
+        if (back(mid(t.a), mid(c))) s += 800;
+        segs.push([J, q, n, tied]);
+      }
+    });
     for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {       // strings crossing strings
-      const [p1, q1, a1, b1] = segs[i], [p2, q2, a2, b2] = segs[j];
-      if (a1 === a2 || a1 === b2 || b1 === a2 || b1 === b2) continue;
+      const [p1, q1, n1, t1] = segs[i], [p2, q2, n2, t2] = segs[j];
+      if (n1 === n2 || (rough && [...t1].some(id => t2.has(id)))) continue;
       if (segsCross(p1, q1, p2, q2)) s += 700;
     }
     const others = [];
     for (const id of pos.keys()) if (!isFrame(id) && id !== key) { const b = box(id); others.push({ id, x: b.x + 10, y: b.y + 10, w: b.w - 20, h: b.h - 20 }); }
-    for (const [p, q, a, b] of segs) for (const o of others) if (o.id !== a && o.id !== b && segHits(p, q, o)) s += 900;   // strings over other cards
+    for (const [p, q, , tied] of segs) for (const o of others) if (!tied.has(o.id) && segHits(p, q, o)) s += 900;   // strings over other cards
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const id of pos.keys()) { const b = box(id); x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
     if (x0 < Infinity) s += Math.max(x1 - x0, (y1 - y0) * A) * 1.2;                           // fits the screen
     return s;
+  }
+
+  // (0.7.8) The same, but with the strings really routed: like a circuit board's autoplacer, the
+  // cards are put where this arrangement has them (for a moment), the autorouter routes every string
+  // and branch, and what comes out is measured: crossings, length, turns. Slower, so Tidy only uses
+  // it to choose between its best few layouts and then nudge the best one, on the looks that route.
+  // (null on a look that doesn't route its strings)
+  function routedUntidiness(cand, strs, A) {
+    if (!ROUND_LOOKS.has(look())) return null;
+    const saved = new Map([...cand.keys()].map(id => [id, pos.get(id)]));
+    const ob = obstacles, fb = frameBoxes;
+    try {
+      for (const [id, p] of cand) pos.set(id, { ...(pos.get(id) || {}), ...p });
+      frameBoxes = frames.filter(r => cand.has(r.id)).map(r => { const b = rectOf(r.id); return b && { id: r.id, x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 }; }).filter(Boolean);
+      obstacles = cards.filter(r => cand.has(r.id) && !isSketch(r)).map(r => { const b = rectOf(r.id); return b && { id: r.id, x: b.x - 6, y: b.y - 6, w: b.w + 12, h: b.h + 12 }; }).filter(Boolean);
+      if (!obstacles.length) return null;
+      const jobs = routeJobs().filter(j => cand.has(j.from) && cand.has(j.to));
+      for (const j of jobs) { j.via = null; j.also = j.also.filter(c => cand.has(c)); }   // (as Tidy leaves them: shaped strings routed afresh)
+      const map = computeRoutes(jobs), lines = [];
+      jobs.forEach((j, n) => {
+        const s = map.get(j.k);
+        if (s?.pts) lines.push({ P: s.pts, n });
+        for (const c of j.also) { const b = map.get(j.k + '+' + c); if (b?.s?.pts) lines.push({ P: b.s.pts, n }); }
+      });
+      let s = untidiness(cand, [], A), turns = 0, crossings = 0;          // (how it fits the screen)
+      for (const L of lines) {
+        const P = L.P;
+        s += polyLen(P);
+        for (let i = 1; i < P.length - 1; i++) {
+          let d = Math.abs(Math.atan2(P[i + 1].y - P[i].y, P[i + 1].x - P[i].x) - Math.atan2(P[i].y - P[i - 1].y, P[i].x - P[i - 1].x));
+          if (d > Math.PI) d = 2 * Math.PI - d;
+          if (d > 0.5) turns++;
+        }
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const p of P) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+        L.bb = { x0, y0, x1, y1 };
+      }
+      for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) {
+        const a = lines[i], b = lines[j];
+        if (a.n === b.n || a.bb.x1 < b.bb.x0 || b.bb.x1 < a.bb.x0 || a.bb.y1 < b.bb.y0 || b.bb.y1 < a.bb.y0) continue;
+        for (let p = 1; p < a.P.length; p++) for (let q = 1; q < b.P.length; q++) if (segsCross(a.P[p - 1], a.P[p], b.P[q - 1], b.P[q])) crossings++;
+      }
+      // (and strings running backwards, as before)
+      const mid = id => { const b = rectOf(id); return b && { x: b.x + b.w / 2, y: b.y + (isFrame(id) ? HEAD / 2 : b.h / 2) }; };
+      for (const t of strs) for (const c of [t.b, ...t.also]) {
+        const p = mid(t.a), q = mid(c);
+        if (p && q && (q.y < p.y - 80 || (Math.abs(q.y - p.y) <= 80 && q.x < p.x - 80))) s += 800;
+      }
+      return s + turns * 12 + crossings * 700;
+    } finally {
+      for (const [id, p] of saved) if (p) pos.set(id, p); else pos.delete(id);
+      obstacles = ob; frameBoxes = fb;
+    }
   }
 
   // (0.7.7) Room for labels: how wide the label is on a string between two cards (either way round).
@@ -371,11 +468,11 @@ export function createBoard(host, api) {
     return out;
   }
 
-  function tidyAll(todo) {
+  function tidyAll(todo, budget = 400) {
     measureLabelRoom();
     const A = screenShape(), tall = A < 0.9, maxCols = tall ? 2 : 3;
     const ids = new Set([...frames, ...todo].map(r => r.id));
-    const ties = tiesAmong(ids);
+    const ties = tiesAmong(ids), strs = stringsAmong(ids);
     const wt = new Map();
     for (const [a, b] of ties) wt.set(a + '>' + b, (wt.get(a + '>' + b) || 0) + 1);
     const w = (a, b) => wt.get(a + '>' + b) || 0;
@@ -439,8 +536,9 @@ export function createBoard(host, api) {
       }
       return pos;
     };
-    let best = untidiness(place(), ties, A);
-    const keep = undo => { const s = untidiness(place(), ties, A); if (s < best - 1) { best = s; return true; } undo(); return false; };
+    let best = Infinity, rough = false;
+    const score = () => untidiness(place(), strs, A, rough);
+    const keep = undo => { const s = score(); if (s < best - 1) { best = s; return true; } undo(); return false; };
     // (rows a bit narrower or wider, if that suits the screen better)
     const tryWidths = () => {
       const base = rowW;
@@ -450,31 +548,90 @@ export function createBoard(host, api) {
         keep(() => { rowW = was; });
       }
     };
-    tryWidths();
-    const until = performance.now() + 300;
-    for (let pass = 0; pass < 5 && performance.now() < until; pass++) {
-      let better = false;
-      for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) {
-        if (order[i].last || order[j].last) continue;
-        [order[i], order[j]] = [order[j], order[i]];
-        if (keep(() => { [order[i], order[j]] = [order[j], order[i]]; })) better = true;
-      }
-      for (const u of units) {
-        const m = u.members;
-        for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) {
-          [m[i], m[j]] = [m[j], m[i]]; build(u);
-          if (keep(() => { [m[i], m[j]] = [m[j], m[i]]; build(u); })) better = true;
+    const improve = until => {
+      for (let pass = 0; pass < 5 && performance.now() < until; pass++) {
+        let better = false;
+        for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) {
+          if (order[i].last || order[j].last) continue;
+          [order[i], order[j]] = [order[j], order[i]];
+          if (keep(() => { [order[i], order[j]] = [order[j], order[i]]; })) better = true;
         }
-        for (const c of [u.cols - 1, u.cols + 1]) {
-          if (c < 1 || c > maxCols || c > m.length || u.last) continue;
-          const was = u.cols; u.cols = c; build(u);
-          if (keep(() => { u.cols = was; build(u); })) better = true;
+        for (const u of units) {
+          const m = u.members;
+          for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) {
+            [m[i], m[j]] = [m[j], m[i]]; build(u);
+            if (keep(() => { [m[i], m[j]] = [m[j], m[i]]; build(u); })) better = true;
+          }
+          for (const c of [u.cols - 1, u.cols + 1]) {
+            if (c < 1 || c > maxCols || c > m.length || u.last) continue;
+            const was = u.cols; u.cols = c; build(u);
+            if (keep(() => { u.cols = was; build(u); })) better = true;
+          }
         }
+        if (!better) break;
       }
-      if (!better) break;
+    };
+    // (0.7.8) Swapping one thing at a time can get stuck in a layout that's only tidier than its
+    // neighbours, so it goes a few ways and keeps the tidiest it finds: the rough way first and then
+    // finished the drawn way, and the drawn way from scratch at a few row widths.
+    const snap = () => ({ order: [...order], members: units.map(u => [...u.members]), cols: units.map(u => u.cols), rowW, score: best });
+    const restore = s => { order.splice(0, order.length, ...s.order); units.forEach((u, i) => { u.members = [...s.members[i]]; u.cols = s.cols[i]; build(u); }); rowW = s.rowW; best = s.score; };
+    const start = snap(), base = rowW, found = [];
+    for (const [k, r] of [[1, true], [1, false], [0.75, false], [1.4, false]]) {
+      restore(start);
+      rowW = Math.max(widest, base * k);
+      rough = r; best = score();
+      tryWidths(); improve(performance.now() + 120); tryWidths();
+      if (rough) { rough = false; best = score(); improve(performance.now() + 120); tryWidths(); }
+      found.push(snap());
     }
-    tryWidths();
+    found.sort((a, b) => a.score - b.score);
+    restore(found[0]);
+    // (0.7.8) Then with the strings really routed (see routedUntidiness): each of these different
+    // layouts nudged (cards swapped, sections narrower or wider, sections swapped) while that's
+    // tidier, and the tidiest kept. (So a layout that suits the screen gets the chance to lose its
+    // crossings, rather than one that doesn't winning because it has none.)
+    const same = (s, t) => s.rowW === t.rowW && s.order.every((u, i) => u === t.order[i]) && s.cols.every((c, i) => c === t.cols[i]) && s.members.every((m, i) => m.every((c, j) => c === t.members[i][j]));
+    const tries = found.filter((s, i) => !found.slice(0, i).some(t => same(s, t)));
+    let bestR = routedUntidiness(place(), strs, A);
+    if (bestR != null && budget > 0) {
+      const t0 = performance.now();
+      let top = null;
+      tries.forEach((s, n) => {
+        restore(s);
+        bestR = routedUntidiness(place(), strs, A);
+        nudge(t0 + budget * (n + 1) / tries.length);
+        const r = snap();
+        r.routed = bestR;
+        if (!top || r.routed < top.routed) top = r;
+      });
+      restore(top);
+    }
     return place();
+    function nudge(until) {
+      const keepR = undo => { const v = routedUntidiness(place(), strs, A); if (v < bestR - 1) { bestR = v; return true; } undo(); return false; };
+      for (let pass = 0; pass < 4 && performance.now() < until; pass++) {
+        let better = false;
+        for (const u of units) {
+          const m = u.members;
+          for (let i = 0; i < m.length && performance.now() < until; i++) for (let j = i + 1; j < m.length; j++) {
+            [m[i], m[j]] = [m[j], m[i]]; build(u);
+            if (keepR(() => { [m[i], m[j]] = [m[j], m[i]]; build(u); })) better = true;
+          }
+          for (const c of [u.cols - 1, u.cols + 1]) {
+            if (c < 1 || c > maxCols || c > m.length || u.last || performance.now() > until) continue;
+            const was = u.cols; u.cols = c; build(u);
+            if (keepR(() => { u.cols = was; build(u); })) better = true;
+          }
+        }
+        for (let i = 0; i < order.length && performance.now() < until; i++) for (let j = i + 1; j < order.length; j++) {
+          if (order[i].last || order[j].last) continue;
+          [order[i], order[j]] = [order[j], order[i]];
+          if (keepR(() => { [order[i], order[j]] = [order[j], order[i]]; })) better = true;
+        }
+        if (!better) break;
+      }
+    }
   }
 
   function tidyInside() {
@@ -482,7 +639,7 @@ export function createBoard(host, api) {
     const A = screenShape();
     const pos = new Map();
     for (const r of [...frames, ...cards]) { const b = rectOf(r.id); if (b) pos.set(r.id, isFrame(r.id) ? { x: b.x, y: b.y, w: b.w, h: b.h } : { x: b.x, y: b.y }); }
-    const ties = tiesAmong(new Set(pos.keys()));
+    const ties = tiesAmong(new Set(pos.keys())), strs = stringsAmong(new Set(pos.keys()));
     const wt = new Map();
     for (const [a, b] of ties) wt.set(a + '>' + b, (wt.get(a + '>' + b) || 0) + 1);
     const w = (a, b) => wt.get(a + '>' + b) || 0;
@@ -501,19 +658,45 @@ export function createBoard(host, api) {
       sec.f.h = Math.max(220, HEAD + PAD + g.h + PAD);
     };
     secs.forEach(apply);
-    let best = untidiness(pos, ties, A);
-    const until = performance.now() + 300;
-    for (let pass = 0; pass < 5 && performance.now() < until; pass++) {
-      let better = false;
-      for (const sec of secs) {
-        const m = sec.kids;
-        for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) {
-          [m[i], m[j]] = [m[j], m[i]]; apply(sec);
-          const s = untidiness(pos, ties, A);
-          if (s < best - 1) { best = s; better = true; } else { [m[i], m[j]] = [m[j], m[i]]; apply(sec); }
+    const search = (rough, until) => {
+      let best = untidiness(pos, strs, A, rough);
+      for (let pass = 0; pass < 5 && performance.now() < until; pass++) {
+        let better = false;
+        for (const sec of secs) {
+          const m = sec.kids;
+          for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) {
+            [m[i], m[j]] = [m[j], m[i]]; apply(sec);
+            const s = untidiness(pos, strs, A, rough);
+            if (s < best - 1) { best = s; better = true; } else { [m[i], m[j]] = [m[j], m[i]]; apply(sec); }
+          }
         }
+        if (!better) break;
       }
-      if (!better) break;
+    };
+    // (0.7.8: the rough way then finished the drawn way, or the drawn way from scratch, whichever's tidier)
+    const kidsNow = () => secs.map(sec => [...sec.kids]);
+    const setKids = ks => secs.forEach((sec, i) => { sec.kids = [...ks[i]]; apply(sec); });
+    const start = kidsNow();
+    search(true, performance.now() + 150); search(false, performance.now() + 150);
+    const first = kidsNow(), firstScore = untidiness(pos, strs, A), firstR = routedUntidiness(pos, strs, A);
+    setKids(start); search(false, performance.now() + 150);
+    let bestR = routedUntidiness(pos, strs, A);
+    if (bestR != null ? bestR > firstR : untidiness(pos, strs, A) > firstScore) { setKids(first); bestR = firstR; }
+    // (0.7.8) Then with the strings really routed (see routedUntidiness), cards swapped while that's tidier.
+    if (bestR != null) {
+      const until = performance.now() + 400;
+      for (let pass = 0; pass < 4 && performance.now() < until; pass++) {
+        let better = false;
+        for (const sec of secs) {
+          const m = sec.kids;
+          for (let i = 0; i < m.length && performance.now() < until; i++) for (let j = i + 1; j < m.length; j++) {
+            [m[i], m[j]] = [m[j], m[i]]; apply(sec);
+            const v = routedUntidiness(pos, strs, A);
+            if (v < bestR - 1) { bestR = v; better = true; } else { [m[i], m[j]] = [m[j], m[i]]; apply(sec); }
+          }
+        }
+        if (!better) break;
+      }
     }
     const out = new Map();
     for (const sec of secs) { out.set(sec.s.id, pos.get(sec.s.id)); for (const k of sec.kids) out.set(k.id, pos.get(k.id)); }
@@ -524,9 +707,9 @@ export function createBoard(host, api) {
   // on it changes) rather than at every redraw.
   let autoCache = null;
   function autoTidy(todo) {
-    const sig = JSON.stringify([key, Math.round(screenShape() * 10), todo.map(r => [r.id, r.data.parent || '', Math.round(hOf(r.id)), sc(r.id)]), frames.map(f => f.id), tiesAmong(new Set([...frames, ...todo].map(r => r.id))),
+    const sig = JSON.stringify([key, look(), Math.round(screenShape() * 10), todo.map(r => [r.id, r.data.parent || '', Math.round(hOf(r.id)), sc(r.id)]), frames.map(f => f.id), tiesAmong(new Set([...frames, ...todo].map(r => r.id))),
       [...frames, ...todo].flatMap(r => (r.data.links || []).filter(l => l.label).map(l => r.id + l.to + l.label.length + (l.dir || '')))]);
-    if (autoCache?.sig !== sig) autoCache = { sig, out: tidyAll(todo) };
+    if (autoCache?.sig !== sig) autoCache = { sig, out: tidyAll(todo, 250) };
     return new Map([...autoCache.out].map(([id, p]) => [id, { ...p }]));
   }
 
@@ -856,6 +1039,13 @@ export function createBoard(host, api) {
     const order = list.map((_, i) => i).filter(i => list[i].label || list[i].knot).sort((a, b) => polyLen(lines[a]) - polyLen(lines[b]));
     for (const i of order) list[i].at = labelSpot(list[i].s, list[i].label, placed, blocks, lines.filter((_, k) => k !== i), !list[i].label);
     return list;
+  }
+  // Every string's label as it's drawn: off arrowheads too, so a short string's arrow isn't hidden
+  // under its label. (The autorouter works its branches out from the same spots: see computeRoutes.)
+  function labelsAsDrawn(items) {
+    const blocks = labelBlocks();
+    for (const it of items) blocks.push(...headZones(it.s, dirOf(it.l), look()));
+    return placeLabels(items, blocks);
   }
 
   // ---------- Which way a string points (0.7.7) ----------
@@ -1346,13 +1536,13 @@ export function createBoard(host, api) {
     const jobs = [];
     for (const r of [...frames, ...cards]) for (const l of r.data.links || []) {
       const A = rectOf(r.id), B = rectOf(l.to);
-      if (A && B && r.id !== l.to) jobs.push({ k: `${r.id}|${l.to}`, from: r.id, to: l.to, A, B, via: viaOf(l), label: l.label || '' });
+      if (A && B && r.id !== l.to) jobs.push({ k: `${r.id}|${l.to}`, from: r.id, to: l.to, A, B, l, via: viaOf(l), label: l.label || '', also: (l.also || []).filter(c => c !== r.id && c !== l.to && rectOf(c)) });
     }
     return jobs;
   }
   function routeSig(jobs) {
     const R = b => [Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h)];
-    return look() + JSON.stringify([jobs.map(j => [j.k, R(j.A), R(j.B), j.via || 0, j.label.length]), obstacles.map(o => [o.id, ...R(o)]), (frameBoxes || []).map(o => [o.id, ...R(o)]), api.ownWire?.() || 0]);
+    return look() + JSON.stringify([jobs.map(j => [j.k, R(j.A), R(j.B), j.via || 0, j.label.length, j.also.join(','), j.l.dir || '']), obstacles.map(o => [o.id, ...R(o)]), (frameBoxes || []).map(o => [o.id, ...R(o)]), api.ownWire?.() || 0]);
   }
   function computeRoutes(jobs) {
     const map = new Map(), G = routingGrid();
@@ -1385,6 +1575,34 @@ export function createBoard(host, api) {
       G.markLabel(j.at, -1); markRoute(G, map.get(j.k)?.pts, -1);   // (not its own label, or itself)
       const s = one(j); map.set(j.k, s);
       markRoute(G, s?.pts, 1); G.markLabel(j.at, 1);
+    }
+    // (0.7.8) Branches, routed too: from where the label (or knot) is drawn, to each of the other
+    // cards, round the cards and across as few strings as they can, like the strings themselves.
+    // (kept with that spot: if the label's drawn somewhere else, the branch is drawn the quick way)
+    if (jobs.some(j => j.also.length)) {
+      for (const j of jobs) G.markLabel(j.at, -1);
+      const items = labelsAsDrawn(jobs.filter(j => map.get(j.k)).map(j => ({ j, l: j.l, s: map.get(j.k), label: j.label, knot: !j.label && j.also.length > 0 })));
+      for (const it of items) G.markLabel(it.at, 1);
+      for (const { j, s, at } of items) {
+        if (!j.also.length) continue;
+        const J = at || s.mid, P = { x: J.x, y: J.y, w: 0, h: 0 }, ck = j.from + '>' + j.to;
+        const sJ = secOf(P);
+        G.markLabel(at, -1);
+        for (const c of j.also) {
+          const C = rectOf(c), seed = ck + '+' + c;
+          if (!C) continue;
+          const ic = G.obsIndex.get(c) || 0, sc = G.secIndex.get(c) || secOf(C);
+          let b = shape(P, C, seed, ck);
+          if (b?.pts && !holds(C, P) && pathPenalty(G, b.pts, 0, ic, sJ, sc) >= 8) {
+            const r = autoroute(G, P, C, 0, ic, sJ, sc, gap);
+            if (r) b = alongPts(r.pts, seed, ck);
+          }
+          if (!b) continue;
+          map.set(j.k + '+' + c, { s: b, J: { x: J.x, y: J.y } });
+          markRoute(G, b.pts, 1);
+        }
+        G.markLabel(at, 1);
+      }
     }
     return map;
   }
@@ -1427,10 +1645,7 @@ export function createBoard(host, api) {
       const branches = (l.also || []).filter(c => on.has(c) && c !== r.id && c !== l.to);
       items.push({ r, l, id, via, s, label: l.label, knot: !l.label && (branches.length > 0 || tieFrom === 'L:' + id), branches });
     }
-    // (labels keep off arrowheads too, so a short string's arrow isn't hidden under its label)
-    const blocks = labelBlocks();
-    for (const it of items) blocks.push(...headZones(it.s, dirOf(it.l), L));
-    placeLabels(items, blocks);
+    labelsAsDrawn(items);
     for (const { r, l, id, via, s, at, branches } of items) {
       const J = at || s.mid;
       junctions.set(id, J);
@@ -1441,7 +1656,8 @@ export function createBoard(host, api) {
       // Branches: more cards joined to this string where its label is, like a T junction.
       const box = at ? { x: J.x - at.w / 2 - 2, y: J.y - at.h / 2 - 2, w: at.w + 4, h: at.h + 4 } : null;
       for (const c of branches) {
-        const b = branchWire(J, c, r.id + '>' + l.to);
+        const rb = routeMap?.get(r.id + '|' + l.to + '+' + c);   // (0.7.8: routed from this same spot)
+        const b = rb && Math.abs(rb.J.x - J.x) < 0.5 && Math.abs(rb.J.y - J.y) < 0.5 ? { ...rb.s } : branchWire(J, c, r.id + '>' + l.to);
         if (!b) continue;
         html += `<path class="wire hit" data-branch="${id}|${esc(c)}" d="${b.d}"/><g class="branch">${dir ? withArrows(b, dir, L, box ? outOf(b.line || b.pts || [], box) + 2 : 0) : b.html}</g>`;
       }
@@ -2347,6 +2563,7 @@ export function createBoard(host, api) {
         : [
           { label: 'Tidy everything (sections and cards)', fn: () => tidy('all') },
           ...(frames.length ? [{ label: 'Tidy inside sections (sections stay put)', fn: () => tidy('inside') }] : []),
+          { label: 'Tidy strings only (cards stay put)', fn: () => tidyStrings() },
         ], true);
     }
     else if (a === 'add') {
@@ -2426,6 +2643,36 @@ export function createBoard(host, api) {
       for (const [id, links] of shapedBefore) await api.store.update(id, { links });
       if (mode !== 'inside' && banner?.banner) await api.store.update(key, { cork: banner });
     });
+  }
+
+  // (0.7.8) Tidy strings: the cards stay put and every string is routed again by the autorouter,
+  // including the ones shaped by hand (which lose their shape on this board; Undo puts it back).
+  // Strings nobody's shaped are routed like this all the time anyway, whenever something moves.
+  async function tidyStrings() {
+    if (busy) return;
+    const before = new Map();
+    for (const r of [...frames, ...cards]) if ((r.data.links || []).some(viaOf)) before.set(r.id, r.data.links);
+    let n = 0;
+    busy = true;
+    try {
+      for (const [id, ls] of before) {
+        const next = ls.map(l => {
+          if (!viaOf(l)) return l;
+          n++;
+          const via = { ...l.via };
+          delete via[key];
+          const m = { ...l, via };
+          if (!Object.keys(via).length) delete m.via;
+          return m;
+        });
+        await api.store.update(id, { links: next });
+      }
+    } finally { busy = false; }
+    selString = null; pop.hidden = true; pendingRender = false;
+    routeCache = null; routeNow = true;
+    try { render(); } finally { routeNow = false; }
+    if (n) api.toast(`Strings tidied: ${n === 1 ? 'the one' : `the ${n}`} you'd shaped went back to the autorouter.`, 'Undo', async () => { for (const [id, links] of before) await api.store.update(id, { links }); });
+    else api.toast('Strings tidied. (They route themselves round the cards whenever something moves.)');
   }
 
   // ---------- The board as a picture (for export and print) ----------
@@ -2577,6 +2824,7 @@ export function createBoard(host, api) {
     redrawStrings: drawLines,
     routeStrings: () => { routeCache = null; routeNow = true; try { drawLines(); } finally { routeNow = false; } },
     shownStrings: () => shown,
+    routedBranches: () => [...(routeMap || new Map())].filter(([k]) => k.includes('+')).map(([k, v]) => ({ k, d: v.s.d })),
     get key() { return key; },
   };
 }
