@@ -14,8 +14,9 @@ import { openSheet, sheetRows, cleanSheet } from './sheet.js';
 import { linkService } from './attach.js';
 import * as ex from './export.js';
 import * as theme from './theme.js';
+import * as pv from './preview.js';
 
-const VERSION = '0.7.8';
+const VERSION = '0.7.9';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -341,6 +342,7 @@ const boardApi = {
   newItem: (type, parent, extra) => newItem(type, parent ?? null, extra),
   placePicker: (key, exclude, onPick) => pickItem({ title: 'Bring onto this board', exclude: new Set(exclude), only: r => r.data.type !== 'section', onPick }),
   style: () => theme.current(store).look,
+  tidyMove: () => theme.current(store).tidyMove === 'move',
   ownWire: () => !!theme.current(store).string,   // your own string colour (instead of the look's)
   pickClip: c => clipModal(c),
   draw: (d, title) => openDrawing({ drawing: d, title }),
@@ -348,6 +350,8 @@ const boardApi = {
   sheet: (s, title) => openSheet({ sheet: s, title, saveFile: deliver }),
   pickLink: l => linkModal(l),
   openDoc: d => openDoc(d),
+  addDoc: file => addDocWithPreview(file),
+  docPreview: d => docPreviewUrl(d),
 };
 
 function renderNav() {
@@ -752,9 +756,11 @@ function buildDetail(host, r) {
     videoInfo: id => store.videoInfo(id),
     onSheet: sh => openSheet({ sheet: sh, title: (I.byId.get(r.id) && titleOf(I.byId.get(r.id))) || 'Spreadsheet', saveFile: deliver }),
     onLink: l => linkModal(l),
-    addDoc: file => store.addDoc(file),
+    addDoc: file => addDocWithPreview(file),
     openDoc: d => openDoc(d),
     saveDoc: d => saveDoc(d),
+    previewDoc: d => previewOptions(d),
+    canPreview: d => !!pv.previewKind(d),
   });
   editor.setHTML(r.data.body || '');
   // Brand new: straight into naming it (a placeholder name like "New section" is selected, ready to type over).
@@ -1557,6 +1563,8 @@ async function settingsModal() {
       <div class="lookpick">${Object.entries(theme.LOOKS).map(([id, l]) => `
         <button data-pick-look="${id}" class="${p.look === id ? 'on' : ''}">${lookPreview(id)}<span>${l.name}</span></button>`).join('')}</div>
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
+      <div class="setrow"><span>Card only strung outside its section</span>${seg('tidyMove', { ask: 'Tidy suggests moving it', move: 'Tidy moves it' })}</div>
+      <p class="hint">When a card’s strings all go to things outside its section, Tidy tries it out of the section (or in the one its strings go to). If the board comes out tidier, it suggests the move, or just makes it if you choose that (Undo puts it back).</p>
       <h3>Claude</h3>
       <p class="hint">Connect Claude, and in any Claude chat you can say “block this out in Brain Tree”: it makes the project here, with its sections, to-dos, notes and strings, and links back to the chat. It can also add to projects and tick things off. It uses your Claude plan; nothing to pay here.</p>
       <div class="kv"><span>Claude</span><b class="claudestate">${store.signedIn() ? 'Checking…' : 'Sign in to Brain Tree first'}</b></div>
@@ -1687,7 +1695,7 @@ async function showExample() {
   const already = I.live.find(r => r.data.type === 'project' && r.data.title === EXAMPLE_TITLE);
   if (already && !confirm('There’s already an example project. Add another one?')) { go({ project: already.id, view: null, item: null }); return; }
   search = ''; $('#search').value = '';
-  const id = await addExample(store, { makeLock });
+  const id = await addExample(store, { makeLock, makePreview: (file, d) => makePreviewPhoto(file, d).catch(() => null) });
   go({ project: id, view: null, item: null });
   toast('Example project added. Open its board from the top of the list.');
 }
@@ -1726,6 +1734,132 @@ async function saveDoc(d) {
   const blob = await store.docBlob(d);
   if (!blob) { toast('That file isn’t on this device yet, and there’s no signal to fetch it.'); return; }
   deliver(blob, d.name);
+}
+
+// ---------- (0.7.9) Files as pictures on the board (see preview.js) ----------
+
+// A file's picture, kept like a photo (so it syncs, and other devices just show it): {pv, pva}.
+// src: the file, or one already open (from openDocument).
+async function makePreviewPhoto(src, d, opts = {}) {
+  const r = src?.render ? await pv.previewFrom(src, opts) : await pv.previewBlob(src, d, opts);
+  if (!r) return null;
+  return { pv: await store.addPhoto(r.blob), pva: r.aspect };
+}
+// A file kept, with its picture made straight away (if it's a kind that has one, and it doesn't
+// take too long: it's still added if not, and the board makes one later).
+async function addDocWithPreview(file) {
+  const d = await store.addDoc(file);
+  if (pv.previewKind(d)) {
+    const p = await Promise.race([makePreviewPhoto(file, d).catch(() => null), new Promise(r => setTimeout(() => r(null), 12000))]);
+    if (p) Object.assign(d, p);
+  }
+  return d;
+}
+// For a file with no picture of its own yet (added before there were pictures): one made on this
+// device and kept here. One at a time, so a board full of files doesn't stall. A file that isn't
+// on this device is fetched for it, unless it's big. Resolves with an address for it, or null.
+const pvMade = new Map();
+let pvQueue = Promise.resolve();
+function docPreviewUrl(d) {
+  if (!pv.previewKind(d)) return Promise.resolve(null);
+  const k = [d.id, d.page || 1, d.crop || ''].join('|');
+  if (!pvMade.has(k)) {
+    const job = (async () => {
+      const hit = await store.previewGet(k);
+      if (hit) return URL.createObjectURL(hit);
+      const made = pvQueue.then(async () => {
+        if (!(await store.hasDoc(d.id)) && (d.size > 15 * 1048576 || !navigator.onLine)) return null;
+        const blob = await store.docBlob(d);
+        const r = blob && await pv.previewBlob(blob, d, { page: d.page, crop: d.crop });
+        if (!r) return null;
+        await store.previewPut(k, r.blob);
+        return URL.createObjectURL(r.blob);
+      });
+      pvQueue = made.catch(() => null);
+      return made;
+    })().catch(() => null);
+    pvMade.set(k, job);
+    job.then(u => { if (!u) setTimeout(() => pvMade.delete(k), 60_000); });   // (try again in a while: it may have been offline)
+  }
+  return pvMade.get(k);
+}
+
+// How a file shows on the board: which page, just part of it (drag across it), or only its tile.
+// Resolves with its new attributes for the note ({pv, pva, page, crop} or {pv: 'off'}), or null.
+async function previewOptions(d) {
+  const blob = await store.docBlob(d);
+  if (!blob) { toast('That file isn’t on this device yet, and there’s no signal to fetch it.'); return null; }
+  let doc = null;
+  try { doc = await pv.openDocument(blob, d); } catch (e) { doc = null; }
+  if (!doc) { toast(navigator.onLine ? 'Brain Tree can’t make a picture of that file, so it shows as a tile.' : 'You’re offline, and showing that kind of file needs a quick download the first time.'); return null; }
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = v => { if (!settled) { settled = true; doc.close(); resolve(v); } };
+    let page = Math.min(Math.max(1, d.page || 1), doc.pages), crop = pv.parseCrop(d.crop), shown = 0;
+    modal(`
+      <h2>How it shows on the board</h2>
+      <p class="hint">Drag across it to pin up just that part${doc.pages > 1 ? ', and use the arrows to pick the page' : ''}. Tap it to go back to all of it.</p>
+      <div class="pvpage"><canvas></canvas><i class="pvcrop" hidden></i></div>
+      ${doc.pages > 1 ? '<div class="pvnav"><button data-pv="prev" aria-label="Page before">‹</button><span class="pvn"></span><button data-pv="next" aria-label="Next page">›</button></div>' : ''}
+      <p class="cerr" role="alert"></p>
+      <div class="mbtns"><button data-pv="tile">Just its tile</button><span class="grow"></span><button data-close>Cancel</button><button class="primary" data-pv="ok">Pin it up</button></div>`, el => {
+      const box = el.querySelector('.pvpage'), cv = box.querySelector('canvas'), cr = box.querySelector('.pvcrop'), err = el.querySelector('.cerr');
+      const showCrop = () => {
+        cr.hidden = !crop;
+        if (crop) Object.assign(cr.style, { left: crop.x * 100 + '%', top: crop.y * 100 + '%', width: crop.w * 100 + '%', height: crop.h * 100 + '%' });
+      };
+      const draw = async () => {
+        const n = ++shown, w = Math.min(1600, Math.round(Math.max(280, el.clientWidth - 40) * (devicePixelRatio || 1)));
+        try {
+          const c = await doc.render(page, w);
+          if (n !== shown) return;
+          cv.width = c.width; cv.height = c.height;
+          cv.getContext('2d').drawImage(c, 0, 0);
+        } catch (e) { err.textContent = 'That page couldn’t be shown.'; }
+        const pn = el.querySelector('.pvn');
+        if (pn) pn.textContent = `Page ${page} of ${doc.pages}`;
+      };
+      draw(); showCrop();
+      // Drag across the page for a snippet; drag the snippet to move it; a tap clears it.
+      let drag = null;
+      const at = e => { const r = cv.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }; };
+      box.addEventListener('pointerdown', e => {
+        const p = at(e);
+        try { box.setPointerCapture(e.pointerId); } catch (err) {}
+        drag = crop && p.x > crop.x && p.x < crop.x + crop.w && p.y > crop.y && p.y < crop.y + crop.h ? { move: true, p, c: { ...crop }, moved: false } : { move: false, p, moved: false };
+      });
+      box.addEventListener('pointermove', e => {
+        if (!drag) return;
+        const p = at(e), dx = p.x - drag.p.x, dy = p.y - drag.p.y;
+        if (Math.abs(dx) + Math.abs(dy) > 0.01) drag.moved = true;
+        if (!drag.moved) return;
+        if (drag.move) crop = { ...drag.c, x: Math.min(1 - drag.c.w, Math.max(0, drag.c.x + dx)), y: Math.min(1 - drag.c.h, Math.max(0, drag.c.y + dy)) };
+        else crop = { x: Math.min(p.x, drag.p.x), y: Math.min(p.y, drag.p.y), w: Math.abs(dx), h: Math.abs(dy) };
+        showCrop();
+      });
+      const end = () => {
+        if (!drag) return;
+        if (!drag.moved || (crop && (crop.w < 0.04 || crop.h < 0.03))) crop = null;
+        drag = null; showCrop();
+      };
+      box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+      el.addEventListener('click', async e => {
+        const b = e.target.closest('[data-pv]');
+        if (!b) return;
+        const a = b.dataset.pv;
+        if (a === 'prev' || a === 'next') { page = Math.min(doc.pages, Math.max(1, page + (a === 'next' ? 1 : -1))); draw(); return; }
+        if (a === 'tile') { finish({ pv: 'off' }); closeModal(); return; }
+        b.disabled = true; b.textContent = 'Pinning…';
+        try {
+          const p = await makePreviewPhoto(doc, d, { page, crop: pv.cropStr(crop) });
+          if (!p) throw new Error('no picture');
+          finish({ ...p, page: page > 1 ? page : undefined, crop: crop ? pv.cropStr(crop) : undefined });
+          closeModal();
+        } catch (e2) { b.disabled = false; b.textContent = 'Pin it up'; err.textContent = 'That couldn’t be made into a picture. Try again, or use just its tile.'; }
+      });
+    }, 'pvsheet');
+    onModalClose = () => finish(null);
+  });
 }
 
 // A link to a document or page: its address and (optionally) a name. Resolves with {url, title},

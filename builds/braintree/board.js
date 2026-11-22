@@ -21,7 +21,8 @@ import { sanitize, escHtml as esc } from './editor.js';
 import { clipOf, clipFaceHTML, iframeHTML, clipDivHTML } from './media.js';
 import { cleanDrawing, drawingSVG, drawDivHTML, drawingBox, moveDrawing, openDrawing } from './draw.js';
 import { cleanSheet, sheetTableHTML, sheetDivHTML } from './sheet.js';
-import { docInfo, linkInfo, docTileHTML, linkTileHTML, docDivHTML, linkDivHTML } from './attach.js';
+import { docInfo, linkInfo, docTileHTML, linkTileHTML, docDivHTML, linkDivHTML, fileKind } from './attach.js';
+import { previewKind, KIND_ASPECT } from './preview.js';
 
 const CARD_W = 220, GAP = 28, PAD = 24, HEAD = 46;
 const SECTION_W = 2 * PAD + 2 * CARD_W + GAP, SECTION_H = 320;
@@ -91,7 +92,8 @@ export function createBoard(host, api) {
     </div>
     <div class="stringpop" hidden><input placeholder="Label (optional)" maxlength="40"><button data-s="save">Save</button><button data-s="branch" title="Join another card to this string">Branch</button><button data-s="auto" title="Let the autorouter find its way again" hidden>Auto</button><button data-s="remove" class="danger">Remove</button><button data-s="dir" class="dirbtn" title="Tap to change which way it points"></button><p class="pophint">Drag the string or its dots to reshape it. Double-tap a big dot to take that turn out.</p></div>
     <div class="boardmenu" hidden></div>
-    <p class="boardhint" hidden></p>`;
+    <p class="boardhint" hidden></p>
+    <div class="tidytip" hidden></div>`;
   const cork = host.querySelector('.cork');
   const world = host.querySelector('.world');
   const lines = host.querySelector('.strings .lines');
@@ -261,7 +263,9 @@ export function createBoard(host, api) {
   // It starts from the flow order, then tries swapping sections, swapping cards within sections
   // and making sections narrower or wider, keeping each change that scores tidier. (0.7.8: scored
   // with strings where they're really drawn, from a few starts; then, on looks that route, with the
-  // strings routed by the autorouter, like a circuit board's autoplacer: see routedUntidiness.)
+  // strings routed by the autorouter, like a circuit board's autoplacer: see routedUntidiness. 0.7.9:
+  // tried packed tight as well as in neat rows, see place and gridOf; and a card strung only to things
+  // outside its section is tried out of it, and the move suggested: see strandedCards.)
   //   tidyAll(todo):  everything laid out from scratch (Tidy everything, and a board nothing's been placed on)
   //   tidyInside():   sections stay where they are; the cards in each are rearranged
 
@@ -428,7 +432,7 @@ export function createBoard(host, api) {
   // Cards in reading order: left to right, then the next row down. (0.7.7: where a labelled string
   // joins two cards side by side, the gap between those columns is wide enough for its label, up to
   // a point; one above the other, the gap between those rows is.)
-  function gridOf(list, cols) {
+  function gridOf(list, cols, stack = true) {
     const colW = Math.max(CARD_W, ...list.map(r => cw(r.id)));
     const rows = [];
     for (let i = 0; i < list.length; i += cols) rows.push(list.slice(i, i + cols));
@@ -438,15 +442,22 @@ export function createBoard(host, api) {
       if (right) { const w = roomBetween(r.id, right.id); if (w) colGap[j] = Math.max(colGap[j], Math.min(200, w + 30)); }
       if (below && roomBetween(r.id, below.id)) rowGap[i] = Math.max(rowGap[i], pointsBetween(r.id, below.id) ? 72 : 50);
     }));
-    const place = new Map();
-    let y = 0, w = 0;
+    // (0.7.9, stack) Each column stacks its own cards, so a short card doesn't leave a gap under it
+    // the height of the tallest card in its row. (The gap above a card is the one its row would have.)
+    const place = new Map(), colY = new Array(cols).fill(0);
+    let w = 0;
     rows.forEach((row, i) => {
-      let x = 0, rh = 0;
-      row.forEach((r, j) => { place.set(r.id, { x, y }); rh = Math.max(rh, hOf(r.id)); x += colW + (colGap[j] ?? 0); });
+      let x = 0;
+      const top = i ? Math.max(...colY) : 0;
+      row.forEach((r, j) => {
+        const y = !i ? 0 : (stack ? colY[j] : top) + (rowGap[i - 1] ?? GAP);
+        place.set(r.id, { x, y });
+        colY[j] = y + hOf(r.id);
+        x += colW + (colGap[j] ?? 0);
+      });
       w = Math.max(w, x - (colGap[row.length - 1] ?? 0));
-      y += rh + (rowGap[i] ?? 0);
     });
-    return { place, w, h: y };
+    return { place, w, h: Math.max(0, ...colY) };
   }
 
   // Things in the order they flow: each after what feeds into it (where strings go round in a
@@ -468,7 +479,11 @@ export function createBoard(host, api) {
     return out;
   }
 
-  function tidyAll(todo, budget = 400) {
+  // (0.7.9) par: cards to lay out as if they were somewhere else (id -> a section's id, or the
+  // project's for not in a section), so Tidy can see how the board would look with them moved.
+  // How tidy the layout it settles on is (lower is tidier) is left in tidyScore.
+  let tidyScore = 0;
+  function tidyAll(todo, budget = 400, par = null) {
     measureLabelRoom();
     const A = screenShape(), tall = A < 0.9, maxCols = tall ? 2 : 3;
     const ids = new Set([...frames, ...todo].map(r => r.id));
@@ -477,7 +492,8 @@ export function createBoard(host, api) {
     for (const [a, b] of ties) wt.set(a + '>' + b, (wt.get(a + '>' + b) || 0) + 1);
     const w = (a, b) => wt.get(a + '>' + b) || 0;
     const cardFlow = list => flowOrder([...list].sort(byOrder), (a, b) => w(a.id, b.id));
-    const parentOf = id => todo.find(c => c.id === id)?.data.parent;
+    const P = c => (par?.has(c.id) ? par.get(c.id) : c.data.parent);
+    const parentOf = id => { const c = todo.find(c => c.id === id); return c && P(c); };
     const inSection = id => frameIds.has(id) || frameIds.has(parentOf(id));
 
     // The blocks to place: each section with its cards; loose cards strung into a section, one by
@@ -485,10 +501,10 @@ export function createBoard(host, api) {
     // rest in one block at the end.
     const units = [];
     for (const s of [...frames].sort((a, b) => (a.data.order || 0) - (b.data.order || 0))) {   // (in their list order)
-      const kids = cardFlow(todo.filter(c => c.data.parent === s.id));
+      const kids = cardFlow(todo.filter(c => P(c) === s.id));
       units.push({ frame: s, members: kids, cols: Math.min(maxCols, Math.max(1, Math.ceil(Math.sqrt(kids.length)))) });
     }
-    const loose = todo.filter(c => !frameIds.has(c.data.parent)).sort(byOrder);
+    const loose = todo.filter(c => !frameIds.has(P(c))).sort(byOrder);
     const linked = id => ties.filter(([a, b]) => a === id || b === id).map(([a, b]) => (a === id ? b : a));
     for (const c of loose.filter(c => linked(c.id).some(inSection))) units.push({ members: [c], cols: 1 });
     const rest = loose.filter(c => !linked(c.id).some(inSection)), seen = new Set(), single = [];
@@ -506,8 +522,9 @@ export function createBoard(host, api) {
     }
     if (single.length) units.push({ members: single, cols: Math.min(tall ? 2 : 4, Math.max(1, Math.ceil(Math.sqrt(single.length)))), last: true });
 
+    let tight = false;   // (0.7.9: see place)
     const build = u => {
-      const g = gridOf(u.members, u.cols);
+      const g = gridOf(u.members, u.cols, tight);
       if (u.frame) {
         u.w = Math.max(320, g.w + 2 * PAD); u.h = Math.max(220, HEAD + PAD + g.h + PAD);
         u.place = new Map([[u.frame.id, { x: 0, y: 0, w: u.w, h: u.h }]]);
@@ -522,17 +539,25 @@ export function createBoard(host, api) {
     const lastU = units.find(u => u.last);
     if (lastU) order.push(lastU);
 
-    // Rows to read along, as wide as suits the screen.
+    // Rows to read along, as wide as suits the screen. (0.7.9, tight: each block goes as high as the
+    // blocks above it allow, like a skyline, rather than every row starting under the tallest block
+    // of the row before, so a block under a short one tucks up instead of leaving a gap; and the cards
+    // in each section stack by column, see gridOf. It's tried both ways, tight and in neat rows, and
+    // whichever comes out tidier on this screen is kept: tight usually wins on a phone.)
     const area = units.reduce((t, u) => t + (u.w + TG) * (u.h + TG), 0);
     const widest = Math.max(...units.map(u => u.w));
     let rowW = Math.max(widest, Math.sqrt(area * A));
     const place = () => {
-      const pos = new Map();
-      let x = 0, y = 0, rowH = 0;
+      const pos = new Map(), sky = [];
+      let x = 0, rowY = 0, rowB = 0;
       for (const u of order) {
-        if (x > 0 && x + u.w > rowW) { x = 0; y += rowH + TG; rowH = 0; }
+        if (x > 0 && x + u.w > rowW) { x = 0; rowY = rowB + TG; }
+        let y = 0;
+        if (!tight) { y = rowY; rowB = Math.max(rowB, y + u.h); }
+        else for (const s of sky) if (s.x0 < x + u.w + TG / 2 && s.x1 > x - TG / 2) y = Math.max(y, s.y + TG);
         for (const [id, p] of u.place) pos.set(id, { ...p, x: x + p.x, y: y + p.y });
-        x += u.w + TG; rowH = Math.max(rowH, u.h);
+        sky.push({ x0: x, x1: x + u.w, y: y + u.h });
+        x += u.w + TG;
       }
       return pos;
     };
@@ -574,15 +599,16 @@ export function createBoard(host, api) {
     // (0.7.8) Swapping one thing at a time can get stuck in a layout that's only tidier than its
     // neighbours, so it goes a few ways and keeps the tidiest it finds: the rough way first and then
     // finished the drawn way, and the drawn way from scratch at a few row widths.
-    const snap = () => ({ order: [...order], members: units.map(u => [...u.members]), cols: units.map(u => u.cols), rowW, score: best });
-    const restore = s => { order.splice(0, order.length, ...s.order); units.forEach((u, i) => { u.members = [...s.members[i]]; u.cols = s.cols[i]; build(u); }); rowW = s.rowW; best = s.score; };
+    // (0.7.9: and each of those packed tight and in neat rows.)
+    const snap = () => ({ order: [...order], members: units.map(u => [...u.members]), cols: units.map(u => u.cols), rowW, tight, score: best });
+    const restore = s => { tight = s.tight; order.splice(0, order.length, ...s.order); units.forEach((u, i) => { u.members = [...s.members[i]]; u.cols = s.cols[i]; build(u); }); rowW = s.rowW; best = s.score; };
     const start = snap(), base = rowW, found = [];
-    for (const [k, r] of [[1, true], [1, false], [0.75, false], [1.4, false]]) {
-      restore(start);
+    for (const t of [false, true]) for (const [k, r] of [[1, true], [1, false], [0.75, false], [1.4, false]]) {
+      restore({ ...start, tight: t });
       rowW = Math.max(widest, base * k);
       rough = r; best = score();
-      tryWidths(); improve(performance.now() + 120); tryWidths();
-      if (rough) { rough = false; best = score(); improve(performance.now() + 120); tryWidths(); }
+      tryWidths(); improve(performance.now() + 100); tryWidths();
+      if (rough) { rough = false; best = score(); improve(performance.now() + 100); tryWidths(); }
       found.push(snap());
     }
     found.sort((a, b) => a.score - b.score);
@@ -591,21 +617,26 @@ export function createBoard(host, api) {
     // layouts nudged (cards swapped, sections narrower or wider, sections swapped) while that's
     // tidier, and the tidiest kept. (So a layout that suits the screen gets the chance to lose its
     // crossings, rather than one that doesn't winning because it has none.)
-    const same = (s, t) => s.rowW === t.rowW && s.order.every((u, i) => u === t.order[i]) && s.cols.every((c, i) => c === t.cols[i]) && s.members.every((m, i) => m.every((c, j) => c === t.members[i][j]));
-    const tries = found.filter((s, i) => !found.slice(0, i).some(t => same(s, t)));
+    const same = (s, t) => s.rowW === t.rowW && s.tight === t.tight && s.order.every((u, i) => u === t.order[i]) && s.cols.every((c, i) => c === t.cols[i]) && s.members.every((m, i) => m.every((c, j) => c === t.members[i][j]));
+    let tries = found.filter((s, i) => !found.slice(0, i).some(t => same(s, t)));
     let bestR = routedUntidiness(place(), strs, A);
+    tidyScore = bestR ?? best;
     if (bestR != null && budget > 0) {
+      // (0.7.9: all of them routed as they are, and the best three nudged, so each gets time enough)
+      for (const s of tries) { restore(s); s.routed = routedUntidiness(place(), strs, A); }
+      tries = tries.sort((a, b) => a.routed - b.routed).slice(0, 3);
       const t0 = performance.now();
       let top = null;
       tries.forEach((s, n) => {
         restore(s);
-        bestR = routedUntidiness(place(), strs, A);
+        bestR = s.routed;
         nudge(t0 + budget * (n + 1) / tries.length);
         const r = snap();
         r.routed = bestR;
         if (!top || r.routed < top.routed) top = r;
       });
       restore(top);
+      tidyScore = top.routed;
     }
     return place();
     function nudge(until) {
@@ -651,8 +682,9 @@ export function createBoard(host, api) {
       const colW = Math.max(CARD_W, ...kids.map(r => cw(r.id)));
       secs.push({ s, f, kids, cols: Math.max(1, Math.min(kids.length || 1, Math.floor((f.w - 2 * PAD + GAP) / (colW + GAP)))) });
     }
+    let stack = true;   // (0.7.9: cards stacked by column, or in neat rows if that's tidier, at the end)
     const apply = sec => {
-      const g = gridOf(sec.kids, sec.cols);
+      const g = gridOf(sec.kids, sec.cols, stack);
       for (const [id, p] of g.place) pos.set(id, { x: sec.f.x + PAD + p.x, y: sec.f.y + HEAD + PAD + p.y });
       sec.f.w = Math.max(320, g.w + 2 * PAD, sec.w0 ?? (sec.w0 = sec.f.w));
       sec.f.h = Math.max(220, HEAD + PAD + g.h + PAD);
@@ -698,6 +730,12 @@ export function createBoard(host, api) {
         if (!better) break;
       }
     }
+    {
+      const now = bestR ?? untidiness(pos, strs, A);
+      stack = false; secs.forEach(apply);
+      const rows = routedUntidiness(pos, strs, A) ?? untidiness(pos, strs, A);
+      if (rows >= now - 1) { stack = true; secs.forEach(apply); }
+    }
     const out = new Map();
     for (const sec of secs) { out.set(sec.s.id, pos.get(sec.s.id)); for (const k of sec.kids) out.set(k.id, pos.get(k.id)); }
     return out;
@@ -742,6 +780,12 @@ export function createBoard(host, api) {
     for (const el of cardsEl.children) placeEl(el);
     placeMedia();
     for (const img of cardsEl.querySelectorAll('img[data-thumb]')) api.store.fileUrl(img.dataset.thumb).then(u => { if (u) img.src = u; else img.remove(); });
+    // (0.7.9) files with no picture of their own yet: made on this device (see app.js docPreviewUrl)
+    for (const img of cardsEl.querySelectorAll('img[data-docpv]')) {
+      const cid = img.closest('[data-card]')?.dataset.card;
+      const d = cid && cardBody(api.store.get(cid)?.data.body).docs.find(x => x.id === img.dataset.docpv);
+      if (d && api.docPreview) api.docPreview(d).then(u => { if (u) img.src = u; else img.remove(); }); else img.remove();
+    }
     const hasLinks = [...cards, ...frames].some(r => (r.data.links || []).length);
     const tieBtn = host.querySelector('[data-b=tie]');
     tieBtn.textContent = words().btn;
@@ -787,7 +831,7 @@ export function createBoard(host, api) {
     }
     // A locked project shows only its name until it's unlocked (its notes are part of what's hidden).
     const locked = type === 'project' && !!api.locked?.(r);
-    const { html: body, media, more } = locked ? {} : cardBody(d.body);
+    const { html: body, media, more, minis = [] } = locked ? {} : cardBody(d.body);
     const chips = [];
     const prog = type === 'project' && !locked ? api.progress(r.id) : null;
     if (locked) chips.push(`<span class="chip locked"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Locked</span>`);
@@ -806,7 +850,7 @@ export function createBoard(host, api) {
       : media.kind === 'photo' ? `<img class="polaroid" data-thumb="${media.id}" alt="">`
       : media.kind === 'clip' ? `<div class="pclip">${clipFaceHTML(media.clip, { big: true })}</div>`
       : media.kind === 'sheet' ? `<div class="psheet">${sheetTableHTML(media.sheet, { maxRows: 10, maxCols: 6 })}</div>`
-      : media.kind === 'doc' ? `<div class="ptile" data-docopen title="Open the file">${docTileHTML(media.doc)}</div>`
+      : media.kind === 'doc' ? docPicHTML(media.doc)
       : media.kind === 'link' ? `<div class="ptile" data-linkopen title="Open the link">${linkTileHTML(media.link)}</div>`
       : `<div class="pdraw">${drawingSVG(media.d)}</div>`;
     return `
@@ -815,6 +859,7 @@ export function createBoard(host, api) {
         ${pic}
         ${showTitle ? `<div class="ptitle">${type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="Done"></button>` : ''}<span>${esc(api.titleOf(r))}</span></div>` : ''}
         ${body ? `<div class="pbody">${body}</div>` : ''}
+        ${minis.length ? `<div class="pminis">${minis.map(m => `<span class="pmini${m.doc ? ' paper' : ''}">${m.id ? `<img data-thumb="${esc(m.id)}" alt="">` : m.doc.pv ? `<img data-thumb="${esc(m.doc.pv)}" alt="">` : `<img data-docpv="${esc(m.doc.id)}" alt="">`}</span>`).join('')}</div>` : ''}
         ${more ? `<p class="pmore">${esc(more)}</p>` : ''}
         ${kids.length ? kidsHTML(kids) : ''}
         ${prog && prog.total ? `<span class="pbar"><i style="width:${Math.round(100 * prog.done / prog.total)}%"></i></span>` : ''}
@@ -822,6 +867,19 @@ export function createBoard(host, api) {
         ${type === 'project' && !locked ? `<span class="openboard" data-openboard="${r.id}">Open its board ›</span>` : ''}
         <span class="csize" data-csize="${r.id}" title="Drag to make it bigger or smaller"></span>
       </div>`;
+  }
+
+  // (0.7.9) A file pinned up as what it looks like: a PDF's page (or the part of it you picked), a
+  // picture, a video's frame, a spreadsheet's first rows… (see preview.js), with its kind and name on
+  // a label along the bottom. Its picture's shape is known before it loads, so the card doesn't
+  // change size. Just its tile if it's a kind with no picture, or you chose that.
+  function docPicHTML(d) {
+    const kind = previewKind(d);
+    if (d.pv === 'off' || !kind) return `<div class="ptile" data-docopen title="Open the file">${docTileHTML({ ...d, pv: undefined, page: undefined, crop: undefined })}</div>`;
+    const k = fileKind(d.name, d.mime), a = clamp(+d.pva || KIND_ASPECT[kind] || 0.75, 0.62, 2.6);
+    return `<div class="pdoc k-${kind}" data-docopen title="Open the file" style="--pva:${Math.round(a * 1000) / 1000}">
+      <span class="dpage"><img class="docpv" ${d.pv ? `data-thumb="${esc(d.pv)}"` : `data-docpv="${esc(d.id)}"`} alt=""></span>
+      <span class="dlabel"><b style="--k:${k.colour}">${esc(k.label)}</b><span>${esc(d.name)}</span></span></div>`;
   }
 
   // Things inside a card: open to-dos first, a few at most.
@@ -1845,7 +1903,8 @@ export function createBoard(host, api) {
     }
     // (anything but that string lets go of it)
     if (selString && e.target.closest('[data-link]')?.dataset.link !== selString) { selString = null; drawLines(); }
-    if (e.target.closest('[data-tick], [data-ci], [data-openboard], [data-play], [data-big], [data-mclose], [data-mbig], [data-docopen], [data-linkopen]')) return;   // their own tap
+    if (e.target.closest('[data-tick], [data-ci], [data-openboard], [data-play], [data-big], [data-mclose], [data-mbig], .ptile[data-docopen], [data-linkopen]')) return;   // their own tap
+    // (0.7.9: a file's picture drags its card like a photo does; a tap on it opens the file, see end)
     const link = e.target.closest('[data-link], [data-branch]');
     // A string's label (or the knot where its branches meet): tap to edit, drag onto a card to branch.
     const knot = !!link?.matches('.slabel, .junction');
@@ -2003,6 +2062,7 @@ export function createBoard(host, api) {
       else if (up && tying) { if (g.id !== key) await tieTap(g.id); }
       else if (up && g.line) await tapLine(g.line, e.clientX, e.clientY);
       else if (up && isSketch(api.store.get(g.id))) drawOnBoard(g.id);    // a drawing on the board: change it there
+      else if (up && g.down?.closest?.('.pdoc[data-docopen]')) { const m = cardBody(api.store.get(g.id)?.data.body).media; if (m?.doc) api.openDoc(m.doc); else api.open(g.id); }
       else if (up) { const sub = g.down?.closest?.('[data-sub]'); api.open(sub ? sub.dataset.sub : g.id); }
     } else if (g.kind === 'scale') {
       if (g.s != null && g.s !== g.s0) await setScale(g.id, g.s);
@@ -2109,7 +2169,7 @@ export function createBoard(host, api) {
     if (e.target.closest('[data-play]') && card) { startPlay(card); return; }
     if (e.target.closest('[data-big]') && card) { const m = cardBody(api.store.get(card)?.data.body).media; if (m?.clip) { stopPlay(); api.bigVideo(m.clip); } return; }
     if (e.target.closest('[data-mclose]')) { stopPlay(); return; }
-    if (e.target.closest('[data-docopen]') && card) { const m = cardBody(api.store.get(card)?.data.body).media; if (m?.doc) api.openDoc(m.doc); return; }
+    if (e.target.closest('.ptile[data-docopen]') && card) { const m = cardBody(api.store.get(card)?.data.body).media; if (m?.doc) api.openDoc(m.doc); return; }
     if (e.target.closest('[data-linkopen]') && card) { const m = cardBody(api.store.get(card)?.data.body).media; if (m?.link) window.open(m.link.url, '_blank', 'noopener,noreferrer'); return; }
     if (e.target.closest('[data-mbig]') && playing) { const c = playing.clip; stopPlay(); api.bigVideo(c); }
   });
@@ -2525,7 +2585,7 @@ export function createBoard(host, api) {
         try {
           let body, title = file.name.replace(/\.[a-z0-9]{1,5}$/i, '');
           if (/^image\/(jpeg|png|webp|gif)$/.test(file.type)) body = `<p><img data-file="${await api.store.addPhoto(file)}" alt=""></p>`;
-          else body = docDivHTML(await api.store.addDoc(file));
+          else body = docDivHTML(await (api.addDoc || api.store.addDoc)(file));   // (0.7.9: with its picture)
           await api.newItem('note', key, { title, body, cork: { [key]: at } });
           at = { x: at.x + CARD_W + GAP, y: at.y };
         } catch (e) { api.toast(e.message || String(e)); }
@@ -2590,19 +2650,145 @@ export function createBoard(host, api) {
   // (0.7.5) Tidy works the layout out once and saves it (see "Tidy" above). 'all': everything laid
   // out again; cards brought in from elsewhere keep their spots (that's what keeps them here), and
   // so do drawings made on the board (they were drawn where they are). 'inside': sections stay put.
+  const tidyTodo = () => cards.filter(r => !guests.has(r.id) && !(isSketch(r) && Number.isFinite(r.data.cork?.[key]?.x)));
+  // Everything laid out again (par: cards as if somewhere else, see tidyAll), under any cards brought
+  // in from elsewhere.
+  function layoutAll(todo, budget = 400, par = null) {
+    const out = tidyAll(todo, budget, par);
+    let gx = Infinity, gy = -Infinity;
+    for (const r of cards) if (guests.has(r.id)) { const p = pos.get(r.id); if (p) { gx = Math.min(gx, p.x); gy = Math.max(gy, p.y + hOf(r.id)); } }
+    if (gy > -Infinity) for (const p of out.values()) { p.x += gx; p.y += gy + 90; }
+    return out;
+  }
+
   async function tidy(mode) {
     if (busy) return;
-    let out;
+    tipToken++; hideTip();
+    let out, moved = [], base = 0;
     if (mode === 'inside') out = tidyInside();
     else {
-      out = tidyAll(cards.filter(r => !guests.has(r.id) && !(isSketch(r) && Number.isFinite(r.data.cork?.[key]?.x))));
-      // (under the ones brought in from elsewhere, if there are any)
-      let gx = Infinity, gy = -Infinity;
-      for (const r of cards) if (guests.has(r.id)) { const p = pos.get(r.id); if (p) { gx = Math.min(gx, p.x); gy = Math.max(gy, p.y + hOf(r.id)); } }
-      if (gy > -Infinity) for (const p of out.values()) { p.x += gx; p.y += gy + 90; }
+      const todo = tidyTodo();
+      out = layoutAll(todo); base = tidyScore;
+      if (api.tidyMove?.()) ({ out, moved } = moveStranded(todo, out, base));
     }
+    const undo = await applyLayout(out, mode, moved);
+    api.toast(mode === 'inside' ? 'Tidied inside the sections.' : moved.length ? 'Board tidied: ' + movedWords(moved) : 'Board tidied.', 'Undo', undo);
+    if (mode !== 'inside' && !api.tidyMove?.()) suggestLater(base);
+  }
+
+  // (0.7.9) Cards stranded in their section: every string they have goes to something outside it
+  // (a "needed before" to a card in another section, say). Tidy never moves a card out of its
+  // section by itself (sections are headings in the list too), so it tries each such card out of
+  // its section, and in the section its strings go to, and if the board comes out clearly tidier it
+  // suggests that (or, if Settings → Boards say so, just does it).
+  function strandedCards() {
+    const on = new Map([...frames, ...cards].map(r => [r.id, r]));
+    const ends = new Map();
+    const tie = (a, b) => { if (a === b || !on.has(a) || !on.has(b)) return; for (const [x, y] of [[a, b], [b, a]]) { if (!ends.has(x)) ends.set(x, new Set()); ends.get(x).add(y); } };
+    for (const r of on.values()) for (const l of r.data.links || []) { tie(r.id, l.to); for (const c of l.also || []) { tie(r.id, c); tie(l.to, c); } }
+    const secOf = id => (frameIds.has(id) ? id : frameIds.has(on.get(id)?.data.parent) ? on.get(id).data.parent : null);
+    const out = [];
+    for (const c of cards) {
+      const S = c.data.parent;
+      if (!frameIds.has(S) || guests.has(c.id) || isSketch(c) || !ends.has(c.id)) continue;
+      const to = [...ends.get(c.id)];
+      if (to.some(id => secOf(id) === S)) continue;
+      // (only the odd one out: the rest of its section is strung together and it isn't part of that.
+      // A section where nothing's strung together, like a shopping list, is just what it's about.)
+      const sibs = cards.filter(k => k !== c && k.data.parent === S && !isSketch(k));
+      if (!sibs.some(k => [...(ends.get(k.id) || [])].some(id => id !== c.id && on.get(id)?.data.parent === S))) continue;
+      const secs = new Set(to.map(secOf));
+      out.push({ c, from: S, into: secs.size === 1 && [...secs][0] ? [...secs][0] : null });
+    }
+    return out;
+  }
+  // The moves to try: in the section its strings go to (if they all go to one), and out of its section.
+  // (a card you've said to keep where it is isn't suggested again: remembered on this device)
+  const keptThere = () => new Set(readLocal('bt-tidy-kept', {})[key] || []);
+  function keepThere(id) { const all = readLocal('bt-tidy-kept', {}); all[key] = [...new Set([...(all[key] || []), id])].slice(-200); writeLocal('bt-tidy-kept', all); }
+  function strandedTries() {
+    const list = [], kept = keptThere();
+    for (const s of strandedCards().filter(s => !kept.has(s.c.id)).slice(0, 3)) {
+      if (s.into) list.push({ c: s.c, from: s.from, to: s.into });
+      list.push({ c: s.c, from: s.from, to: key });
+    }
+    return list;
+  }
+  function tryMove(todo, t, budget = 150) {
+    const out = layoutAll(todo, budget, new Map([[t.c.id, t.to]]));
+    return { ...t, out, score: tidyScore };
+  }
+  const clearlyTidier = (s, base) => s < base - Math.max(100, base * 0.05);
+  const movedWords = moved => moved.map(m => `“${short(api.titleOf(m.c))}” ${m.to === key ? `taken out of “${short(api.titleOf(api.store.get(m.from)))}”` : `moved into “${short(api.titleOf(api.store.get(m.to)))}”`}`).join('; ') + '.';
+
+  // (Settings say just do it) The tidiest move for each stranded card, all of them if that's tidier still.
+  function moveStranded(todo, out, base) {
+    const good = strandedTries().map(t => tryMove(todo, t)).filter(r => clearlyTidier(r.score, base)).sort((a, b) => a.score - b.score);
+    const pick = [], seen = new Set();
+    for (const g of good) if (!seen.has(g.c.id)) { seen.add(g.c.id); pick.push(g); }
+    if (!pick.length) return { out, moved: [] };
+    if (pick.length > 1) {
+      const all = layoutAll(todo, 150, new Map(pick.map(g => [g.c.id, g.to])));
+      if (tidyScore < pick[0].score) return { out: all, moved: pick };
+    }
+    return { out: pick[0].out, moved: [pick[0]] };
+  }
+
+  // (Settings say suggest it, the usual) Worked out a moment after the board's tidied, a move at a
+  // time so the board stays usable, then shown as a tip over the board.
+  let tipToken = 0;
+  const tipEl = host.querySelector('.tidytip');
+  function hideTip() { tipEl.hidden = true; tipEl.innerHTML = ''; }
+  let tipTried = [];   // (what was tried and how much tidier, in %, for testing)
+  function suggestLater(base) {
+    const token = ++tipToken, k0 = key, todo = tidyTodo(), tries = strandedTries(), good = [];
+    tipTried = [];
+    if (!tries.length) return;
+    let i = 0;
+    const step = () => {
+      if (token !== tipToken || key !== k0) return;
+      if (busy) { setTimeout(step, 200); return; }
+      if (i < tries.length) {
+        const r = tryMove(todo, tries[i++]);
+        tipTried.push({ c: api.titleOf(r.c), to: r.to === key ? 'out' : api.titleOf(api.store.get(r.to)), gain: Math.round(1000 * (base - r.score) / base) / 10 });
+        if (clearlyTidier(r.score, base)) good.push(r);
+        setTimeout(step, 30);
+        return;
+      }
+      showTip(good.sort((a, b) => a.score - b.score));
+    };
+    setTimeout(step, 700);
+  }
+  function showTip(good) {
+    if (!good.length) { hideTip(); return; }
+    const c = good[0].c, mine = good.filter(g => g.c === c), rest = good.filter(g => g.c !== c);
+    const name = id => `“${esc(short(api.titleOf(api.store.get(id))))}”`;
+    tipEl.innerHTML = `
+      <p><b>Tidy tip:</b> ${name(c.id)} is only strung to cards outside ${name(c.data.parent)}. ${mine[0].to === key ? 'Taken out of it' : `Moved into ${name(mine[0].to)}`}, the board would be tidier.</p>
+      <div class="tbtns">${mine.map((g, n) => `<button data-tip="${n}" class="${n ? '' : 'primary'}">${g.to === key ? 'Take it out' : `Move into ${name(g.to)}`}</button>`).join('')}
+        ${rest.length ? '<button data-tip="next">Next tip</button>' : ''}<button data-tip="keep" class="dim" title="Tidy won’t suggest moving this card again">Keep it there</button><button data-tip="no" class="x" aria-label="Not now">×</button></div>`;
+    tipEl.hidden = false;
+    tipEl.onclick = async e => {
+      const b = e.target.closest('[data-tip]');
+      if (!b || busy) return;
+      if (b.dataset.tip === 'next') { showTip(rest); return; }
+      if (b.dataset.tip === 'keep') { keepThere(c.id); if (rest.length) showTip(rest); else { tipToken++; hideTip(); } return; }
+      tipToken++; hideTip();
+      if (b.dataset.tip === 'no') return;
+      const g = mine[+b.dataset.tip];
+      if (!api.store.get(g.c.id) || api.store.get(g.c.id).data.parent !== g.from) return;   // (moved meanwhile)
+      const undo = await applyLayout(g.out, 'all', [g]);
+      api.toast(movedWords([g]).replace(/^./, s => s.toUpperCase()), 'Undo', undo);
+    };
+  }
+
+  // A layout saved, with any cards moved to another section (moved: [{c, from, to}]). Gives back
+  // what puts it all as it was.
+  async function applyLayout(out, mode, moved = []) {
     const ids = [...out.keys()].filter(id => api.store.get(id));
     const before = new Map(ids.map(id => [id, api.store.get(id).data.cork]));
+    const parents = new Map(moved.map(m => [m.c.id, m.to]));
+    const parentsBefore = new Map(moved.map(m => [m.c.id, m.from]));
     const proj = api.store.get(key), banner = proj?.data.cork;
     // (0.7.6) Strings shaped by hand: moved along if both ends moved the same way, otherwise handed
     // back to the autorouter (the shape was for where things were).
@@ -2631,18 +2817,18 @@ export function createBoard(host, api) {
       for (const id of ids) {
         const r = api.store.get(id), p = out.get(id), s = r.data.cork?.[key]?.s;   // (a card keeps its size)
         const spot = isFrame(id) ? { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: Math.round(p.h) } : { x: Math.round(p.x), y: Math.round(p.y), ...(s ? { s } : {}) };
-        await api.store.update(id, { cork: { ...(r.data.cork || {}), [key]: spot } });
+        await api.store.update(id, { cork: { ...(r.data.cork || {}), [key]: spot }, ...(parents.has(id) ? { parent: parents.get(id) } : {}) });
       }
       for (const [id, links] of shapedNext) await api.store.update(id, { links });
       // (the banner goes back over the middle of it all)
       if (mode !== 'inside' && banner?.banner) { const c = { ...banner }; delete c.banner; await api.store.update(key, { cork: Object.keys(c).length ? c : undefined }); }
     } finally { busy = false; }
     needsFit = mode !== 'inside'; render();
-    api.toast(mode === 'inside' ? 'Tidied inside the sections.' : 'Board tidied.', 'Undo', async () => {
-      for (const [id, c] of before) await api.store.update(id, { cork: c });
+    return async () => {
+      for (const [id, c] of before) await api.store.update(id, { cork: c, ...(parentsBefore.has(id) ? { parent: parentsBefore.get(id) } : {}) });
       for (const [id, links] of shapedBefore) await api.store.update(id, { links });
       if (mode !== 'inside' && banner?.banner) await api.store.update(key, { cork: banner });
-    });
+    };
   }
 
   // (0.7.8) Tidy strings: the cards stay put and every string is routed again by the autorouter,
@@ -2811,6 +2997,7 @@ export function createBoard(host, api) {
     show(boardKey) {
       if (boardKey !== key) {
         key = boardKey;
+        tipToken++; hideTip();
         heights.clear();
         tying = false; tieFrom = null; host.classList.remove('tying');
         stopPlay();
@@ -2825,6 +3012,7 @@ export function createBoard(host, api) {
     routeStrings: () => { routeCache = null; routeNow = true; try { drawLines(); } finally { routeNow = false; } },
     shownStrings: () => shown,
     routedBranches: () => [...(routeMap || new Map())].filter(([k]) => k.includes('+')).map(([k, v]) => ({ k, d: v.s.d })),
+    tipTried: () => tipTried,
     get key() { return key; },
   };
 }
@@ -2836,12 +3024,15 @@ export function createBoard(host, api) {
 // Remembered, since boards redraw often.
 const bodyCache = new Map();
 function cardBody(html) {
-  if (!html) return { html: '', media: null, more: '' };
+  if (!html) return { html: '', media: null, minis: [], docs: [], more: '' };
   if (bodyCache.has(html)) return bodyCache.get(html);
   const doc = new DOMParser().parseFromString('<body>' + sanitize(html) + '</body>', 'text/html');
   const b = doc.body;
   let media = null;
   const extra = { photo: 0, clip: 0, draw: 0, sheet: 0, doc: 0, link: 0 };
+  // (0.7.9) More photos and files than the first are pinned up too, small, along the bottom (a few;
+  // any more are counted). docs: every file in it, for making their pictures.
+  const minis = [], docs = [];
   for (const el of b.querySelectorAll('img[data-file], div[data-yt], div[data-draw], div[data-sheet], div[data-doc], div[data-weblink]')) {
     const m = el.tagName === 'IMG' ? { kind: 'photo', id: el.getAttribute('data-file') }
       : el.hasAttribute('data-yt') ? { kind: 'clip', clip: clipOf(el) }
@@ -2849,7 +3040,10 @@ function cardBody(html) {
       : el.hasAttribute('data-doc') ? { kind: 'doc', doc: docInfo(el) }
       : el.hasAttribute('data-weblink') ? { kind: 'link', link: linkInfo(el) }
       : { kind: 'draw', d: cleanDrawing(el.getAttribute('data-draw')) };
-    if (!media && (m.id || m.clip || m.d || m.sheet || m.doc || m.link)) media = m; else extra[m.kind]++;
+    if (m.doc) docs.push(m.doc);
+    if (!media && (m.id || m.clip || m.d || m.sheet || m.doc || m.link)) media = m;
+    else if (minis.length < 4 && (m.id || (m.doc && m.doc.pv !== 'off' && previewKind(m.doc)))) minis.push(m);
+    else extra[m.kind]++;
   }
   for (const el of b.querySelectorAll('img, div[data-yt], div[data-draw], div[data-sheet], div[data-doc], div[data-weblink]')) el.remove();
   for (const el of b.querySelectorAll('p, div')) if (!el.textContent.trim() && !el.querySelector('ul, ol, hr')) el.remove();
@@ -2865,7 +3059,7 @@ function cardBody(html) {
   const out = b.textContent.trim() || b.querySelector('li') ? b.innerHTML.trim() : '';
   const words = { photo: ['photo', 'photos'], clip: ['clip', 'clips'], draw: ['drawing', 'drawings'], sheet: ['spreadsheet', 'spreadsheets'], doc: ['file', 'files'], link: ['link', 'links'] };
   const more = Object.entries(extra).filter(([, n]) => n).map(([k, n]) => `${n} ${words[k][n === 1 ? 0 : 1]}`).join(', ');
-  const res = { html: out, media, more: more ? `+ ${more} more inside` : '' };
+  const res = { html: out, media, minis, docs, more: more ? `+ ${more} more inside` : '' };
   if (bodyCache.size > 400) bodyCache.clear();
   bodyCache.set(html, res);
   return res;

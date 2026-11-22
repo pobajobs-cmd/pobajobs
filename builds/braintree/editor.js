@@ -14,14 +14,14 @@ import { cleanSheet, sheetTableHTML } from './sheet.js';
 import { docInfo, linkInfo, docTileHTML, linkTileHTML, writeDoc, writeLink } from './attach.js';
 
 const ALLOWED = {
-  P: [], DIV: ['data-yt', 'data-start', 'data-end', 'data-title', 'data-draw', 'data-sheet', 'data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts', 'data-weblink'], BR: [], STRONG: [], B: [], EM: [], I: [], U: [], S: [], STRIKE: [],
+  P: [], DIV: ['data-yt', 'data-start', 'data-end', 'data-title', 'data-draw', 'data-sheet', 'data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts', 'data-pv', 'data-pva', 'data-page', 'data-crop', 'data-weblink'], BR: [], STRONG: [], B: [], EM: [], I: [], U: [], S: [], STRIKE: [],
   H1: [], H2: [], H3: [], UL: ['class'], OL: [], LI: ['data-checked'], BLOCKQUOTE: [], PRE: [], CODE: [], HR: [],
   A: ['href'], IMG: ['data-file', 'src', 'alt'],
 };
 // Blocks that hold something other than text, and the attributes each keeps.
 const EMBEDS = ['data-yt', 'data-draw', 'data-sheet', 'data-doc', 'data-weblink'];
-const KEEP = { 'data-yt': ['data-yt', 'data-start', 'data-end', 'data-title'], 'data-draw': ['data-draw'], 'data-sheet': ['data-sheet'], 'data-doc': ['data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts'], 'data-weblink': ['data-weblink', 'data-title'] };
-const EMBED_ATTRS = ['data-yt', 'data-start', 'data-end', 'data-title', 'data-draw', 'data-sheet', 'data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts', 'data-weblink'];
+const KEEP = { 'data-yt': ['data-yt', 'data-start', 'data-end', 'data-title'], 'data-draw': ['data-draw'], 'data-sheet': ['data-sheet'], 'data-doc': ['data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts', 'data-pv', 'data-pva', 'data-page', 'data-crop'], 'data-weblink': ['data-weblink', 'data-title'] };
+const EMBED_ATTRS = ['data-yt', 'data-start', 'data-end', 'data-title', 'data-draw', 'data-sheet', 'data-doc', 'data-name', 'data-size', 'data-mime', 'data-parts', 'data-pv', 'data-pva', 'data-page', 'data-crop', 'data-weblink'];
 const DROP = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'TEMPLATE', 'SVG', 'MATH', 'NOSCRIPT', 'FORM', 'INPUT', 'BUTTON', 'SELECT', 'TEXTAREA', 'HEAD', 'TITLE', 'META', 'LINK']);
 
 export function sanitize(html) {
@@ -64,6 +64,9 @@ function clean(node) {
         child.setAttribute('data-name', (child.getAttribute('data-name') || 'File').slice(0, 200));
         for (const a of ['data-size', 'data-parts']) if (!/^\d{1,9}$/.test(child.getAttribute(a) || '')) child.removeAttribute(a);
         if (!/^[\w.+-]{1,60}\/[\w.+-]{1,80}$/.test(child.getAttribute('data-mime') || '')) child.setAttribute('data-mime', 'application/octet-stream');
+        // (0.7.9: how it shows on a board, see attach.js)
+        const ok = { 'data-pv': /^([A-Za-z0-9_-]{8,64}|off)$/, 'data-pva': /^\d{1,2}(\.\d{1,4})?$/, 'data-page': /^[1-9]\d{0,3}$/, 'data-crop': /^(0|1|0?\.\d{1,4})(,(0|1|0?\.\d{1,4})){3}$/ };
+        for (const [a, re] of Object.entries(ok)) if (child.hasAttribute(a) && !re.test(child.getAttribute(a))) child.removeAttribute(a);
       } else if (kind === 'data-weblink') {
         if (!/^https?:\/\/\S{3,2000}$/i.test(child.getAttribute('data-weblink') || '')) { child.remove(); continue; }
         if (child.hasAttribute('data-title')) child.setAttribute('data-title', child.getAttribute('data-title').slice(0, 200));
@@ -137,7 +140,9 @@ document.addEventListener('pointerdown', e => closePops?.(e), true);
 // onClip(clip?), onDraw(drawing?), onSheet(sheet?) and onLink(link?) ask for a new or changed one (null =
 // cancelled, 'remove' = take it out); videoInfo(id) looks up a video's title. addDoc(file) keeps a file and
 // says what it is; openDoc(info) / saveDoc(info) open or save a copy of one.
-export function createEditor(host, { onChange, resolveFile, addPhoto, onError, onImage, onClip, onDraw, videoInfo, onSheet, onLink, addDoc, openDoc, saveDoc }) {
+// (0.7.9) previewDoc(info) asks how a file shows on a board: resolves with its new preview
+// attributes ({pv, pva, page, crop}, or {pv: 'off'}), or null.
+export function createEditor(host, { onChange, resolveFile, addPhoto, onError, onImage, onClip, onDraw, videoInfo, onSheet, onLink, addDoc, openDoc, saveDoc, previewDoc, canPreview }) {
   host.innerHTML = `
     <div class="tools" role="toolbar" aria-label="Formatting">
       <button type="button" data-cmd="h" title="Heading">${ICONS.h}</button>
@@ -422,9 +427,15 @@ export function createEditor(host, { onChange, resolveFile, addPhoto, onError, o
     if (docEl && body.contains(docEl)) {
       e.preventDefault();
       const d = docInfo(docEl);
-      showPop(docEl, [['open', 'Open'], ['save', 'Save a copy'], ['remove', 'Take it out of the note', 'danger']], a => {
+      showPop(docEl, [['open', 'Open'], ['save', 'Save a copy'], ...(previewDoc && canPreview?.(d) ? [['preview', 'How it shows on the board…']] : []), ['remove', 'Take it out of the note', 'danger']], async a => {
         if (a === 'open') openDoc?.(d);
         else if (a === 'save') saveDoc?.(d);
+        else if (a === 'preview') {
+          const res = await previewDoc(d);
+          if (!res || !body.contains(docEl)) return;
+          writeDoc(docEl, { ...d, pv: undefined, pva: undefined, page: undefined, crop: undefined, ...res });
+          docEl.replaceChildren(); hydrate(); changed(); flush();
+        }
         else { docEl.remove(); changed(); flush(); }
       });
       return;
@@ -511,6 +522,7 @@ export function createEditor(host, { onChange, resolveFile, addPhoto, onError, o
       if (el.hasAttribute('data-yt')) { const c = clipOf(el); el.className = 'clip'; if (c) el.innerHTML = clipFaceHTML(c, { edit: true }); }
       else { const dr = cleanDrawing(el.getAttribute('data-draw')); el.className = 'drawblock'; if (dr) el.innerHTML = drawingSVG(dr) + '<span class="dedit">Edit drawing</span>'; }
     }
+    for (const img of body.querySelectorAll('img[data-pvthumb]:not([src])')) resolveFile(img.dataset.pvthumb).then(url => { if (url) img.src = url; else img.remove(); });
     for (const img of body.querySelectorAll('img[data-file]:not([src])')) {
       img.classList.add('loading');
       resolveFile(img.dataset.file).then(url => {

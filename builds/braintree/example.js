@@ -22,6 +22,13 @@
 //   Tidy (0.7.8): laid out with the strings really routed, so "read from" and its branch to "Film the
 //                   intro" don't cross "Shot plan" → "Write the script"; the notes checklist mentions
 //                   routed branches and "Tidy strings only"
+//   Tidy (0.7.9): the notes checklist covers packing tight and the suggestion to move a card strung
+//                   only outside its section; "then" (Rough cut → Add music) and "shots for" (Shot plan
+//                   → Film the intro) keep every section strung together, so the example itself gets
+//                   no such suggestion
+//   file pictures (0.7.9): the script draft PDF shows its first page on the board (made when the example
+//                   is added), with "Hook lines.txt" pinned up small beside it; the checklist covers
+//                   "How it shows on the board" (page, snippet, tile)
 
 import { clipDivHTML } from './media.js';
 import { drawDivHTML, drawingBox } from './draw.js';
@@ -35,8 +42,9 @@ const day = offset => { const d = new Date(); d.setDate(d.getDate() + offset); r
 export const EXAMPLE_TITLE = 'Example: Make a short video';
 export const EXAMPLE_PASSWORD = 'tree';
 
-// makeLock(password) comes from the app (it's how a project gets its lock).
-export async function addExample(store, { makeLock } = {}) {
+// makeLock(password) comes from the app (it's how a project gets its lock), and so does
+// makePreview(file, info) (0.7.9: a file's picture for the board, {pv, pva}).
+export async function addExample(store, { makeLock, makePreview } = {}) {
   // Made a minute "ago", so opening one doesn't jump into renaming it like a brand-new item does.
   const created = new Date(Date.now() - 60_000).toISOString();
   let order = Date.now();
@@ -45,19 +53,20 @@ export async function addExample(store, { makeLock } = {}) {
 
   // A photo and a file, made here so the example needs nothing from outside.
   const photo = await sketchPhoto(store).catch(() => null);
-  const draft = await scriptPDF(store).catch(() => null);
+  const draft = await scriptPDF(store, makePreview).catch(() => null);
+  const hooks = await hooksFile(store, makePreview).catch(() => null);
 
   const project = await make({
     type: 'project', title: EXAMPLE_TITLE, start: day(0), due: day(21),
     body: `<p>This is an example project, to show what Brain Tree can do. Have a look around, tick things off, change anything, then delete it with the bin at the top when you're done.</p>
-<ul class="checklist"><li data-checked="true">A project holds to-dos, notes, sections and smaller projects</li><li>Open its board (the Board button at the top) to see everything pinned up, with strings between related cards</li><li>On the board, tap String, then two cards, to tie them together. Tap a string to label it</li><li>Drag a string's label onto another card to branch it, like a T junction: “read from” goes to two cards</li><li>Strings and their branches find their own way round cards, turning corners like tracks on a circuit board (on Corkboard they're real string, so they cross)<li>Tap a string and drag it, or its dots, to shape it yourself: drag a small dot to add a turn, double-tap a big one to take it out. Auto in the string's menu hands it back<li>A string can point one way, the other, both ways or neither: tap it, then the arrow line in its menu. “feeds into” points to “Write the script” on every look<li>Labels sit on their string where there's room, otherwise just beside it with a dotted line back, and Tidy leaves room for them between cards</li><li>Tap Draw on the board to draw straight onto it, with pens, a highlighter, shapes and arrows. The star is a drawing like that: tap it to change it</li><li>Tidy lays the board out again in the order the work flows, like the autoplacer on a circuit board: it routes the strings for real and moves cards round until they're short and don't cross (“read from” and its branch stay clear of the string from “Shot plan”). “Tidy inside sections” keeps the sections where you put them, and “Tidy strings only” leaves every card where it is and routes every string again, even ones you've shaped</li><li>Drag the bottom corner of a card to make it bigger or smaller: the thumbnail sketch is Large</li><li>+ Add on the board adds notes, to-dos, sections, YouTube clips, drawings, spreadsheets, files and links</li><li>“Write the script” is pinned to the top of the list. Hold it to unpin it</li><li>“Surprise ending” is locked. Its password is <b>${EXAMPLE_PASSWORD}</b></li><li>The share button at the top prints the list or the board, or saves it as a PDF, a picture or a spreadsheet</li><li>In the list, swipe a to-do left or right, or hold it for more (hold and drag to move it)</li><li>A project opens as its list or its board, whichever you looked at last</li><li>Settings → Claude connects Claude: then in any Claude chat, say “block this out in Brain Tree” and it makes a project like this one, with a link back to the chat</li><li>Settings (the cog at the top) has colour themes and a look for every board: try Circuit board or Neon</li></ul>`,
+<ul class="checklist"><li data-checked="true">A project holds to-dos, notes, sections and smaller projects</li><li>Open its board (the Board button at the top) to see everything pinned up, with strings between related cards</li><li>On the board, tap String, then two cards, to tie them together. Tap a string to label it</li><li>Drag a string's label onto another card to branch it, like a T junction: “read from” goes to two cards</li><li>Strings and their branches find their own way round cards, turning corners like tracks on a circuit board (on Corkboard they're real string, so they cross)<li>Tap a string and drag it, or its dots, to shape it yourself: drag a small dot to add a turn, double-tap a big one to take it out. Auto in the string's menu hands it back<li>A string can point one way, the other, both ways or neither: tap it, then the arrow line in its menu. “feeds into” points to “Write the script” on every look<li>Labels sit on their string where there's room, otherwise just beside it with a dotted line back, and Tidy leaves room for them between cards</li><li>Tap Draw on the board to draw straight onto it, with pens, a highlighter, shapes and arrows. The star is a drawing like that: tap it to change it</li><li>Tidy lays the board out again in the order the work flows, like the autoplacer on a circuit board: it routes the strings for real and moves cards round until they're short and don't cross (“read from” and its branch stay clear of the string from “Shot plan”). “Tidy inside sections” keeps the sections where you put them, and “Tidy strings only” leaves every card where it is and routes every string again, even ones you've shaped</li><li>Tidy packs things tight when that suits the screen (usually on a phone): sections tuck up under shorter ones, and cards stack in columns with no gaps. If a card's strings all go to cards outside its section, it tries the card out of the section and suggests moving it if the board comes out tidier (Settings → Boards can let it just do it)</li><li>Files show on the board as what they are: “Write the script” has the draft PDF's first page pinned up, and a text file beside it, small. Tap a file in a note, then “How it shows on the board”, to pick another page, drag out just part of it, or show it as a tile. Photos, videos, Word, Excel, PowerPoint, text, audio and zips get pictures too</li><li>Drag the bottom corner of a card to make it bigger or smaller: the thumbnail sketch is Large</li><li>+ Add on the board adds notes, to-dos, sections, YouTube clips, drawings, spreadsheets, files and links</li><li>“Write the script” is pinned to the top of the list. Hold it to unpin it</li><li>“Surprise ending” is locked. Its password is <b>${EXAMPLE_PASSWORD}</b></li><li>The share button at the top prints the list or the board, or saves it as a PDF, a picture or a spreadsheet</li><li>In the list, swipe a to-do left or right, or hold it for more (hold and drag to move it)</li><li>A project opens as its list or its board, whichever you looked at last</li><li>Settings → Claude connects Claude: then in any Claude chat, say “block this out in Brain Tree” and it makes a project like this one, with a link back to the chat</li><li>Settings (the cog at the top) has colour themes and a look for every board: try Circuit board or Neon</li></ul>`,
   });
   const P = { parent: project };
 
   // Loose to-dos and notes.
   await make({ ...P, type: 'task', title: 'Pick a topic', done: true, doneAt: now, body: '<p>Octopuses: three hearts, blue blood, and arms that can taste.</p>' });
   const script = await make({ ...P, type: 'task', title: 'Write the script', due: day(0), pinned: now,
-    body: '<p>Keep it under 60 seconds. Steps are inside this to-do, and the draft is attached.</p>' + (draft ? docDivHTML(draft) : '') });
+    body: '<p>Keep it under 60 seconds. Steps are inside this to-do, and the draft is attached.</p>' + (draft ? docDivHTML(draft) : '') + (hooks ? docDivHTML(hooks) : '') });
   await make({ parent: script, type: 'task', title: 'A hook for the first 10 seconds', done: true, doneAt: now });
   await make({ parent: script, type: 'task', title: 'Three main points' });
   await make({ parent: script, type: 'task', title: 'Ending and call to action' });
@@ -138,6 +147,9 @@ export async function addExample(store, { makeLock } = {}) {
   await tie(shotPlan, script);
   await tie(sketch, thumb, 'first try');
   await tie(budget, music, 'pays for', null, 'to');
+  // (0.7.9) so each section's cards are strung together, and Tidy has no card to suggest moving
+  await tie(rough, music, 'then');
+  await tie(shotPlan, intro, 'shots for');
 
   return project;
 }
@@ -179,7 +191,7 @@ async function sketchPhoto(store) {
 }
 
 // The script draft as a PDF (made with the same writer as the list export), kept like any file.
-async function scriptPDF(store) {
+async function scriptPDF(store, makePreview) {
   const say = text => ({ t: 'p', text });
   const blob = listPDF({
     title: 'Script draft: Octopuses in 60 seconds', sub: 'Version 1 · about 55 seconds',
@@ -194,5 +206,18 @@ async function scriptPDF(store) {
     ],
   });
   const file = new File([blob], 'Script draft.pdf', { type: 'application/pdf' });
-  return store.addDoc(file);
+  return withPicture(file, store, makePreview);
+}
+
+// A file kept, with its picture for the board (0.7.9) if the app gave a way to make one.
+async function withPicture(file, store, makePreview) {
+  const d = await store.addDoc(file);
+  const p = makePreview && await Promise.race([makePreview(file, d), new Promise(r => setTimeout(() => r(null), 10000))]);
+  return p ? { ...d, ...p } : d;
+}
+
+// (0.7.9) A short text file, so the script to-do has a second file pinned up small beside the PDF.
+function hooksFile(store, makePreview) {
+  const text = 'Hook lines to try\n\n1. "This animal has three hearts. And blue blood."\n2. "What if your arm could taste?"\n3. "Octopuses: smarter than they look."\n\nRead them out loud. Keep the one that makes you want to watch.\n';
+  return withPicture(new File([text], 'Hook lines.txt', { type: 'text/plain' }), store, makePreview);
 }

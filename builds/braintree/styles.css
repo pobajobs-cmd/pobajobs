@@ -938,6 +938,14 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 .stringpop button.danger { color: var(--string); }
 .boardhint { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 6; margin: 0; padding: 0.45rem 0.9rem; border-radius: 14px; background: var(--card); color: var(--soft); font-size: 0.85rem; box-shadow: var(--shadow); width: max-content; max-width: calc(100% - 24px); text-align: center; pointer-events: none; }
 .tying .boardhint { color: var(--ink); box-shadow: 0 0 0 2px var(--wire), var(--shadow); }
+/* (0.7.9) Tidy's suggestion to move a card strung only outside its section */
+.tidytip { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 7; width: min(440px, calc(100% - 24px)); padding: 0.5rem 0.6rem 0.45rem 0.7rem; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 0 0 1.5px var(--wire), var(--shadow); font-size: 0.8rem; }
+.tidytip p { margin: 0 0 0.35rem; line-height: 1.35; }
+.tidytip .tbtns { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.tidytip button { font-weight: 600; font-size: 0.8rem; padding: 0.3rem 0.5rem; border-radius: 8px; color: var(--accent-ink); }
+.tidytip button.primary { background: var(--accent-bg); }
+.tidytip button.dim { color: var(--soft); margin-left: auto; }
+.tidytip button.x { color: var(--soft); font-size: 1.05rem; line-height: 1; padding: 0.2rem 0.45rem; }
 
 /* ---------- YouTube clips ---------- */
 
@@ -1181,6 +1189,38 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .pcard .ptile { margin: 0 0 10px; background: rgba(255, 255, 255, 0.6); border-color: color-mix(in srgb, var(--paper-ink) 15%, transparent); color: var(--paper-ink); }
 .pcard .ptile .tname small { color: var(--paper-soft); }
 .pcard .ptile:hover { border-color: var(--accent); }
+/* In a note, a file with a picture shows a little copy of it instead of its kind. */
+.tile .tpv { flex-shrink: 0; width: 38px; height: 44px; object-fit: cover; object-position: top; border-radius: 4px; box-shadow: 0 0 0 1px var(--line); background: #FFF; }
+.tile .tpv + .tkind { display: none; }
+
+/* (0.7.9) A file pinned up as what it looks like (see preview.js): a sheet of paper (or a photo,
+   a video's frame…) with its kind and name on a label underneath. Its shape (--pva) is known
+   before its picture loads; until then, or if it can't be made, it's a blank ruled sheet. */
+.pcard .pdoc { position: relative; display: block; margin: 0 0 10px; overflow: hidden; cursor: pointer; background: #FFF; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 10px rgba(0, 0, 0, 0.14); }
+.pcard .pdoc .dpage { position: relative; display: block; aspect-ratio: var(--pva, 0.75); background: #FFF repeating-linear-gradient(to bottom, transparent 0 13px, rgba(40, 60, 90, 0.07) 13px 14px) 0 16px / 100% calc(100% - 26px) no-repeat; }
+.pcard .pdoc .docpv { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; pointer-events: none; }
+.pcard .pdoc .docpv[data-docpv] { object-fit: contain; }   /* (made on this device: its shape isn't known ahead, so all of it shows) */
+.pcard .pdoc .dlabel { display: flex; align-items: center; gap: 6px; padding: 5px 7px; background: #FAFAF7; color: #333; font-size: 0.7rem; line-height: 1.2; border-top: 1px solid rgba(0, 0, 0, 0.08); }
+.pcard .pdoc .dlabel b { flex-shrink: 0; padding: 1px 5px; border-radius: 3px; background: var(--k); color: #FFF; font-size: 0.6rem; letter-spacing: 0.03em; }
+.pcard .pdoc .dlabel span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcard .pdoc.k-video .dpage::before { content: ''; position: absolute; z-index: 1; left: 50%; top: 50%; margin-top: -22px; width: 44px; height: 44px; margin-left: -22px; border-radius: 50%; background: rgba(0, 0, 0, 0.55) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 7v10l8-5z' fill='white'/%3E%3C/svg%3E") center / 26px no-repeat; pointer-events: none; }
+.pcard .pdoc:hover { box-shadow: 0 0 0 2px var(--accent), 0 4px 10px rgba(0, 0, 0, 0.14); }
+/* More photos and files, small, pinned along the bottom. */
+.pcard .pminis { display: flex; flex-wrap: wrap; gap: 7px; margin: 2px 0 9px; pointer-events: none; }
+.pcard .pmini { width: 46px; height: 46px; flex-shrink: 0; overflow: hidden; background: #FFF; border: 3px solid #FFF; border-bottom-width: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28); transform: rotate(-2deg); }
+.pcard .pmini:nth-child(2n) { transform: rotate(2.5deg); }
+.pcard .pmini.paper { border: 0; height: 52px; width: 40px; }
+.pcard .pmini img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+:root[data-look="blueprint"] .pcard .pdoc, :root[data-look="blueprint"] .pcard .pmini { box-shadow: none; outline: 1px solid var(--bp-line); }
+:root[data-look="circuit"] .pcard .pdoc, :root[data-look="neon"] .pcard .pdoc, :root[data-look="hacker"] .pcard .pdoc, :root[data-look="chalkboard"] .pcard .pdoc, :root[data-look="space"] .pcard .pdoc, :root[data-look="minimal"] .pcard .pdoc { border-radius: 6px; box-shadow: none; filter: brightness(0.94); }
+:root[data-look="circuit"] .pcard .pmini, :root[data-look="neon"] .pcard .pmini, :root[data-look="hacker"] .pcard .pmini, :root[data-look="chalkboard"] .pcard .pmini, :root[data-look="space"] .pcard .pmini, :root[data-look="minimal"] .pcard .pmini { border: 0; border-radius: 4px; box-shadow: none; transform: none; }
+
+/* (0.7.9) Picking how a file shows on the board: its page, with the part you drag across picked out. */
+.pvsheet .pvpage { position: relative; width: fit-content; max-width: 100%; margin: 0.4rem auto 0.6rem; overflow: hidden; background: #FFF; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+.pvsheet .pvpage canvas { display: block; max-width: 100%; max-height: 56vh; width: auto; height: auto; }
+.pvsheet .pvcrop { position: absolute; outline: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); pointer-events: none; }
+.pvsheet .pvnav { display: flex; align-items: center; justify-content: center; gap: 0.8rem; margin: 0 0 0.3rem; color: var(--soft); font-size: 0.9rem; }
+.pvsheet .pvnav button { font-size: 1.25rem; line-height: 1; padding: 0.25rem 0.85rem; border-radius: 8px; border: 1px solid var(--line); color: var(--ink); }
 .blockpop { position: absolute; z-index: 5; display: grid; gap: 2px; min-width: 210px; padding: 5px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .blockpop button { text-align: left; padding: 0.5rem 0.7rem; border-radius: 8px; font-size: 0.92rem; }
 .blockpop button:hover { background: var(--hover); }

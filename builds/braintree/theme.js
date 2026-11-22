@@ -61,7 +61,9 @@ export const LOOKS = {
   chalkboard: { name: 'Chalkboard', wire: () => '#F4F1E6' },
   space: { name: 'Space', wire: () => '#C9D8FF' },                  // constellations
 };
-export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard' };
+// (tidyMove, 0.7.9: when Tidy finds a card strung only to things outside its section, 'ask' suggests
+// moving it, 'move' just does it)
+export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard', tidyMove: 'ask' };
 
 export const PREF_ID = 'pref-appearance';
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');

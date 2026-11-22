@@ -477,6 +477,14 @@ export async function docBlob(d) {
   } catch (e) { return null; }
 }
 
+// Is this file's copy on this device?
+export async function hasDoc(id) { return !!(await (await tx('files', 'readonly', s => reqP(s.getKey(id))))); }
+
+// (0.7.9) Pictures of files made on this device (for files added before files had pictures): kept
+// here only, never uploaded. key: file id | page | crop.
+export async function previewGet(key) { const rec = await (await tx('files', 'readonly', s => reqP(s.get('pv~' + key)))); return rec?.blob || null; }
+export async function previewPut(key, blob) { await tx('files', 'readwrite', s => s.put({ id: 'pv~' + key, blob, mime: blob.type, uploaded: true, local: true })); }
+
 async function uploadFiles() {
   const pending = await tx('files', 'readonly', s => reqP(s.getAll()));
   for (const f of (await pending).filter(f => !f.uploaded)) {

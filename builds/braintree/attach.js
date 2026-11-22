@@ -60,21 +60,36 @@ export function linkService(url) {
   return { name: host, colour: '#5D6D7E', host };
 }
 
-export const docInfo = el => ({ id: el.getAttribute('data-doc'), name: el.getAttribute('data-name') || 'File', size: +el.getAttribute('data-size') || 0, mime: el.getAttribute('data-mime') || 'application/octet-stream', parts: +el.getAttribute('data-parts') || 1 });
+// (0.7.9) How a file shows on a board (see preview.js), all optional:
+//   data-pv    its picture, kept like a photo (or "off": just its tile)
+//   data-pva   that picture's shape, width / height
+//   data-page  which page of it (from 1)
+//   data-crop  just part of the page: "x,y,w,h" as fractions of it
+const PV = ['pv', 'pva', 'page', 'crop'];
+export const docInfo = el => {
+  const d = { id: el.getAttribute('data-doc'), name: el.getAttribute('data-name') || 'File', size: +el.getAttribute('data-size') || 0, mime: el.getAttribute('data-mime') || 'application/octet-stream', parts: +el.getAttribute('data-parts') || 1 };
+  for (const k of PV) { const v = el.getAttribute('data-' + k); if (v) d[k] = k === 'pva' || k === 'page' ? +v : v; }
+  return d;
+};
 export const linkInfo = el => ({ url: el.getAttribute('data-weblink'), title: el.getAttribute('data-title') || '' });
 
-export const docDivHTML = d => `<div data-doc="${esc(d.id)}" data-name="${esc(d.name)}" data-size="${d.size | 0}" data-mime="${esc(d.mime)}" data-parts="${d.parts | 0 || 1}"></div>`;
+export const docDivHTML = d => `<div data-doc="${esc(d.id)}" data-name="${esc(d.name)}" data-size="${d.size | 0}" data-mime="${esc(d.mime)}" data-parts="${d.parts | 0 || 1}"${PV.filter(k => d[k]).map(k => ` data-${k}="${esc(d[k])}"`).join('')}></div>`;
 export const linkDivHTML = l => `<div data-weblink="${esc(l.url)}"${l.title ? ` data-title="${esc(l.title)}"` : ''}></div>`;
-export function writeDoc(el, d) { for (const [k, v] of Object.entries({ doc: d.id, name: d.name, size: d.size | 0, mime: d.mime, parts: d.parts || 1 })) el.setAttribute('data-' + k, v); }
+export function writeDoc(el, d) {
+  for (const [k, v] of Object.entries({ doc: d.id, name: d.name, size: d.size | 0, mime: d.mime, parts: d.parts || 1 })) el.setAttribute('data-' + k, v);
+  for (const k of PV) { if (d[k]) el.setAttribute('data-' + k, d[k]); else el.removeAttribute('data-' + k); }
+}
 export function writeLink(el, l) { el.setAttribute('data-weblink', l.url); if (l.title) el.setAttribute('data-title', l.title); else el.removeAttribute('data-title'); }
 
 const DOC_IC = '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
 const LINK_IC = '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 
-// A file's tile: its kind (coloured), name and size.
+// A file's tile: its kind (coloured), name and size. (0.7.9: in a note, with a little copy of how it
+// shows on the board, if it has a picture)
 export function docTileHTML(d, extra = '') {
   const k = fileKind(d.name, d.mime);
-  return `<span class="tkind" style="--k:${k.colour}">${DOC_IC}<b>${esc(k.label)}</b></span><span class="tname"><b>${esc(d.name)}</b><small>${esc(fmtSize(d.size))}</small></span>${extra}`;
+  const pic = d.pv && d.pv !== 'off' ? `<img class="tpv" data-pvthumb="${esc(d.pv)}" alt="">` : '';
+  return `${pic}<span class="tkind" style="--k:${k.colour}">${DOC_IC}<b>${esc(k.label)}</b></span><span class="tname"><b>${esc(d.name)}</b><small>${esc(fmtSize(d.size))}${d.pv === 'off' ? ' · a tile on the board' : d.crop ? ' · a snippet on the board' : d.page > 1 ? ` · page ${d.page} on the board` : ''}</small></span>${extra}`;
 }
 // A link's tile: where it is (Google Doc, Dropbox…), its name, its address.
 export function linkTileHTML(l, extra = '') {
