@@ -185,6 +185,19 @@ The user found short strings with labels obscured (labels covering cards and eac
 - **Claude**: strings in `block_out_project` and `add_items`, and `tie_string`, take `arrow` (`to`, `from`, `both`, `none`; `tie_string` flips it if the string is stored the other way round). `get_project` lists which way each string points. The instructions ask for `arrow: "to"` where a link has a direction.
 - Example project: "feeds into" and "pays for" point to their far end; notes lines for arrows and label placement.
 
+## 0.7.8 Tidy that routes, and routed branches
+
+The user asked where the "autoroute tidy" was, and pointed at a crossing on the example board (on a phone, Circuit look): the "read from" branch to "Film the intro" crossed "Shot plan" → "Write the script". They asked why Tidy didn't just move "Film the intro" below that string.
+
+- **Why it crossed**: Tidy's score (`untidiness`) drew each string as a straight line between card middles and skipped pairs of strings sharing a card, so it couldn't see the crossing (both strings touch "Write the script"). Branches were scored as separate strings from the first card, not from the junction.
+- **Scored as drawn**: strings now run from the side of each card facing the other (`facing`, as the looks draw them), a branch from halfway along its string (where its label or knot goes) to its card (`stringsAmong` gives each string with its branches), and any two different strings that cross count, even if they share a card.
+- **A wider search**: swapping one thing at a time could get stuck, so `tidyAll` goes four ways and keeps the best. First the old rough score (middle to middle, smoother) finished with the drawn score, then the drawn score from scratch at row widths ×1, ×0.75 and ×1.4. `tidyInside` uses the rough-then-drawn way, or drawn from scratch, whichever scores better.
+- **Then with the strings really routed** (`routedUntidiness`, on looks that route: not Corkboard or Space): for a moment the cards go where a layout has them, `computeRoutes` routes every string and branch, and the result is measured (route length, turns × 12, crossings × 700, strings running backwards × 800, plus how well it fits the screen). Each distinct layout from the search is nudged that way (cards swapped, section columns ±1, sections swapped) within a share of a time budget (400 ms for Tidy, 250 ms for a board nothing's placed on), and the best one is kept. This is how a phone-shaped layout loses its crossings instead of a wide layout winning just because it has none.
+- **Results** (routed crossings counted from the drawn paths): example board 1 → 0 on desktop and 2 → 0 on a phone (strings less than half as long); CNC board 0 crossings, total string length 5306 → about 4500. Tidy takes about 0.3–0.5 s on a desktop.
+- **Branches are routed** (`computeRoutes`, last): from where the label is drawn (`labelsAsDrawn`, shared with `drawLines`, so the spot matches) to each card, keeping the look's own shape if it gets through cleanly, otherwise by the autorouter, so they go round cards and across as few strings and labels as they can. A branch is drawn from the router only if its label is where it was routed from; otherwise the quick way (`branchWire`), as while dragging.
+- **"Tidy strings only (cards stay put)"** in the Tidy menu: every string on the board is routed again, and hand-shaped ones are handed back to the autorouter (Undo restores them). Strings nobody has shaped are routed like this all the time anyway.
+- Example project: notes lines for routed branches, the routed Tidy and "Tidy strings only".
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
