@@ -93,7 +93,7 @@ export const LOOKS = {
 };
 // (tidyMove, 0.7.9: when Tidy finds a card strung only to things outside its section, 'ask' suggests
 // moving it, 'move' just does it)
-export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard', tidyMove: 'ask', morning: '' };   // (0.9.0) morning: the morning summary's time, or '' for none
+export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard', tidyMove: 'ask', morning: '', motion: 'on' };   // (0.9.3) motion: board backgrounds move ('on') or stay still ('off')   // (0.9.0) morning: the morning summary's time, or '' for none
 
 export const PREF_ID = 'pref-appearance';
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
@@ -133,6 +133,7 @@ export function apply(prefs) {
   root.style.colorScheme = dark ? 'dark' : 'light';
   root.dataset.mode = dark ? 'dark' : 'light';
   root.dataset.look = look;
+  root.toggleAttribute('data-still', p.motion === 'off');
   root.dataset.theme = theme.id;
   root.toggleAttribute('data-flat', !!theme.flat);
   for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.content = c.bg;

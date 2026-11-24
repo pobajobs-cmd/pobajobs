@@ -2,7 +2,7 @@
 // Your data isn't here (that's in IndexedDB); /api/ requests always go to the network.
 // Bump VERSION whenever any file below changes, so devices pick up the new copy.
 
-const VERSION = 'braintree-0.9.2';
+const VERSION = 'braintree-0.9.3';
 const FILES = ['./', 'app.js', 'store.js', 'editor.js', 'board.js', 'theme.js', 'media.js', 'draw.js', 'example.js', 'gestures.js', 'sheet.js', 'attach.js', 'export.js', 'preview.js', 'record.js', 'search.js', 'plan.js', 'timeline.js', 'remind.js', 'widget.js', 'styles.css', 'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 // (0.7.9) Mozilla's pdf.js, for pictures of PDFs on boards: fetched the first time it's needed, then
 // kept here (under its own name, so a new version of Brain Tree doesn't throw it away).

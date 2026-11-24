@@ -1875,6 +1875,8 @@ export function createBoard(host, api) {
     // Zoomed out, pins and connect dots grow so they stay big enough for a finger.
     world.style.setProperty('--iz', clamp(1 / view.z, 1, 2.4).toFixed(2));
     cork.style.backgroundPosition = `${view.x}px ${view.y}px`;
+    // (0.9.3) for looks whose backgrounds size and place themselves (styles.css): where the board is, and its zoom
+    cork.style.setProperty('--bx', view.x + 'px'); cork.style.setProperty('--by', view.y + 'px'); cork.style.setProperty('--bz', view.z);
     cork.style.backgroundSize = `${Math.max(8, 220 * view.z)}px ${Math.max(8, 220 * view.z)}px, ${Math.max(4, 24 * view.z)}px ${Math.max(4, 24 * view.z)}px`;
     placeMedia();
   }

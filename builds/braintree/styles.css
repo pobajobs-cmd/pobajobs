@@ -888,7 +888,7 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
 :root[data-look="chalkboard"] .strings .slabel text { fill: #F4F1E6; font-family: var(--hand); font-size: 13px; }
 
 /* Space: a star field, dark glass cards, constellations between them. (The stars don't zoom.) */
-:root[data-look="space"] .cork { background-color: #060A1C; background-size: 173px 173px, 251px 251px, 389px 389px, 640px 640px !important;
+:root[data-look="space"] .cork { background-color: #060A1C;   /* (sizes: see 0.9.3 at the end) */
   background-image: radial-gradient(circle at 23% 37%, rgba(255, 255, 255, 0.9) 1px, transparent 1.6px), radial-gradient(circle at 71% 18%, rgba(200, 220, 255, 0.75) 1.2px, transparent 1.8px),
     radial-gradient(circle at 40% 80%, rgba(255, 240, 220, 0.8) 1.4px, transparent 2.2px), radial-gradient(circle at 80% 62%, rgba(255, 255, 255, 0.55) 0.8px, transparent 1.3px); }
 :root[data-look="space"] .pcard { --paper-ink: #EEF2FF; --paper-soft: rgba(225, 232, 255, 0.7); --faint: rgba(225, 232, 255, 0.5); --check: #0B1230; --proj: #9FC2FF;
@@ -1694,8 +1694,97 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 :root[data-look="newspaper"] .strings .marker { stroke-width: 2.6; opacity: 0.9; }
 :root[data-look="newspaper"] .strings .slabel rect { fill: #F9F6EE; stroke: #B3261E; stroke-width: 1.2; }
 :root[data-look="newspaper"] .strings .slabel text { fill: #B3261E; font-family: ui-serif, Georgia, serif; font-style: italic; font-weight: 700; }
-/* (0.9.2) these backgrounds are whole pictures or their own patterns, not the board's 220 px tiles */
-:root[data-look="ocean"] .cork, :root[data-look="sunset"] .cork, :root[data-look="mocha"] .cork { background-size: 100% 100% !important; background-position: 0 0 !important; }
-:root[data-look="sakura"] .cork { background-size: 260px 260px !important; }
-:root[data-look="arctic"] .cork { background-size: 100% 100%, 38px 38px, 61px 61px !important; background-position: 0 0, 0 0, 19px 13px !important; }
-:root[data-look="newspaper"] .cork { background-size: 240px 100%, 7px 7px !important; background-position: 0 0 !important; }
+
+/* ---------- (0.9.3) Board backgrounds that move with the board, and some that move by themselves ----------
+   The board sets --bx, --by (where the world's corner is on screen) and --bz (the zoom) on .cork,
+   so a look's background can be pinned to the board: patterns tile at their own size times the
+   zoom, and skies and seas are tall gradients fixed to the board (the deeper you go, the darker).
+   Moving layers are .cork::before / ::after: oversized by 800 px so they can slide one tile and
+   loop; they slide with transforms (cheap), and stop when "Moving backgrounds" is off in Settings
+   or the phone asks for less motion (html[data-still]). */
+/* (behind everything on the board: .cork is its own layer, the moving ones sit just above its own background) */
+.cork { isolation: isolate; }
+.cork::before, .cork::after { pointer-events: none; z-index: -1; }
+:root[data-look="ocean"] .cork::before, :root[data-look="ocean"] .cork::after, :root[data-look="space"] .cork::before, :root[data-look="space"] .cork::after,
+:root[data-look="arctic"] .cork::before, :root[data-look="arctic"] .cork::after, :root[data-look="sakura"] .cork::before {
+  content: ""; position: absolute; inset: -800px; --tile: 300px; background-size: var(--tile) var(--tile);
+  background-position: calc(var(--bx, 0px) + 800px) calc(var(--by, 0px) + 800px); }
+@keyframes bt-slide-x { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(var(--tile), 0, 0); } }
+@keyframes bt-slide-up { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, calc(var(--tile) * -1), 0); } }
+@keyframes bt-fall { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, var(--tile), 0); } }
+@keyframes bt-fall-wind { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(var(--tile) * -1), calc(var(--tile) * 2), 0); } }
+@keyframes bt-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes bt-shoot { 0%, 88% { opacity: 0; transform: translate3d(0, 0, 0) rotate(-24deg); } 89% { opacity: 1; } 96% { opacity: 0.9; } 100% { opacity: 0; transform: translate3d(-520px, 230px, 0) rotate(-24deg); } }
+
+/* Ocean: the deeper down the board, the darker the water; light ripples drift by and bubbles rise. */
+:root[data-look="ocean"] .cork { background-color: #03141B; background-repeat: repeat-x !important;
+  background-image: linear-gradient(180deg, #3A93A6 0% 47%, #12556A 49%, #0B3442 51%, #062330 55%, #03141B 60% 100%);
+  background-size: 100% calc(40000px * var(--bz, 1)) !important; background-position: 0 calc(var(--by, 0px) - 20000px * var(--bz, 1)) !important; }
+:root[data-look="ocean"][data-mode="dark"] .cork { background-image: linear-gradient(180deg, #24707F 0% 47%, #0C4352 49%, #072630 51%, #041A22 55%, #020C11 60% 100%); background-color: #020C11; }
+:root[data-look="ocean"] .cork::before { --tile: calc(360px * var(--bz, 1));
+  background-image: radial-gradient(70px 22px at 30% 30%, rgba(143, 233, 238, 0.12), transparent 70%), radial-gradient(46px 16px at 76% 66%, rgba(143, 233, 238, 0.10), transparent 70%),
+    radial-gradient(100px 30px at 62% 12%, rgba(255, 255, 255, 0.06), transparent 70%), radial-gradient(36px 12px at 12% 82%, rgba(143, 233, 238, 0.09), transparent 70%);
+  animation: bt-slide-x 46s linear infinite; }
+:root[data-look="ocean"] .cork::after { --tile: calc(240px * var(--bz, 1));
+  background-image: radial-gradient(circle at 20% 80%, rgba(220, 250, 255, 0.32) 0 2px, transparent 3px), radial-gradient(circle at 70% 42%, rgba(220, 250, 255, 0.24) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 46% 10%, rgba(220, 250, 255, 0.28) 0 2.5px, transparent 3.5px);
+  animation: bt-slide-up 18s linear infinite; }
+
+/* Postcards: a sunset sky fixed to the board (golden at the top, dusk lower down), the sun in it. */
+:root[data-look="sunset"] .cork { background-color: #2C2147; background-repeat: no-repeat, repeat-x !important;
+  background-image: radial-gradient(circle, rgba(255, 240, 180, 0.95) 0 13%, rgba(255, 225, 160, 0.3) 14% 30%, transparent 31%), linear-gradient(180deg, #FFD9A8 0% 44%, #FFC48F 50%, #FF9468 51.8%, #D65F7A 53.6%, #6A3F7E 55.7%, #2C2147 59% 100%);
+  background-size: calc(600px * var(--bz, 1)) calc(600px * var(--bz, 1)), 100% calc(40000px * var(--bz, 1)) !important;
+  background-position: calc(var(--bx, 0px) + 1000px * var(--bz, 1)) calc(var(--by, 0px) - 80px * var(--bz, 1)), 0 calc(var(--by, 0px) - 20000px * var(--bz, 1)) !important; }
+:root[data-look="sunset"][data-mode="dark"] .cork { background-color: #140F22;
+  background-image: radial-gradient(circle, rgba(255, 200, 150, 0.55) 0 11%, rgba(255, 180, 140, 0.15) 12% 28%, transparent 29%), linear-gradient(180deg, #B0607A 0% 44%, #8C4A5E 50%, #6A3555 51.8%, #3A2550 53.6%, #1C1530 55.7%, #140F22 59% 100%); }
+
+/* Sakura: petals on the paper, and more drifting down. */
+:root[data-look="sakura"] .cork { background-size: calc(260px * var(--bz, 1)) calc(260px * var(--bz, 1)) !important; background-position: var(--bx, 0px) var(--by, 0px) !important; }
+:root[data-look="sakura"] .cork::before { --tile: calc(340px * var(--bz, 1));
+  background-image: radial-gradient(7px 4px at 22% 18%, rgba(244, 143, 177, 0.7) 96%, transparent 100%), radial-gradient(4px 7px at 68% 52%, rgba(248, 187, 208, 0.85) 96%, transparent 100%),
+    radial-gradient(5px 3px at 40% 86%, rgba(236, 120, 160, 0.55) 96%, transparent 100%);
+  animation: bt-fall-wind 30s linear infinite; }
+
+/* Café: wood planks and the glow of the lamps, fixed to the wall. */
+:root[data-look="mocha"] .cork { background-repeat: repeat !important;
+  background-image: radial-gradient(closest-side, rgba(255, 220, 170, 0.13), transparent), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 7%, transparent 7% 38%, rgba(0, 0, 0, 0.06) 38% 45%, transparent 45%);
+  background-size: calc(900px * var(--bz, 1)) calc(700px * var(--bz, 1)), calc(29px * var(--bz, 1)) 100% !important; background-position: var(--bx, 0px) var(--by, 0px), var(--bx, 0px) 0 !important; }
+
+/* Frost: snow lying on the board, and snow falling past it. */
+:root[data-look="arctic"] .cork { background-repeat: repeat, repeat, repeat-x !important;
+  background-image: radial-gradient(circle at 12% 30%, rgba(255, 255, 255, 0.95) 0 1.4px, transparent 2px), radial-gradient(circle at 58% 74%, rgba(255, 255, 255, 0.9) 0 1.1px, transparent 1.7px), radial-gradient(circle at 81% 19%, rgba(120, 165, 210, 0.35) 0 1px, transparent 1.6px), radial-gradient(circle at 37% 52%, rgba(255, 255, 255, 0.8) 0 0.9px, transparent 1.5px),
+    radial-gradient(circle at 70% 40%, rgba(255, 255, 255, 0.85) 0 1.2px, transparent 1.8px), radial-gradient(circle at 22% 86%, rgba(120, 165, 210, 0.3) 0 0.9px, transparent 1.5px),
+    linear-gradient(180deg, #F8FBFD 0% 45%, #E6EFF6 50%, #D3E2EF 57.5% 100%); background-color: #D3E2EF;
+  background-size: calc(140px * var(--bz, 1)) calc(140px * var(--bz, 1)), calc(140px * var(--bz, 1)) calc(140px * var(--bz, 1)), calc(140px * var(--bz, 1)) calc(140px * var(--bz, 1)), calc(140px * var(--bz, 1)) calc(140px * var(--bz, 1)),
+    calc(97px * var(--bz, 1)) calc(97px * var(--bz, 1)), calc(97px * var(--bz, 1)) calc(97px * var(--bz, 1)), 100% calc(40000px * var(--bz, 1)) !important;
+  background-position: var(--bx, 0px) var(--by, 0px), var(--bx, 0px) var(--by, 0px), var(--bx, 0px) var(--by, 0px), var(--bx, 0px) var(--by, 0px), var(--bx, 0px) var(--by, 0px), var(--bx, 0px) var(--by, 0px), 0 calc(var(--by, 0px) - 20000px * var(--bz, 1)) !important; }
+:root[data-look="arctic"][data-mode="dark"] .cork { background-image: radial-gradient(circle at 12% 30%, rgba(220, 235, 255, 0.4) 0 1.4px, transparent 2px), radial-gradient(circle at 58% 74%, rgba(220, 235, 255, 0.35) 0 1.1px, transparent 1.7px), radial-gradient(circle at 81% 19%, rgba(136, 192, 208, 0.25) 0 1px, transparent 1.6px), radial-gradient(circle at 37% 52%, rgba(220, 235, 255, 0.3) 0 0.9px, transparent 1.5px),
+    radial-gradient(circle at 70% 40%, rgba(220, 235, 255, 0.35) 0 1.2px, transparent 1.8px), radial-gradient(circle at 22% 86%, rgba(136, 192, 208, 0.2) 0 0.9px, transparent 1.5px),
+    linear-gradient(180deg, #26303E 0% 45%, #1B2330 50%, #111720 57.5% 100%); background-color: #111720; }
+:root[data-look="arctic"] .cork::before { --tile: calc(170px * var(--bz, 1));
+  background-image: radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.95) 0 2.2px, transparent 3px), radial-gradient(circle at 64% 58%, rgba(255, 255, 255, 0.85) 0 1.6px, transparent 2.4px),
+    radial-gradient(circle at 86% 14%, rgba(255, 255, 255, 0.9) 0 1.9px, transparent 2.7px);
+  filter: drop-shadow(0 0 1px rgba(90, 130, 180, 0.6)); animation: bt-fall 14s linear infinite; }
+:root[data-look="arctic"] .cork::after { --tile: calc(260px * var(--bz, 1));
+  background-image: radial-gradient(circle at 40% 30%, rgba(255, 255, 255, 0.9) 0 3px, transparent 3.8px), radial-gradient(circle at 76% 80%, rgba(255, 255, 255, 0.8) 0 2.6px, transparent 3.4px);
+  filter: drop-shadow(0 0 1px rgba(90, 130, 180, 0.6)); animation: bt-fall 9s linear infinite; }
+
+/* Newsprint: the columns and the grain of the paper, fixed to the page. */
+:root[data-look="newspaper"] .cork { background-repeat: repeat !important;
+  background-image: linear-gradient(90deg, transparent 0 99.2%, rgba(0, 0, 0, 0.07) 99.2%), radial-gradient(circle, rgba(0, 0, 0, 0.05) 9%, transparent 14%);
+  background-size: calc(240px * var(--bz, 1)) 100%, max(3px, calc(7px * var(--bz, 1))) max(3px, calc(7px * var(--bz, 1))) !important; background-position: var(--bx, 0px) 0, var(--bx, 0px) var(--by, 0px) !important; }
+:root[data-look="newspaper"][data-mode="dark"] .cork { background-image: linear-gradient(90deg, transparent 0 99.2%, rgba(255, 255, 255, 0.06) 99.2%), radial-gradient(circle, rgba(255, 255, 255, 0.04) 9%, transparent 14%); }
+
+/* Space: the stars stay put on the board (they used to stay put on the screen); some twinkle, and now and then one shoots past. */
+:root[data-look="space"] .cork { background-image: radial-gradient(circle at 33.1% 16.5%, rgba(255, 255, 255, 0.9) 0.8px, transparent 1.4px), radial-gradient(circle at 80.8% 11.0%, rgba(200, 220, 255, 0.8) 0.8px, transparent 1.4px), radial-gradient(circle at 5.6% 43.6%, rgba(200, 220, 255, 0.8) 0.8px, transparent 1.4px), radial-gradient(circle at 10.7% 42.8%, rgba(200, 220, 255, 0.8) 0.8px, transparent 1.4px), radial-gradient(circle at 62.5% 58.0%, rgba(255, 255, 255, 0.6) 0.8px, transparent 1.4px), radial-gradient(circle at 6.8% 23.2%, rgba(255, 240, 220, 0.85) 1px, transparent 1.7px), radial-gradient(circle at 42.2% 53.9%, rgba(200, 220, 255, 0.8) 1.2px, transparent 2.0px), radial-gradient(circle at 11.9% 56.8%, rgba(255, 240, 220, 0.85) 1px, transparent 1.7px), radial-gradient(circle at 11.4% 70.4%, rgba(200, 220, 255, 0.8) 0.8px, transparent 1.4px), radial-gradient(circle at 49.7% 53.0%, rgba(255, 255, 255, 0.6) 1.2px, transparent 2.0px), radial-gradient(circle at 58.2% 45.5%, rgba(200, 220, 255, 0.8) 1.2px, transparent 2.0px), radial-gradient(circle at 78.3% 69.1%, rgba(255, 255, 255, 0.9) 1px, transparent 1.7px), radial-gradient(circle at 57.1% 52.4%, rgba(255, 255, 255, 0.6) 1.2px, transparent 2.0px), radial-gradient(circle at 29.6% 96.1%, rgba(255, 255, 255, 0.6) 0.8px, transparent 1.4px), radial-gradient(circle at 17.8% 34.8%, rgba(200, 220, 255, 0.45) 0.8px, transparent 1.4px), radial-gradient(circle at 5.8% 66.1%, rgba(200, 220, 255, 0.45) 1px, transparent 1.7px), radial-gradient(circle at 34.7% 35.6%, rgba(200, 220, 255, 0.45) 0.8px, transparent 1.4px), radial-gradient(circle at 8.6% 11.0%, rgba(200, 220, 255, 0.45) 0.8px, transparent 1.4px), radial-gradient(circle at 68.9% 8.2%, rgba(200, 220, 255, 0.45) 1px, transparent 1.7px), radial-gradient(circle at 64.1% 97.3%, rgba(200, 220, 255, 0.45) 0.8px, transparent 1.4px), radial-gradient(circle at 70.8% 87.2%, rgba(255, 255, 255, 0.5) 0.8px, transparent 1.4px), radial-gradient(circle at 92.3% 36.1%, rgba(255, 255, 255, 0.5) 1px, transparent 1.7px), radial-gradient(circle at 49.4% 22.9%, rgba(255, 255, 255, 0.5) 0.8px, transparent 1.4px), radial-gradient(circle at 72.9% 40.2%, rgba(255, 255, 255, 0.5) 0.8px, transparent 1.4px) !important;
+  background-size: calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)), calc(457px * var(--bz, 1)) calc(457px * var(--bz, 1)) !important; }
+:root[data-look="space"] .cork::before { --tile: calc(523px * var(--bz, 1));
+  background-image: radial-gradient(circle at 18.0% 40.6%, rgba(255, 255, 255, 1) 1.6px, transparent 2.7px), radial-gradient(circle at 80.7% 84.9%, rgba(255, 246, 225, 1) 1.6px, transparent 2.7px), radial-gradient(circle at 41.9% 36.4%, rgba(255, 255, 255, 1) 1.6px, transparent 2.7px), radial-gradient(circle at 16.5% 18.9%, rgba(255, 246, 225, 1) 1.3px, transparent 2.2px), radial-gradient(circle at 24.4% 48.6%, rgba(220, 232, 255, 1) 1.3px, transparent 2.2px), radial-gradient(circle at 29.1% 16.0%, rgba(255, 246, 225, 1) 1.6px, transparent 2.7px);
+  animation: bt-twinkle 3.6s ease-in-out infinite; }
+:root[data-look="space"] .cork::after { inset: auto; top: 12%; left: 78%; width: 140px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(200, 220, 255, 0)); background-size: auto;
+  opacity: 0; animation: bt-shoot 11s ease-in infinite 2s; }
+
+/* Still: no movement (Settings → Boards → Backgrounds, or the phone's Reduce Motion). */
+:root[data-still] .cork::before, :root[data-still] .cork::after { animation: none !important; }
+:root[data-still][data-look="space"] .cork::after { display: none; }
+@media (prefers-reduced-motion: reduce) { .cork::before, .cork::after { animation: none !important; } :root[data-look="space"] .cork::after { display: none; } }

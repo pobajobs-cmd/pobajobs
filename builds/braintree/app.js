@@ -21,7 +21,7 @@ import { createTimeline } from './timeline.js';
 import * as remind from './remind.js';
 import { widgetScript } from './widget.js';
 
-const VERSION = '0.9.2';
+const VERSION = '0.9.3';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -1912,6 +1912,8 @@ async function settingsModal(focus) {
       <div class="lookpick">${Object.entries(theme.LOOKS).map(([id, l]) => `
         <button data-pick-look="${id}" class="${p.look === id ? 'on' : ''}">${lookPreview(id)}<span>${l.name}</span></button>`).join('')}</div>
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
+      <div class="setrow"><span>Backgrounds</span>${seg('motion', { on: 'Moving', off: 'Still' })}</div>
+      <p class="hint">Some looks move a little by themselves: the sea’s light and bubbles, snow, petals, twinkling and shooting stars. Still keeps them still (so does the phone’s Reduce Motion setting).</p>
       <div class="setrow"><span>Card only strung outside its section</span>${seg('tidyMove', { ask: 'Tidy suggests moving it', move: 'Tidy moves it' })}</div>
       <p class="hint">When a card’s strings all go to things outside its section, Tidy tries it out of the section (or in the one its strings go to). If the board comes out tidier, it suggests the move, or just makes it if you choose that (Undo puts it back).</p>
       <h3 id="set-remind">Reminders</h3>
