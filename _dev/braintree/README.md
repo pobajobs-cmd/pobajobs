@@ -295,6 +295,12 @@ The user said to build all of the proposed theme packs and fixes ("Go for all yo
 - New fonts: Typewriter and Handwritten (Settings → Text style).
 - Tested headless (Edge): every pack's board, Case file / Studio / Workshop / Field notes / Night sky lists, Studio's timeline, Golden hour light and dark, Sakura at night, Amber, Newsprint in dark mode, Seasons resolving to Woodland in November. Not tested on the iPhone.
 
+## 0.9.6 Polish
+
+- A sweep of every theme (24) in light and dark through Today, a project, its board, the timeline, the weekly review, Upcoming and Settings, on desktop and phone shapes: no errors, every look and string colour set. Phone shots of Studio, Workshop, the Studio timeline and Case file's review.
+- The weekly review's Late list shows the first 8, then "Show N more".
+- Settings → Boards no longer offers Iceberg as everyone's look (it drew an iceberg round ordinary sections); it's for iceberg charts' own boards (hold a project → Board look). Still shown there if it's already picked.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
