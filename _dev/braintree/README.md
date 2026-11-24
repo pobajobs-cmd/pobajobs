@@ -20,7 +20,7 @@ Open it from the home screen and sign in there. The home-screen app keeps its ow
 
 | What | Where |
 |---|---|
-| App (published) | `builds/braintree/`: `index.html`, `app.js` (screens), `store.js` (offline data and sync), `editor.js` (note editor), `board.js` (boards), `theme.js` (looks), `media.js` (YouTube clips), `draw.js` (drawings), `sheet.js` (spreadsheets), `attach.js` (files and links), `preview.js` (files as pictures on boards, 0.7.9), `record.js` (Record mode: a board as a video, 0.8.0), `export.js` (PDF, print, CSV), `example.js` (example project), `gestures.js` (swipe, hold, drag in the lists), `styles.css`, `sw.js` (offline files) |
+| App (published) | `builds/braintree/`: `index.html`, `app.js` (screens), `store.js` (offline data and sync), `editor.js` (note editor), `board.js` (boards), `theme.js` (looks), `media.js` (YouTube clips), `draw.js` (drawings), `sheet.js` (spreadsheets), `attach.js` (files and links), `preview.js` (files as pictures on boards, 0.7.9), `record.js` (Record mode: a board as a video, 0.8.0), `search.js` (search, 0.8.1), `export.js` (PDF, print, CSV), `example.js` (example project), `gestures.js` (swipe, hold, drag in the lists), `styles.css`, `sw.js` (offline files) |
 | Server code | `worker-braintree.js` (imported by `worker.js`; kept off the site by `.assetsignore`) |
 | Data online | D1 database `pobajobs`, tables `bt_items`, `bt_files` (photos), `bt_meta`, `bt_logins` |
 | Data on each device | The browser's IndexedDB (`braintree`), so the app works offline |
@@ -224,6 +224,17 @@ The user's idea: a "record" mode for making videos from a board (think true crim
 - **Play** opens a full-screen player (play/pause, scrub, close). **Voiceover**: an audio file kept like any file; "Time the shots to it" plays it, and each tap of Next shot ends the shot that's on (durations are worked back from the taps, less each transition). **Make video** records the player as it plays (`MediaRecorder` on `canvas.captureStream(30)`, the voiceover mixed in through an `AudioContext`): MP4 where the browser can (Chrome, Edge, Safari), WebM otherwise, 1080×1920 or 1920×1080, 10 Mbit/s; then shared (phone) or downloaded, like an export.
 - Tested headless (Edge): the editor on desktop and phone shapes; a tap on a card adds a shot; the scene ready in about 0.1 s; frames across a 7-shot recording on the CNC board (Circuit) and the example's (Corkboard) show every effect; Make video gave an 8.6 s MP4 (5.3 MB); tap-along timing set the durations as expected. Not tested: a real iPhone (share sheet after recording, audio in the video, smoothness), a real voiceover, long recordings.
 - Example project: "How it comes together", 9:16, True crime, nine shots using most effects and every transition; a notes line about Record.
+
+## 0.8.1 Search everywhere, in a project, and on a board
+
+The user couldn't find the example recording (theirs was an example project from before 0.8.0, which never got one) and asked for search across the whole app and in each project.
+
+- **Search** (new `search.js`): the words typed, in any order, anywhere in a thing: title, text, checklists, spreadsheet cells (as they show, formulas worked out), file names, clip and link titles, a link's site, and string labels. Capitals and accents don't matter; "quotes" keep words together. Results best first (title hits above text hits, a word's start above its middle), with the words marked and a line of the text round them when they were found there.
+- **Everywhere** (the side panel's box): projects that match first, then results under their top project, with where each is inside it (section › sub-project), then things in no project. On a phone the side panel is out of sight once results show (that hid the box as you typed), so there its box is read-only and opens a search page with its own box (`findAll`, `#listFind` in `all` mode).
+- **In a project**: a magnifier in the list's top bar (`#findBtn`, or `/`) opens a box under it (`#listFind` in `project` mode); results grouped by what's loose in the project, then each section or sub-project; "Search everywhere for …" moves the words to the everywhere search. On a phone the Board button is just its icon now, so the project's name has room.
+- **Find on a board** (the magnifier in the board's header, or `/`): matching cards and sections stay bright, the rest fade (strings too), ‹ › or Enter / Shift+Enter go through them in reading order, and the board glides to each (close enough to read, or all of a big section). Kept through redraws; closed by Record and by changing boards.
+- **The example's recording** is now `exampleRecording()` in example.js; an example project with no `recs` gets it (cards found by their titles, `EXAMPLE_REC_CARDS`), once per device and only after this device has synced, so deleting it keeps it gone.
+- Tested headless (Edge), desktop and phone shapes: words only in a spreadsheet, a file name and a string label; capitals; quotes; nothing found; a project's search and moving it to everywhere; the phone search page keeping its box focused; board Find (1 of 3, Enter to the next, the view gliding there, still marked after a redraw); the recording added to an older example and staying gone once deleted. No errors.
 
 ## Free tier
 
