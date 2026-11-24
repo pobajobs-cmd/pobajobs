@@ -56,10 +56,11 @@ const WORDS = {
   arctic: words('Draw a line', 'Line melted away.', 'Line drawn.'),
   newspaper: words('Mark it up', 'Mark struck out.', 'Marked up.'),
   amber: words('Pipe one into the other', 'Pipe killed.', 'Piped.'),
+  iceberg: words('Draw a line', 'Line removed.', 'Line drawn.'),   // (0.9.4)
 };
 // (0.9.2) Each newer look draws its strings the way an older one does (smooth curves, a pen line,
 // right angles…) and has its own colours, cards, sections and banner in styles.css.
-const LOOK_BASE = { ocean: 'neon', sunset: 'minimal', sakura: 'neon', mocha: 'notebook', arctic: 'blueprint', newspaper: 'whiteboard', amber: 'hacker' };
+const LOOK_BASE = { ocean: 'neon', sunset: 'minimal', sakura: 'neon', mocha: 'notebook', arctic: 'blueprint', newspaper: 'whiteboard', amber: 'hacker', iceberg: 'minimal' };
 function words(tie, cut, done) {
   return { ...TIE, tie, cut, done, hint: 'Drag the dot on a card’s edge onto another card, or tap String, to tie them together.' };
 }
@@ -816,6 +817,7 @@ export function createBoard(host, api) {
     else if (!cards.length && !frames.length) { hint.textContent = 'Nothing here yet. Add a note, a to-do or a section below.'; hint.hidden = false; }
     else { hint.textContent = words().hint; hint.hidden = cards.length < 2 || hasLinks || readLocal('bt-hint-seen', false); }
     drawLines();
+    drawBerg();   // (0.9.4)
     if (needsFit) { needsFit = false; fit(); } else applyView();
     if (findQ) runFind(findQ, false);
   }
@@ -2653,6 +2655,7 @@ export function createBoard(host, api) {
       menu(r.left + 10, r.top, a === 'fit'
         ? [{ label: 'Fit everything on screen', fn: () => fit() }]
         : [
+          ...(isBerg() ? [{ label: 'Arrange as an iceberg (tiers from the tip down)', fn: () => arrangeIceberg() }] : []),
           { label: 'Tidy everything (sections and cards)', fn: () => tidy('all') },
           ...(frames.length ? [{ label: 'Tidy inside sections (sections stay put)', fn: () => tidy('inside') }] : []),
           { label: 'Tidy strings only (cards stay put)', fn: () => tidyStrings() },
@@ -3344,13 +3347,22 @@ export function createBoard(host, api) {
       try { const bb = lines.getBBox(); if (bb.width || bb.height) grow(bb.x, bb.y, bb.width, bb.height); } catch (e) {}
       out += `<g>${inlineSVG(strings, true)}</g>`;
 
+      // (0.9.4) the iceberg and its depths are part of the picture
+      if (isBerg()) for (const el of bergEl.querySelectorAll('.ice.over, .depth')) { try { const bb = el.getBBox(); if (bb.width) grow(bb.x, bb.y, bb.width, bb.height); } catch (e) {} }
       if (x0 === Infinity) throw new Error('There’s nothing on this board yet.');
       const pad = 40;
       x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
       const W = Math.ceil(x1 - x0), H = Math.ceil(y1 - y0);
       const bgc = getComputedStyle(cork).backgroundColor;
       const tex = look() === 'corkboard' ? cork.style.getPropertyValue('--cork-tex').replace(/^url\(["']?|["']?\)$/g, '') : '';
-      const bg = `<rect x="${f(x0)}" y="${f(y0)}" width="${W}" height="${H}" fill="${bgc}"/>` + (tex ? `<defs><pattern id="bt-cork" width="220" height="220" patternUnits="userSpaceOnUse"><image href="${tex}" width="220" height="220"/></pattern></defs><rect x="${f(x0)}" y="${f(y0)}" width="${W}" height="${H}" fill="url(#bt-cork)"/>` : '');
+      // (0.9.4) the iceberg: sky and water (darker with depth), and the ice
+      let berg = '';
+      if (isBerg()) {
+        const wl = bergWL;
+        berg = `<defs><linearGradient id="bt-sea" gradientUnits="userSpaceOnUse" x1="0" y1="${f(wl - 2000)}" x2="0" y2="${f(wl + 4000)}"><stop offset="0" stop-color="#E8F6FD"/><stop offset="0.3333" stop-color="#A8DAF3"/><stop offset="0.3334" stop-color="#3B8DC0"/><stop offset="0.4667" stop-color="#1E5C8C"/><stop offset="0.6667" stop-color="#0E3456"/><stop offset="1" stop-color="#06111F"/></linearGradient></defs>`;
+      }
+      const X0e = x0, Y0e = y0;
+      const bg = (isBerg() ? `${berg}<rect x="${f(X0e - 40)}" y="${f(Y0e - 40)}" width="${W + 80}" height="${H + 80}" fill="url(#bt-sea)"/><g>${inlineSVG(bergEl, true)}</g>` : `<rect x="${f(x0)}" y="${f(y0)}" width="${W}" height="${H}" fill="${bgc}"/>`) + (tex ? `<defs><pattern id="bt-cork" width="220" height="220" patternUnits="userSpaceOnUse"><image href="${tex}" width="220" height="220"/></pattern></defs><rect x="${f(x0)}" y="${f(y0)}" width="${W}" height="${H}" fill="url(#bt-cork)"/>` : '');
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="${f(x0)} ${f(y0)} ${W} ${H}">${bg}${out}</svg>`;
       for (const el of hidden) el.style.display = '';
       const extra = opts.collect ? await opts.collect(ox, oy) : null;
@@ -3360,6 +3372,89 @@ export function createBoard(host, api) {
       host.classList.remove('exporting');
       view = savedView; applyView();
     }
+  }
+
+  // ----- (0.9.4) Iceberg -----
+  // On the Iceberg look a board is an iceberg chart: its sections are the tiers, from the tip down
+  // (in the order they're in the list). Above the first tier is the sky; the waterline runs under
+  // it; the water gets darker the deeper the tiers go; and an iceberg is drawn round the tiers.
+  // "Arrange as an iceberg" (under Tidy) stacks the tiers, each a little wider than the one above.
+  const isBerg = () => api.style() === 'iceberg';
+  const bergEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  bergEl.setAttribute('class', 'berg'); bergEl.setAttribute('width', '1'); bergEl.setAttribute('height', '1'); bergEl.setAttribute('overflow', 'visible');
+  world.prepend(bergEl);
+  const DEPTHS = ['The tip', '20 m down', '100 m down', '500 m down', '1,500 m down', '4,000 m down', '8,000 m down', '11,000 m down'];
+  const tierOrder = () => [...frames].sort((a, b) => (a.data.order || 0) - (b.data.order || 0) || (a.data.created || '').localeCompare(b.data.created || ''));
+  let bergWL = 0;
+  function drawBerg() {
+    if (!isBerg()) { if (bergEl.firstChild) bergEl.innerHTML = ''; cork.style.removeProperty('--wl'); return; }
+    const rs = frames.map(r => rectOf(r.id)).filter(Boolean).sort((a, b) => a.y - b.y);
+    const all = [...frames, ...cards].map(r => rectOf(r.id)).filter(Boolean);
+    const top = all.length ? Math.min(...all.map(b => b.y)) : 0;
+    bergWL = rs.length >= 2 ? (rs[0].y + rs[0].h + rs[1].y) / 2 : rs.length ? rs[0].y + rs[0].h + 40 : top + 200;
+    cork.style.setProperty('--wl', Math.round(bergWL));
+    if (!rs.length) { bergEl.innerHTML = `<path class="waterline" d="M-20000 ${f(bergWL)}H20000"/>`; return; }
+    // A rough outline round the tiers: down the right side, a ragged bottom, up the left, to a peak.
+    let seed = hash(key);
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const R = [], L = [], pad = 30;
+    for (const b of rs) {
+      R.push([b.x + b.w + pad + rnd() * 16, b.y + 6 + rnd() * 18], [b.x + b.w + pad + 10 + rnd() * 22, b.y + b.h * (0.35 + rnd() * 0.3)], [b.x + b.w + pad + rnd() * 16, b.y + b.h - rnd() * 10]);
+      L.push([b.x - pad - rnd() * 16, b.y + 6 + rnd() * 18], [b.x - pad - 10 - rnd() * 22, b.y + b.h * (0.35 + rnd() * 0.3)], [b.x - pad - rnd() * 16, b.y + b.h - rnd() * 10]);
+    }
+    const t0 = rs[0], last = rs[rs.length - 1], by = last.y + last.h + 40;
+    const peak = [[t0.x + t0.w * (0.3 + rnd() * 0.1), t0.y - 40 - rnd() * 20], [t0.x + t0.w * (0.5 + rnd() * 0.1), t0.y - 95 - rnd() * 25], [t0.x + t0.w * (0.75 + rnd() * 0.1), t0.y - 35 - rnd() * 20]];
+    const foot = [[last.x + last.w * 0.8, by + 30 + rnd() * 40], [last.x + last.w * 0.55, by + 80 + rnd() * 50], [last.x + last.w * 0.3, by + 50 + rnd() * 40], [last.x + last.w * 0.1, by + 10 + rnd() * 30]];
+    const pts = [...peak, ...R, ...foot, ...L.reverse()];
+    const d = 'M' + pts.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + 'Z';
+    const xs = pts.map(p => p[0]), X0 = Math.min(...xs) - 60, X1 = Math.max(...xs) + 60, Y0 = Math.min(...pts.map(p => p[1])) - 60, Y1 = Math.max(...pts.map(p => p[1])) + 60;
+    // (how deep each tier is, beside it)
+    const marks = tierOrder().map(r => rectOf(r.id)).filter(Boolean).map((b, i) => `<text class="depth${b.y + 30 < bergWL ? ' up' : ''}" x="${f(X0 - 10)}" y="${f(b.y + 30)}" text-anchor="end">${DEPTHS[Math.min(i, DEPTHS.length - 1)]}</text>`).join('');
+    bergEl.innerHTML = `<defs><clipPath id="bt-berg-up"><rect x="${f(X0)}" y="${f(Y0)}" width="${f(X1 - X0)}" height="${f(Math.max(0, bergWL - Y0))}"/></clipPath>
+      <clipPath id="bt-berg-down"><rect x="${f(X0)}" y="${f(bergWL)}" width="${f(X1 - X0)}" height="${f(Math.max(0, Y1 - bergWL))}"/></clipPath></defs>
+      <path class="ice under" d="${d}" clip-path="url(#bt-berg-down)"/><path class="ice over" d="${d}" clip-path="url(#bt-berg-up)"/>
+      <path class="waterline" d="M${f(X0 - 20000)} ${f(bergWL)}H${f(X1 + 20000)}"/>${marks}`;
+  }
+  // The tiers stacked from the tip down, each at least as wide as the one above; their cards in rows.
+  async function arrangeIceberg() {
+    if (busy) return;
+    const tiers = tierOrder();
+    if (!tiers.length) { api.toast('Add sections first: each one is a tier of the iceberg, from the tip down.'); return; }
+    const byOrder = (a, b) => (a.data.order || 0) - (b.data.order || 0) || (a.data.created || '').localeCompare(b.data.created || '');
+    const inTier = new Map(tiers.map(t => [t.id, cards.filter(c => c.data.parent === t.id && !isSketch(c)).sort(byOrder)]));
+    const n = tiers.length, M = Math.min(6, Math.max(3, n));
+    const out = new Map(), GAPY = 60, WL_GAP = 150;
+    let prevCols = 1, y = 0;
+    const rowsOf = (list, cols) => { const rows = []; for (let i = 0; i < list.length; i += cols) rows.push(list.slice(i, i + cols)); return rows; };
+    // (loose cards float above the tip)
+    const loose = cards.filter(c => !frameIds.has(c.data.parent) && !isSketch(c)).sort(byOrder);
+    if (loose.length) {
+      const rows = rowsOf(loose, Math.min(4, loose.length));
+      for (const row of rows) {
+        const h = Math.max(...row.map(c => hOf(c.id))), w = row.length * CARD_W + (row.length - 1) * GAP;
+        row.forEach((c, i) => out.set(c.id, { x: -w / 2 + i * (CARD_W + GAP), y }));
+        y += h + GAP;
+      }
+      y += 70;
+    }
+    tiers.forEach((t, i) => {
+      const list = inTier.get(t.id);
+      let cols = 1 + Math.round(i * (M - 1) / Math.max(1, n - 1));
+      cols = Math.min(8, Math.max(cols, prevCols, Math.ceil(list.length / 3)));
+      prevCols = cols;
+      const w = Math.max(320, cols * CARD_W + (cols - 1) * GAP + 2 * PAD), x = -w / 2;
+      let cy = y + HEAD + 8;
+      for (const row of rowsOf(list, cols)) {
+        const rw = row.length * CARD_W + (row.length - 1) * GAP, h = Math.max(...row.map(c => hOf(c.id)));
+        row.forEach((c, j) => out.set(c.id, { x: -rw / 2 + j * (CARD_W + GAP), y: cy }));
+        cy += h + GAP;
+      }
+      const h = Math.max(150, cy - GAP + PAD - y);
+      out.set(t.id, { x, y, w, h });
+      y += h + (i === 0 ? WL_GAP : GAPY);
+    });
+    const undo = await applyLayout(out, 'all');
+    api.toast('Arranged as an iceberg: the tip at the top, the deepest tier at the bottom.', 'Undo', undo);
   }
 
   // ----- (0.8.1) Find on this board -----
@@ -3451,6 +3546,7 @@ export function createBoard(host, api) {
   return {
     exportSVG,
     find: openFind,
+    iceberg: () => arrangeIceberg(),   // (0.9.4)
     show(boardKey) {
       if (boardKey !== key) {
         if (recMode) setRecMode(false);

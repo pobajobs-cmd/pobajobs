@@ -21,7 +21,7 @@ import { createTimeline } from './timeline.js';
 import * as remind from './remind.js';
 import { widgetScript } from './widget.js';
 
-const VERSION = '0.9.3';
+const VERSION = '0.9.4';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -71,6 +71,7 @@ const ICON = {
   bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg>',
   tpl: '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" stroke-dasharray="3 2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
   link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+  berg: '<svg viewBox="0 0 24 24"><path d="M2 11h20"/><path d="M9 11l2-5 2 2 1.5-1L16 11"/><path d="M6 11l1.5 6 4 4 4-2.5 2.5-7.5"/></svg>',
 };
 // The small icons on a note's row for what it holds.
 const ROWIC = {
@@ -349,6 +350,7 @@ function render() {
   const onBoard = route.view === 'board' && !search;
   const onTimeline = route.view === 'timeline' && !search;   // (0.9.0)
   document.body.dataset.view = onBoard ? 'board' : onTimeline ? 'timeline' : 'lists';
+  theme.showBoardLook(theme.current(store), onBoard ? boardLook(route.board) : null);   // (0.9.4)
   document.body.toggleAttribute('data-drawer', (onBoard || onTimeline) && !!route.item);
   document.body.dataset.pane = route.item ? 'detail' : (route.view || route.project || searching()) ? 'list' : 'nav';
   renderNav();
@@ -361,6 +363,69 @@ function render() {
   } else renderList();
   renderDetail();
   gest.restore();
+}
+
+// (0.9.4) A project's board can have its own look (an iceberg chart, say).
+const boardLook = id => { const l = id && I?.byId.get(id)?.data.look; return l && l in theme.LOOKS ? l : null; };
+function boardLookSheet(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  const cur = r.data.look || '';
+  modal(`
+    <div class="sethead"><button type="button" class="setdone" data-close>Done</button><h2>Board look</h2></div>
+    <p class="hint">How “${esc(titleOf(r))}” looks on its board. Other boards keep yours (Settings → Boards).</p>
+    <div class="settings"><button class="setbtn ${cur ? '' : 'on'}" data-blook="">Same as my other boards (${esc(theme.LOOKS[theme.current(store).look]?.name || 'Corkboard')})</button>
+    <div class="lookpick">${Object.entries(theme.LOOKS).map(([lid, l]) => `<button data-blook="${lid}" class="${cur === lid ? 'on' : ''}">${lookPreview(lid)}<span>${l.name}</span></button>`).join('')}</div></div>`, el => {
+    el.addEventListener('click', async e => {
+      const b = e.target.closest('[data-blook]');
+      if (!b) return;
+      const was = r.data.look;
+      await store.update(id, { look: b.dataset.blook || undefined });
+      closeModal();
+      toast(b.dataset.blook ? `“${titleOf(r)}” now has the ${theme.LOOKS[b.dataset.blook].name} look.` : 'Back to the same look as your other boards.', 'Undo', () => store.update(id, { look: was }));
+    });
+  });
+}
+
+// (0.9.4) An iceberg chart: a project whose board has the Iceberg look, with a section for each tier
+// (the tip down to the abyss), arranged as an iceberg, and a recording that dives down through it.
+const ICEBERG_TIERS = ['Level 1: Everyone knows this', 'Level 2: Most people have heard of it', 'Level 3: Fans know this', 'Level 4: Deep cuts', 'Level 5: Almost nobody knows', 'Level 6: The abyss'];
+function icebergSheet() {
+  modal(`
+    <h2>New iceberg chart</h2>
+    <form class="tplform">
+      <label class="field">What’s it about?<input class="tname" placeholder="e.g. Octopus facts" maxlength="120" autocomplete="off" enterkeyhint="done"></label>
+      <p class="hint">Makes a project with six tiers, from what everyone knows at the tip to the abyss at the bottom. Rename the tiers, add more, and put things in them (on the board or in the list). Its board shows them as an iceberg, and its Record has a dive down through them ready to play.</p>
+      <div class="mbtns"><button type="button" data-close>Cancel</button><button class="primary">Make it</button></div>
+    </form>`, el => {
+    const nm = el.querySelector('.tname');
+    setTimeout(() => nm.focus(), 30);
+    el.querySelector('form').addEventListener('submit', async e => {
+      e.preventDefault();
+      el.querySelector('.primary').disabled = true;
+      const about = nm.value.trim() || 'Untitled';
+      closeModal();
+      const now = new Date(Date.now() - 60_000).toISOString();
+      let order = Date.now();
+      const pid = await store.create({ type: 'project', title: `Iceberg: ${about}`, created: now, order: order++, look: 'iceberg',
+        body: '<p>An iceberg chart: the tip is what everyone knows, and each tier down is more obscure, down to the abyss. Rename the tiers and add to them; Tidy → Arrange as an iceberg lays it out again.</p>' });
+      const tiers = [];
+      for (const t of ICEBERG_TIERS) tiers.push(await store.create({ type: 'section', title: t, parent: pid, created: now, order: order++, body: '' }));
+      await store.update(pid, { recs: [icebergDive(tiers)] });
+      go({ view: 'board', board: pid, project: null, item: null });
+      // (laid out once the board has drawn, so the cards' sizes are known)
+      setTimeout(() => board?.iceberg?.(), 700);
+    });
+  });
+}
+function icebergDive(tierIds) {
+  let n = 0;
+  const S = (k, tid, extra = {}) => ({ sid: `dive${n++}`, k, tid: tid || null, at: { dx: 0, dy: 0, w: 0 }, dur: 3, trans: 'glide', fx: {}, cap: null, ...extra });
+  return { id: 'iceberg-dive', name: 'The dive', aspect: '16:9', look: 'none', audio: null, shots: [
+    S('board', null, { dur: 3, cap: { text: 'How deep does it go?', style: 'type' } }),
+    ...tierIds.map((t, i) => S('section', t, { dur: 4, trans: i ? 'glide' : 'zoom', fx: { spot: true }, cap: { text: ICEBERG_TIERS[i].split(':')[0], style: 'lower', sub: ICEBERG_TIERS[i].split(': ')[1] || '' } })),
+    S('board', null, { trans: 'zoom', dur: 3, cap: { text: 'That’s the whole iceberg.', style: 'type' } }),
+  ] };
 }
 
 let timeline = null;
@@ -387,7 +452,7 @@ const boardApi = {
   toast: (...a) => toast(...a),
   newItem: (type, parent, extra) => newItem(type, parent ?? null, extra),
   placePicker: (key, exclude, onPick) => pickItem({ title: 'Bring onto this board', exclude: new Set(exclude), only: r => r.data.type !== 'section', onPick }),
-  style: () => theme.current(store).look,
+  style: () => boardLook(route.board) || theme.current(store).look,   // (0.9.4: a board's own look, else yours)
   tidyMove: () => theme.current(store).tidyMove === 'move',
   ownWire: () => !!theme.current(store).string,   // your own string colour (instead of the look's)
   pickClip: c => clipModal(c),
@@ -1584,7 +1649,7 @@ function itemMenu(id) {
   if (type === 'project') items.push(mi('board', ICON.board, 'Open its board'), mi('add', ICON.plus, 'Add a to-do to it'), mi('done', ICON.check, d.done ? 'Reopen project' : 'Finish project'));
   if (type === 'project') items.push(...(d.lock ? [mi('locknow', ICON.lock, 'Lock it now'), mi('lockset', ICON.lock, 'Change its password…'), mi('unlockall', ICON.unlock, 'Take the lock off')] : [mi('lockset', ICON.lock, 'Lock with a password…')]));
   if (type === 'project' || type === 'section') items.push(mi('export', ICON.share, 'Print or export…'));
-  if (type === 'project') items.push(mi('share', ICON.link, d.share ? 'Read-only link…' : 'Share a read-only link…'));
+  if (type === 'project') items.push(mi('share', ICON.link, d.share ? 'Read-only link…' : 'Share a read-only link…'), mi('blook', ICON.board, d.look && theme.LOOKS[d.look] ? `Board look: ${theme.LOOKS[d.look].name}…` : 'Board look…'));
   if (type === 'project') items.push(mi('fromtpl', ICON.copy, d.template ? 'Start a project from this template…' : 'Start a new project like this…'), mi('tpl', ICON.tpl, d.template ? 'Stop it being a template' : 'Make it a template'));
   if (type !== 'section') items.push(mi('pin', ICON.pin, d.pinned ? 'Unpin' : `Pin to ${pinWhere(r)}`));
   if (canTop(r)) items.push(mi('top', ICON.top, 'Move to the top'));
@@ -1619,6 +1684,7 @@ function itemMenu(id) {
       else if (m === 'lockset') lockSheet(id);
       else if (m === 'unlockall') removeLock(id);
       else if (m === 'share') shareSheet(id);
+      else if (m === 'blook') boardLookSheet(id);
       else if (m === 'fromtpl') fromTemplateSheet(id);
       else if (m === 'tpl') { await store.update(id, { template: d.template ? undefined : true }); toast(d.template ? 'Not a template now: it’s back in Today and the timeline.' : 'Made a template: it’s under Templates in the sidebar, and stays out of Today and the timeline.', 'Undo', () => store.update(id, { template: d.template })); }
       else if (m === 'export') exportSheet({ project: type === 'project' ? id : I.project(r)?.id, section: type === 'section' ? id : null });
@@ -1882,6 +1948,9 @@ function lookPreview(id) {
       <rect x="8" y="10" width="36" height="28" fill="#F9F6EE" transform="rotate(-2 26 24)"/><path d="M12 16H40" stroke="#1A1A1A" stroke-width="1.6" transform="rotate(-2 26 24)"/><path d="M12 22H38M12 26H36M12 30H39" stroke="rgba(0,0,0,.3)" transform="rotate(-2 26 24)"/>
       <rect x="76" y="11" width="36" height="27" fill="#F9F6EE" transform="rotate(2 94 24)"/><path d="M80 17H108" stroke="#1A1A1A" stroke-width="1.6" transform="rotate(2 94 24)"/>
       <path d="M45 28C55 23 63 31 72 26" fill="none" stroke="#B3261E" stroke-width="2" stroke-linecap="round"/><path d="M67 22.5L72.5 26L66.5 29" fill="none" stroke="#B3261E" stroke-width="1.8" stroke-linecap="round"/>`,
+    iceberg: `<rect width="120" height="48" fill="#06111F"/><rect width="120" height="17" fill="#CFEAF8"/><rect y="17" width="120" height="10" fill="#3B8DC0"/><rect y="27" width="120" height="10" fill="#1E5C8C"/><rect y="37" width="120" height="11" fill="#0E3456"/>
+      <path d="M52 17L58 5L62 9L66 6L70 17Z" fill="#F7FCFF"/><path d="M52 17L44 30L40 46H82L78 30L70 17Z" fill="rgba(200,235,255,.25)" stroke="rgba(220,245,255,.5)"/><path d="M0 17H120" stroke="#fff" stroke-dasharray="5 3"/>
+      <rect x="54" y="8" width="12" height="7" rx="1.5" fill="#fff"/><rect x="47" y="21" width="12" height="7" rx="1.5" fill="#fff"/><rect x="62" y="21" width="12" height="7" rx="1.5" fill="#fff"/><rect x="44" y="34" width="10" height="7" rx="1.5" fill="#fff"/><rect x="57" y="34" width="10" height="7" rx="1.5" fill="#fff"/><rect x="70" y="34" width="10" height="7" rx="1.5" fill="#fff"/>`,
     amber: `<rect width="120" height="48" fill="#0B0803"/><path d="M0 4H120M0 10H120M0 16H120M0 22H120M0 28H120M0 34H120M0 40H120M0 46H120" stroke="rgba(255,176,0,.05)"/>
       <rect x="8" y="9" width="38" height="30" fill="#120C04" stroke="#8A5A00"/><rect x="8" y="9" width="38" height="6" fill="#1C1306"/><path d="M12 23h12M12 29h18" stroke="#FFB000" stroke-width="1.6"/>
       <rect x="74" y="9" width="38" height="30" fill="#120C04" stroke="#8A5A00"/><rect x="74" y="9" width="38" height="6" fill="#1C1306"/><path d="M78 23h16M78 29h10" stroke="#FFB000" stroke-width="1.6"/>
@@ -2613,12 +2682,14 @@ function newMenu(anchorParent) {
       <button class="primary" data-n="project">${ICON.folder} Project</button>
       ${route.project && anchorParent === route.project ? `<button class="primary" data-n="section">${ICON.section} Section in this project</button>` : ''}
       ${I.live.some(r => r.data.type === 'project' && r.data.template) ? `<button class="primary" data-n="tpl">${ICON.tpl} Project from a template</button>` : ''}
+      <button class="primary" data-n="iceberg">${ICON.berg} Iceberg chart</button>
       <button data-close>Cancel</button>
     </div>`, el => {
     el.addEventListener('click', async e => {
       const b = e.target.closest('[data-n]');
       if (!b) return;
       closeModal();
+      if (b.dataset.n === 'iceberg') { icebergSheet(); return; }
       if (b.dataset.n === 'tpl') { pickItem({ title: 'Start from which template?', only: r => r.data.type === 'project' && r.data.template, onPick: fromTemplateSheet }); return; }
       const id = await newItem(b.dataset.n, anchorParent);
       if (b.dataset.n === 'project' && !anchorParent && !route.project) go({ project: id, view: null, item: id });

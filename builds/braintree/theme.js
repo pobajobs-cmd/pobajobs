@@ -56,6 +56,9 @@ export const THEMES = [
   { id: 'newspaper', name: 'Newspaper', look: 'newspaper', font: 'serif',
     light: { bg: '#F4F1EA', side: '#EAE5DA', card: '#FBF9F4', ink: '#1A1A1A', soft: '#5C5850', accent: '#1A1A1A', string: '#A4161A', on: '#FFFFFF', proj: '#2B4C7E', ok: '#2E6B3F' },
     dark: { bg: '#161513', side: '#11100E', card: '#1F1E1B', ink: '#ECE8DF', soft: '#A39E93', accent: '#ECE8DF', string: '#E35D5B', on: '#161513', proj: '#8FA9D6', ok: '#7DBB8A' } },
+  { id: 'iceberg', name: 'Iceberg', look: 'arctic',   // 0.9.4 (boards: Frost; iceberg charts have the Iceberg look on their own boards)
+    light: { bg: '#F2F8FC', side: '#E4EFF6', card: '#FFFFFF', ink: '#0F2233', soft: '#557086', accent: '#1F7AB8', string: '#D6455D', on: '#FFFFFF', proj: '#1D5C8C', ok: '#2F8A6E' },
+    dark: { bg: '#071522', side: '#050F19', card: '#0E2133', ink: '#E3F1FA', soft: '#8FB0C6', accent: '#6CC3F0', string: '#FF7088', on: '#04121D', proj: '#8DC8F0', ok: '#5CC2A0' } },
   { id: 'amber', name: 'Amber terminal', look: 'amber', font: 'mono',
     light: { bg: '#FBF6EC', side: '#F3EAD6', card: '#FFFDF7', ink: '#2B1E05', soft: '#77643F', accent: '#C77700', string: '#B03A2E', on: '#FFFFFF', proj: '#5A6F2B', ok: '#4E7D3A' },
     dark: { bg: '#0B0803', side: '#070502', card: '#15100A', ink: '#FFC266', soft: '#B38A45', accent: '#FFB000', string: '#FF6A3D', on: '#1A1000', proj: '#E6D27A', ok: '#C8E06B' } },
@@ -90,6 +93,7 @@ export const LOOKS = {
   arctic: { name: 'Frost', wire: dark => (dark ? '#9CC9F0' : '#3D6FA8') },
   newspaper: { name: 'Newsprint', wire: () => '#B3261E' },          // an editor's red pen
   amber: { name: 'Amber', wire: () => '#FFB000' },                  // an old amber screen
+  iceberg: { name: 'Iceberg', wire: () => '#7CC4EC' },              // 0.9.4: iceberg charts, tiers from the tip down
 };
 // (tidyMove, 0.7.9: when Tidy finds a card strung only to things outside its section, 'ask' suggests
 // moving it, 'move' just does it)
@@ -106,6 +110,17 @@ export function current(store) {
   if (saved && !saved.look) p.look = saved.board === 'grid' ? 'blueprint' : saved.boardStyle === 'whiteboard' ? 'whiteboard' : saved.board === 'dots' ? 'notebook' : 'corkboard';
   if (!(p.look in LOOKS)) p.look = 'corkboard';
   return p;
+}
+
+// (0.9.4) A board can have a look of its own (project data.look, like an iceberg chart): while it's
+// showing, the page takes that look and its string colour; leaving it puts yours back.
+export function showBoardLook(prefs, look) {
+  const p = { ...DEFAULTS, ...prefs }, root = document.documentElement;
+  const want = look && look in LOOKS ? look : (p.look in LOOKS ? p.look : 'corkboard');
+  if (root.dataset.look === want && root.dataset.boardLook === (look || '')) return;
+  root.dataset.look = want;
+  root.dataset.boardLook = look || '';
+  root.style.setProperty('--wire', wireColour(look ? { ...p, look: want, string: null } : { ...p, look: want }, root.dataset.mode === 'dark'));
 }
 
 // The colour of the strings and lines on the board right now.

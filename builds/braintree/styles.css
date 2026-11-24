@@ -1788,3 +1788,34 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 :root[data-still] .cork::before, :root[data-still] .cork::after { animation: none !important; }
 :root[data-still][data-look="space"] .cork::after { display: none; }
 @media (prefers-reduced-motion: reduce) { .cork::before, .cork::after { animation: none !important; } :root[data-look="space"] .cork::after { display: none; } }
+
+/* ---------- (0.9.4) Iceberg: an iceberg chart. Sky above the waterline (--wl, set by the board), water
+   getting darker with depth below it, the ice drawn round the tiers (svg.berg, in the board itself). */
+.berg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+:root:not([data-look="iceberg"]) .berg { display: none; }
+:root[data-look="iceberg"] { --pin-bg: #FFFFFF; --pin-edge: #1F7AB8; }
+:root[data-look="iceberg"] .cork { background-color: #06111F; background-repeat: repeat-x !important;
+  background-image: linear-gradient(180deg, #E8F6FD 0% 45%, #A8DAF3 50%, #3B8DC0 50%, #1E5C8C 52%, #0E3456 55%, #06111F 60% 100%);
+  background-size: 100% calc(40000px * var(--bz, 1)) !important; background-position: 0 calc(var(--by, 0px) + (var(--wl, 0) - 20000) * var(--bz, 1) * 1px) !important; }
+.berg .ice.over { fill: #F7FCFF; stroke: #B9DDF2; stroke-width: 2.5; stroke-linejoin: round; filter: drop-shadow(0 4px 10px rgba(40, 100, 150, 0.25)); }
+.berg .ice.under { fill: rgba(190, 232, 252, 0.2); stroke: rgba(210, 240, 255, 0.5); stroke-width: 2.5; stroke-linejoin: round; }
+.berg .waterline { stroke: rgba(255, 255, 255, 0.85); stroke-width: 3; stroke-dasharray: 22 10; fill: none; }
+.berg .depth.up { fill: rgba(15, 34, 51, 0.7); stroke: rgba(255, 255, 255, 0.5); }
+.berg .depth { fill: rgba(255, 255, 255, 0.72); font: 700 15px var(--font); letter-spacing: 0.04em; paint-order: stroke; stroke: rgba(6, 17, 31, 0.35); stroke-width: 3px; }
+:root[data-look="iceberg"] .pcard { --paper-ink: #0F2233; --paper-soft: #557086;
+  transform: none; border-radius: 10px; padding: 14px 14px 12px; background: #FFFFFF; border: 1px solid #CFE6F3; box-shadow: 0 6px 18px rgba(4, 30, 60, 0.28); }
+:root[data-look="iceberg"] .pcard.t-task { border-top: 3px solid #6CC3F0; padding-top: 13px; }
+:root[data-look="iceberg"] .pcard.t-project { border: 2px solid #1F7AB8; }
+:root[data-look="iceberg"] .pcard.t-project::before { display: none; }
+:root[data-look="iceberg"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 26%, #FFFFFF); }
+:root[data-look="iceberg"] .pcard .pbar i { background: #1F7AB8; }
+:root[data-look="iceberg"] .pbanner { color: #0F2233; }
+:root[data-look="iceberg"] .pbanner .btitle { font-size: 2.4rem; font-weight: 900; letter-spacing: -0.02em; }
+:root[data-look="iceberg"] .frame { border: 0; border-radius: 16px; background: transparent; }
+:root[data-look="iceberg"] .frame.on, :root[data-look="iceberg"] .frame.drop { box-shadow: 0 0 0 3px var(--accent); }
+:root[data-look="iceberg"] .fhead { top: 8px; left: 10px; height: 32px; padding: 0 2.4rem 0 0.8rem; border-radius: 16px; background: rgba(6, 17, 31, 0.62); color: #FFFFFF; font-size: 0.95rem; font-weight: 800; }
+:root[data-look="iceberg"] .frame[class*=" c-"] .fhead { box-shadow: inset 4px 0 0 var(--sticky); }
+:root[data-look="iceberg"] .fsize { background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.6) 50%); }
+:root[data-look="iceberg"] .strings .thin { stroke-width: 2; }
+:root[data-look="iceberg"] .strings .slabel rect { fill: #0F2233; stroke: none; }
+:root[data-look="iceberg"] .strings .slabel text { fill: #E3F1FA; }
