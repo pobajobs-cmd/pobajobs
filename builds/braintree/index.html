@@ -41,11 +41,13 @@ try { var l = JSON.parse(localStorage.getItem('bt-look')); if (l) { var r = docu
     <header class="bar">
       <button id="listBack" class="back" data-act="back-nav"></button>
       <h2 id="listTitle"></h2>
+      <button id="findBtn" class="iconbtn" data-act="find" aria-label="Search in this project" title="Search in this project (/)" hidden></button>
       <button id="boardBtn" class="boardlink" data-act="open-board" title="This project's board (corkboard)" hidden></button>
       <button id="exportBtn" class="iconbtn" data-act="export-list" aria-label="Print or export this list" title="Print or export" hidden></button>
       <button id="newBtn" class="iconbtn accent" data-act="new" aria-label="New"></button>
       <button id="setBtn" class="iconbtn" data-act="settings" aria-label="Settings" title="Settings"></button>
     </header>
+    <div id="listFind" hidden><input type="search" autocomplete="off" enterkeyhint="search" aria-label="Search"><button type="button" class="link" data-act="find-close">Cancel</button></div>
     <div class="listscroll">
       <div id="listHead"></div>
       <form id="quickAdd" autocomplete="off"><span class="tick ghost"></span><input placeholder="Add a to-do" enterkeyhint="done"></form>

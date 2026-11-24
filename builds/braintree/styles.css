@@ -1339,3 +1339,34 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .recplayer .rpbar .rpnext { background: #E0312B; font-weight: 700; padding: 0.55rem 1.1rem; }
 .recplayer .rpseek { flex: 1; min-width: 60px; accent-color: #E0312B; }
 .recplayer .rptime { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: #AAA; white-space: nowrap; }
+
+/* (0.8.1) Search: words picked out, a bit of the text under a result, a project's own search box,
+   and Find on a board. */
+mark { background: color-mix(in srgb, var(--accent) 38%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.row.hassnip { flex-wrap: wrap; row-gap: 0; padding-top: 0.35rem; padding-bottom: 0.4rem; }
+.row .snip { flex-basis: 100%; padding-left: calc(20px + 0.6rem); color: var(--soft); font-size: 0.82rem; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.group.found .gname.band span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#findBtn.on, .bfind.on { background: var(--accent-bg); color: var(--accent-ink); }
+#listFind { display: flex; align-items: center; gap: 0.4rem; margin: 0 0.8rem 0.5rem; padding: 0 0.3rem 0 0.65rem; border-radius: 10px; background: var(--hover); }
+#listFind[hidden] { display: none; }
+#listFind:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+#listFind > svg { width: 17px; height: 17px; color: var(--faint); }
+#listFind input { flex: 1; min-width: 0; border: 0; background: none; outline: none; padding: 0.5rem 0.2rem; font-size: 16px; }
+#listFind .link { padding: 0.35rem 0.4rem; font-size: 0.9rem; }
+.findall { margin: 0.2rem 0.9rem 0.6rem; color: var(--soft); font-size: 0.88rem; }
+.boardfind { position: absolute; left: 50%; transform: translateX(-50%); z-index: 7; display: flex; align-items: center; gap: 2px; width: min(460px, calc(100% - 24px)); padding: 4px 4px 4px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.boardfind[hidden] { display: none; }
+.boardfind .fic { width: 17px; height: 17px; color: var(--faint); }
+.boardfind input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 16px; padding: 0.4rem 0.35rem; }
+.boardfind .fcount { color: var(--faint); font-size: 0.82rem; white-space: nowrap; padding: 0 4px; font-variant-numeric: tabular-nums; }
+.boardfind.none .fcount { color: var(--string); font-weight: 600; }
+.boardfind button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; color: var(--soft); flex-shrink: 0; }
+.boardfind button:hover { background: var(--hover); color: var(--ink); }
+.boardfind button svg { width: 18px; height: 18px; }
+.finding .pcard { transition: box-shadow 0.15s, transform 0.15s, opacity 0.2s; }
+.finding .frame, .finding .strings, .finding .media { transition: opacity 0.2s; }
+.finding .pcard:not(.fhit), .finding .pbanner:not(.fhit) { opacity: 0.22; }
+.finding .frame:not(.fhit) { opacity: 0.45; }
+.finding .strings, .finding .media { opacity: 0.3; }
+.finding .fnow { outline: 3px solid var(--accent); outline-offset: 5px; border-radius: 6px; }
+@media (max-width: 599px) { #boardBtn { padding: 0 0.55rem; } #boardBtn span { display: none; } }

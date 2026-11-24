@@ -4,11 +4,12 @@
 // group inside a project: a heading in the project's list, a labelled frame on its board.
 
 import * as store from './store.js';
+import * as S from './search.js';
 import { createEditor, textOf, firstPhoto, mediaSummary, escHtml as esc } from './editor.js';
 import { createBoard, COLOURS } from './board.js';
 import { parseYouTube, parseTime, fmtTime, thumbUrl, watchUrl, iframeHTML, rangeText } from './media.js';
 import { openDrawing } from './draw.js';
-import { addExample, EXAMPLE_TITLE } from './example.js';
+import { addExample, EXAMPLE_TITLE, EXAMPLE_REC_CARDS, exampleRecording } from './example.js';
 import { createGestures } from './gestures.js';
 import { openSheet, sheetRows, cleanSheet } from './sheet.js';
 import { linkService } from './attach.js';
@@ -16,7 +17,7 @@ import * as ex from './export.js';
 import * as theme from './theme.js';
 import * as pv from './preview.js';
 
-const VERSION = '0.8.0';
+const VERSION = '0.8.1';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -56,6 +57,7 @@ const ICON = {
   lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   unlock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>',
   share: '<svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
 };
 // The small icons on a note's row for what it holds.
 const ROWIC = {
@@ -72,6 +74,10 @@ const typeIcon = t =>(t === 'project' ? ICON.folder : t === 'section' ? ICON.sec
 
 let route = { view: null, project: null, item: null };
 let search = '';
+// (0.8.1) A project's own search: which project it's open in, and what's typed in it.
+let pfind = { id: null, q: '' };
+let findAll = false;               // (0.8.1) on a phone: the search-everything page is open (maybe nothing typed yet)
+const searching = () => !!search || findAll;
 let I = null;                       // index of the current data, rebuilt on every change
 let editor = null, editingId = null, titleTimer = null;
 const openDone = new Set();         // lists with their "Done" section expanded
@@ -286,7 +292,7 @@ function onRoute() {
   render();
 }
 
-const listKey = () => (search ? 'search' : route.project ? 'p:' + route.project : route.view || 'today');
+const listKey = () => (searching() ? 'search' : route.project ? 'p:' + route.project : route.view || 'today');
 
 // ---------- Rendering ----------
 
@@ -316,7 +322,7 @@ function render() {
   const onBoard = route.view === 'board' && !search;
   document.body.dataset.view = onBoard ? 'board' : 'lists';
   document.body.toggleAttribute('data-drawer', onBoard && !!route.item);
-  document.body.dataset.pane = route.item ? 'detail' : (route.view || route.project || search) ? 'list' : 'nav';
+  document.body.dataset.pane = route.item ? 'detail' : (route.view || route.project || searching()) ? 'list' : 'nav';
   renderNav();
   if (onBoard) {
     board ??= createBoard($('#board'), boardApi);
@@ -443,16 +449,62 @@ function upcomingGroups(pool) {
   return [...map].map(([name, items]) => ({ name, items }));
 }
 
+// (0.8.1) Search results, best first, in groups. Searching everything: projects that match first, then
+// what's in each project (under its top project), then things in no project. Searching one project
+// (under = its id): what's loose in it, then each section or sub-project with what matches in it.
+function searchGroups(pool, ts, under) {
+  if (!ts.length) return [];
+  const hits = new Map(), groups = new Map();
+  for (const r of pool) {
+    const m = S.matchItem(r, titleOf(r), ts);
+    if (!m) continue;
+    hits.set(r.id, { ...m, ts });
+    const path = I.ancestors(r);
+    let gk, name, gu, first = false;
+    if (under) {
+      const box = path[path.findIndex(x => x.id === under) + 1];
+      gk = box ? box.id : under; gu = box ? box.id : under; name = titleOf(box || I.byId.get(under)); first = !box;
+    } else if (r.data.type === 'project') { gk = '~projects'; name = 'Projects'; gu = null; first = true; }
+    else {
+      const top = path.find(x => x.data.type === 'project');
+      gk = top ? top.id : '~loose'; name = top ? titleOf(top) : 'Not in a project'; gu = top ? top.id : null;
+    }
+    if (!groups.has(gk)) groups.set(gk, { name, items: [], hits, under: gu, first, best: 0 });
+    const g = groups.get(gk);
+    g.items.push(r); g.best = Math.max(g.best, m.score);
+  }
+  const score = r => hits.get(r.id).score;
+  for (const g of groups.values()) g.items.sort((a, b) => score(b) - score(a) || byPinnedUpdated(a, b));
+  return [...groups.values()].sort((a, b) => (b.first - a.first) || (b.best - a.best) || a.name.localeCompare(b.name));
+}
+
+// (0.8.1) A project's own search (the magnifier at the top of its list).
+function openFind() {
+  if (!route.project) return;
+  pfind = { id: route.project, q: '' };
+  render();
+  const inp = $('#listFind input'); inp.focus(); inp.select();
+}
+function closeFind(redraw = true) {
+  pfind = { id: null, q: '' };
+  if (redraw) render();
+}
+// (0.8.1) On a phone: the search-everything page, with its own box (the side panel's is out of sight).
+function openFindAll() {
+  findAll = true; pfind = { id: null, q: '' };
+  render();
+  $('#listFind input').focus();
+}
+
 function renderList() {
   const key = listKey();
   const t = today();
   let title = '', head = '', groups = [], addHint = 'Add a to-do', canAdd = true;
 
-  if (search) {
-    title = 'Search';
-    const q = search.toLowerCase();
-    const hits = I.live.filter(r => (titleOf(r) + ' ' + textOf(r.data.body)).toLowerCase().includes(q)).sort(byPinnedUpdated);
-    groups = [{ name: hits.length ? `${hits.length} found` : 'Nothing found', items: hits }];
+  if (searching()) {
+    groups = searchGroups(I.live, S.terms(search), null);
+    const n = groups.reduce((a, g) => a + g.items.length, 0);
+    title = search && n ? `${n} found` : 'Search';
     canAdd = false;
   } else if (route.project && isLocked(I.byId.get(route.project))) {
     // Locked: just the way in. (Left alone while it's showing, so a redraw doesn't wipe what you've typed.)
@@ -478,6 +530,12 @@ function renderList() {
       ${p.data.lock ? `<button class="lockbtn" data-act="lock-now" data-id="${p.id}" title="Lock it again now">${ICON.lock}<span>Lock</span></button>` : ''}</div>`;
     // Everything in it, or just what's due today / coming up (from anywhere inside, sections and sub-projects too).
     const tab = projTab(p.id), pool = I.descendants(p.id);
+    if (pfind.id === p.id && pfind.q) {
+      // (0.8.1) Searching just this project: what matches, under the section or sub-project it's in.
+      groups = searchGroups(pool, S.terms(pfind.q), p.id);
+      head = `<p class="findall">${groups.length ? '' : 'Nothing in this project matches that. '}<button class="link" data-act="find-everywhere">Search everywhere for “${esc(pfind.q)}”</button></p>`;
+      canAdd = false;
+    } else {
     const nToday = pool.filter(r => isOpen(r) && ((r.data.due && r.data.due <= t) || (r.data.start === t && !r.data.due))).length;
     const nSoon = pool.filter(r => isUpcoming(r, t)).length;
     head += `<div class="seg projtabs" role="tablist" aria-label="Show">${[['all', 'Everything'], ['today', 'Today', nToday], ['upcoming', 'Upcoming', nSoon]]
@@ -506,6 +564,7 @@ function renderList() {
         ...sections.map(s => ({ name: titleOf(s), section: s, items: openOf(I.kids.get(s.id) || []) })),
         { name: 'Done', items: [...kids, ...inSections].filter(r => r.data.type === 'task' && r.data.done).sort((a, b) => (b.data.doneAt || '').localeCompare(a.data.doneAt || '')), done: true },
       ];
+    }
     }
   } else {
     const v = route.view || 'today';
@@ -548,6 +607,20 @@ function renderList() {
   $('#listTitle').textContent = title;
   $('#listHead').innerHTML = head;
   $('#boardBtn').hidden = !route.project || !!search;
+  // (0.8.1) the project's own search: the magnifier, and the box under the bar while it's open
+  const canFind = !!route.project && !search && !isLocked(I.byId.get(route.project));
+  if (pfind.id && (pfind.id !== route.project || !canFind)) closeFind(false);
+  $('#findBtn').hidden = !canFind;
+  $('#findBtn').classList.toggle('on', pfind.id === route.project);
+  // The search box in the list itself: a project's own search, or (on a phone, where the one in the
+  // side panel is out of sight) searching everything.
+  const lf = $('#listFind'), mode = searching() ? (wide.matches ? '' : 'all') : pfind.id && pfind.id === route.project ? 'project' : '';
+  lf.hidden = !mode; lf.dataset.mode = mode;
+  if (mode) {
+    const inp = lf.querySelector('input'), v = mode === 'all' ? search : pfind.q;
+    inp.placeholder = mode === 'all' ? 'Search everything' : `Search in ${titleOf(I.byId.get(route.project))}`;
+    if (inp.value.trim() !== v) inp.value = v;
+  }
   $('#exportBtn').hidden = !!search || (!route.project && ['trash', 'conflicts'].includes(route.view));
   const qa = $('#quickAdd');
   qa.hidden = !canAdd;
@@ -572,7 +645,8 @@ function renderList() {
         ${isOpenSec ? g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project, where: g.where })).join('') : ''}</div>`;
     }
     const band = g.name && !g.bare ? `<div class="gname band ${g.late ? 'late' : ''}"><span>${esc(g.name)}</span><small>${g.items.length}</small></div>` : '';
-    return `<div class="group ${g.late ? 'late' : ''} ${g.bare ? 'bare' : ''}" ${g.drop ? `data-drop="${g.drop}" data-kind="${g.kind}"` : ''}>${band}${g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project, where: g.where })).join('')}</div>`;
+    const rowOf = r => rowHTML(r, g.hits ? { inProject: true, hit: g.hits.get(r.id), under: g.under } : { trash: g.trash, inProject: !!route.project, where: g.where });
+    return `<div class="group ${g.late ? 'late' : ''} ${g.bare ? 'bare' : ''} ${g.hits ? 'found' : ''}" ${g.drop ? `data-drop="${g.drop}" data-kind="${g.kind}"` : ''}>${band}${g.items.map(rowOf).join('')}</div>`;
   }).join('');
   const nothing = !groups.some(g => g.items.length);
   $('#listBody').innerHTML = html || (nothing ? `<p class="empty">${emptyText()}</p>` : '');
@@ -580,7 +654,8 @@ function renderList() {
 }
 
 function emptyText() {
-  if (search) return 'Nothing matches that.';
+  if (searching() && !search) return 'Type to search everything: titles, text, checklists, spreadsheets, file names and string labels. Put "quotes" round words that go together.';
+  if (searching()) return 'Nothing matches that. Search looks at titles, text, checklists, spreadsheets, file names and string labels.';
   if (route.project) return 'Nothing in this project yet. Add a to-do above, or use + for notes, sections and sub-projects.';
   return {
     today: 'Nothing due today. Enjoy it, or add something above.',
@@ -614,7 +689,7 @@ function checkCount(body = '') {
 
 // One line per row (list style B, "Compact"): tick or icon, the title with a few grey extras
 // after it (steps done, where it lives), one small icon, and the date in a column on the right.
-function rowHTML(r, { trash = false, inProject = false, where = false } = {}) {
+function rowHTML(r, { trash = false, inProject = false, where = false, hit = null, under = null } = {}) {
   const d = r.data, t = today();
   const type = d.type || 'note';
   const sel = route.item === r.id ? 'on' : '';
@@ -627,6 +702,8 @@ function rowHTML(r, { trash = false, inProject = false, where = false } = {}) {
   if (proj) { const sec = I.parentOf(r)?.data.type === 'section' ? I.parentOf(r) : null; bits.push(`· ${titleOf(proj)}${sec ? ' › ' + titleOf(sec) : ''}`); }
   // In a project's Today / Upcoming: which section or sub-project it's in, if not loose in the project.
   if (where && route.project) { const par = I.parentOf(r); if (par && par.id !== route.project) bits.push('· ' + titleOf(par)); }
+  // (0.8.1) A search result: inside something further down than its group says.
+  if (hit) { const path = I.ancestors(r), at = under ? path.findIndex(x => x.id === under) : -1, rest = path.slice(at + 1); if (rest.length) bits.push('· ' + rest.map(titleOf).join(' › ')); }
   // One small icon: a conflict, a repeat, or what a note holds.
   const kind = type === 'note' && noteKind(d.body);
   const ic = r.conflict ? `<span class="meta late" title="Conflict: changed on two devices">${ICON.warn}</span>`
@@ -642,11 +719,12 @@ function rowHTML(r, { trash = false, inProject = false, where = false } = {}) {
   const lead = type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="${d.done ? 'Mark not done' : 'Mark done'}"></button>`
     : `<span class="ic t-${type}">${typeIcon(type)}</span>`;
   return `
-    <div class="row ${sel} t-${type} ${d.done ? 'is-done' : ''} ${d.color ? 'c-' + d.color : ''}" data-open="${r.id}" role="button" tabindex="0">
+    <div class="row ${sel} t-${type} ${d.done ? 'is-done' : ''} ${d.color ? 'c-' + d.color : ''} ${hit?.inText ? 'hassnip' : ''}" data-open="${r.id}" role="button" tabindex="0">
       ${trash ? `<span class="ic">${typeIcon(type)}</span>` : lead}
-      <span class="title">${d.pinned ? `<span class="pinmark" title="Pinned">${ICON.pin}</span>` : ''}${esc(titleOf(r))}${bits.length ? ` <small>${esc(bits.join(' '))}</small>` : ''}</span>
+      <span class="title">${d.pinned ? `<span class="pinmark" title="Pinned">${ICON.pin}</span>` : ''}${hit ? S.markHTML(titleOf(r), hit.ts, esc) : esc(titleOf(r))}${bits.length ? ` <small>${esc(bits.join(' '))}</small>` : ''}</span>
       ${ic}${r.dirty && store.status.state !== 'signedout' ? '<span class="dot-pending" title="Not synced yet"></span>' : ''}
       ${trash ? `<span class="trashacts"><button data-restore="${r.id}">Restore</button><button class="danger" data-purge="${r.id}">Delete</button></span>` : `<span class="when ${wcls}">${esc(when)}</span>`}
+      ${hit?.inText ? `<span class="snip">${S.snippetHTML(r, hit.ts, esc)}</span>` : ''}
     </div>`;
 }
 
@@ -1692,6 +1770,22 @@ function claudeSheet(url) {
   });
 }
 
+// (0.8.1) An example project added before 0.8.0 has no recording: it gets the one new examples come
+// with (once on each device, and only once this device has synced, so it doesn't undo one changed
+// elsewhere; delete it and it stays gone).
+function exampleRecUpgrade() {
+  if (!(store.status.state === 'signedout' || store.status.lastSync > 0)) return;
+  for (const p of I.live) {
+    if (p.data.type !== 'project' || p.data.title !== EXAMPLE_TITLE || p.data.recs || store.get(p.id)?.data.recs) continue;
+    const seen = 'bt-exrec:' + p.id;
+    if (readLocal(seen, false)) continue;
+    writeLocal(seen, true);
+    const inside = I.descendants(p.id), ids = {};
+    for (const [k, t] of Object.entries(EXAMPLE_REC_CARDS)) ids[k] = inside.find(r => r.data.title === t)?.id;
+    if (Object.values(ids).every(Boolean)) store.update(p.id, { recs: [exampleRecording(ids)] });
+  }
+}
+
 async function showExample() {
   const already = I.live.find(r => r.data.type === 'project' && r.data.title === EXAMPLE_TITLE);
   if (already && !confirm('There’s already an example project. Add another one?')) { go({ project: already.id, view: null, item: null }); return; }
@@ -2251,7 +2345,18 @@ document.addEventListener('click', async e => {
     const a = x.dataset.act;
     const id = editingId;
     if (a === 'back') { saveEditing(); go({ item: null }); }
-    else if (a === 'back-nav') { search = ''; $('#search').value = ''; go({ view: null, project: null, item: null }); }
+    else if (a === 'back-nav') { search = ''; findAll = false; $('#search').value = ''; go({ view: null, project: null, item: null }); }
+    else if (a === 'find') { if (pfind.id === route.project) closeFind(); else openFind(); }
+    else if (a === 'find-close') {
+      if ($('#listFind').dataset.mode === 'project') closeFind();
+      else { search = ''; findAll = false; $('#search').value = ''; render(); }
+    }
+    else if (a === 'find-everywhere') {
+      const q = pfind.q; closeFind(false);
+      search = q; $('#search').value = q; findAll = !wide.matches;
+      render();
+      if (findAll) $('#listFind input').focus(); else $('#search').focus();
+    }
     else if (a === 'sync') store.signedIn() ? store.sync() : showLogin(true);
     else if (a === 'login') showLogin(true);
     else if (a === 'settings') settingsModal();
@@ -2289,8 +2394,10 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (!$('#modal').hidden) closeModal(); else if (!$('#lightbox').hidden) $('#lightbox').hidden = true; }
   // On a keyboard: N adds a to-do, / searches (when you're not typing somewhere).
   const typing = e.target.closest?.('input, textarea, select, [contenteditable]');
+  // (0.8.1) / on a board: Find on this board
+  if (!typing && e.key === '/' && $('#modal').hidden && !e.ctrlKey && !e.metaKey && document.body.dataset.view === 'board' && board?.find) { e.preventDefault(); board.find(); return; }
   if (!typing && $('#modal').hidden && !e.ctrlKey && !e.metaKey && !e.altKey && document.body.dataset.view !== 'board') {
-    if (e.key === '/') { e.preventDefault(); $('#search').focus(); return; }
+    if (e.key === '/') { e.preventDefault(); if (!$('#findBtn').hidden && $('#list').offsetParent) openFind(); else $('#search').focus(); return; }
     if (e.key === 'n' || e.key === 'N') {
       const qa = $('#quickAdd input');
       if (qa && !$('#quickAdd').hidden && qa.offsetParent) { e.preventDefault(); qa.focus(); return; }
@@ -2338,6 +2445,22 @@ $('#search').addEventListener('input', e => {
   search = e.target.value.trim();
   render();
 });
+// (0.8.1) On a phone the side panel goes out of sight once there are results, so tapping its box
+// opens the search page, which has a box of its own.
+const phoneSearch = () => { $('#search').readOnly = !wide.matches; };
+phoneSearch();
+wide.addEventListener('change', phoneSearch);
+$('#search').addEventListener('click', () => { if (!wide.matches) openFindAll(); });
+$('#listFind input').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  if ($('#listFind').dataset.mode === 'project') pfind.q = v;
+  else { search = v; $('#search').value = e.target.value; }
+  render();
+});
+$('#listFind input').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); $('#listFind [data-act=find-close]').click(); }
+  else if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+});
 
 window.addEventListener('hashchange', onRoute);
 wide.addEventListener('change', () => onRoute());
@@ -2371,6 +2494,8 @@ if (['127.0.0.1', 'localhost'].includes(location.hostname)) window.btApp = { get
   $('#setBtn').innerHTML = ICON.gear;
   $('#boardBtn').innerHTML = ICON.board + '<span>Board</span>';
   $('#exportBtn').innerHTML = ICON.share;
+  $('#findBtn').innerHTML = ICON.search;
+  $('#listFind').insertAdjacentHTML('afterbegin', ICON.search);
   $('#listBack').innerHTML = ICON.back + '<span>Lists</span>';
   try {
     await store.load();
@@ -2387,6 +2512,8 @@ if (['127.0.0.1', 'localhost'].includes(location.hostname)) window.btApp = { get
   });
   await migrate();
   onRoute();
+  store.onChange(() => { try { exampleRecUpgrade(); } catch (e) {} });
+  try { exampleRecUpgrade(); } catch (e) {}
   if (!store.signedIn() && !readLocal('bt-skipped-login', false)) showLogin(true);
   else store.sync();
 

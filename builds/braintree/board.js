@@ -24,6 +24,7 @@ import { cleanSheet, sheetTableHTML, sheetDivHTML } from './sheet.js';
 import { docInfo, linkInfo, docTileHTML, linkTileHTML, docDivHTML, linkDivHTML, fileKind } from './attach.js';
 import { previewKind, KIND_ASPECT } from './preview.js';
 import { TRANS_NAMES, FX, LOOKS, SIZES, timeline, totalTime, openPlayer } from './record.js';
+import { terms, matchItem } from './search.js';
 
 const CARD_W = 220, GAP = 28, PAD = 24, HEAD = 46;
 const SECTION_W = 2 * PAD + 2 * CARD_W + GAP, SECTION_H = 320;
@@ -65,6 +66,7 @@ export function createBoard(host, api) {
     <header class="boardhead">
       <button class="back" data-act="back-nav"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><span>Lists</span></button>
       <h2></h2>
+      <button class="iconbtn bfind" aria-label="Find on this board" title="Find on this board (/)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
       <button class="iconbtn bexport" data-act="export-board" aria-label="Print or export the board" title="Print or export"><svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></button>
       <button class="tolist" data-act="board-list">List view</button>
       <button class="iconbtn bsettings" data-act="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -802,6 +804,7 @@ export function createBoard(host, api) {
     else { hint.textContent = words().hint; hint.hidden = cards.length < 2 || hasLinks || readLocal('bt-hint-seen', false); }
     drawLines();
     if (needsFit) { needsFit = false; fit(); } else applyView();
+    if (findQ) runFind(findQ, false);
   }
   const area = id => { const p = pos.get(id); return (p?.w || 0) * (p?.h || 0); };
 
@@ -3003,6 +3006,7 @@ export function createBoard(host, api) {
     host.classList.toggle('rec', on);
     if (!on) { for (const el of Object.values(recEls)) el.remove(); for (const k in recEls) delete recEls[k]; removeEventListener('resize', recLayout); render(); return; }
     if (tying) setTying(false);
+    if (!findEl.hidden) closeFind();
     let all = recs();
     if (!all.length) {
       const rec = { id: rid(), name: 'Recording 1', aspect: cork.clientWidth < cork.clientHeight ? '9:16' : '16:9', look: 'none', audio: null, shots: [] };
@@ -3338,11 +3342,99 @@ export function createBoard(host, api) {
     }
   }
 
+  // ----- (0.8.1) Find on this board -----
+  // The magnifier at the top: type, and what matches stays bright while everything else fades back;
+  // ‹ › (or Enter, Shift+Enter) go from one to the next in reading order, and the board glides to each.
+  let findQ = '', findHits = [], findAt = 0, findTween = 0;
+  const findEl = Object.assign(document.createElement('div'), { className: 'boardfind', hidden: true });
+  findEl.innerHTML = `<svg viewBox="0 0 24 24" class="fic"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+    <input type="search" placeholder="Find on this board" autocomplete="off" enterkeyhint="search" aria-label="Find on this board">
+    <span class="fcount" aria-live="polite"></span>
+    <button data-f="prev" aria-label="Previous match" title="Previous (Shift+Enter)"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button data-f="next" aria-label="Next match" title="Next (Enter)"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    <button data-f="close" aria-label="Stop finding"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+  host.append(findEl);
+  const findIn = findEl.querySelector('input'), findBtn = host.querySelector('.bfind');
+  function openFind() {
+    if (recMode) setRecMode(false);
+    if (tying) setTying(false);
+    findEl.hidden = false;
+    findEl.style.top = (host.querySelector('.boardhead').offsetHeight + 10) + 'px';
+    findBtn.classList.add('on');
+    findIn.focus(); findIn.select();
+    if (findIn.value.trim()) runFind(findIn.value);
+  }
+  function closeFind() {
+    findEl.hidden = true; findQ = ''; findHits = []; findAt = 0;
+    findBtn.classList.remove('on');
+    markFind();
+  }
+  // jump: go to the first match (as you type); otherwise (the board was drawn again) stay on the one you're on.
+  function runFind(q, jump = true) {
+    const was = findHits[findAt];
+    findQ = q.trim();
+    const ts = terms(findQ);
+    findHits = !ts.length ? [] : [...frames, ...cards]
+      .filter(r => matchItem(r, api.titleOf(r), ts))
+      .map(r => ({ id: r.id, b: rectOf(r.id) })).filter(x => x.b)
+      .sort((a, b) => (Math.round(a.b.y / 140) - Math.round(b.b.y / 140)) || (a.b.x - b.b.x))
+      .map(x => x.id);
+    findAt = jump ? 0 : Math.max(0, findHits.indexOf(was));
+    markFind();
+    if (jump && findHits.length) findGo(0);
+  }
+  function markFind() {
+    host.classList.toggle('finding', !!findQ);
+    const set = new Set(findHits), now = findHits[findAt];
+    for (const el of [...cardsEl.children, ...framesEl.children]) {
+      const id = el.dataset.card || el.dataset.frame;
+      el.classList.toggle('fhit', set.has(id));
+      el.classList.toggle('fnow', !!findQ && id === now);
+    }
+    findEl.querySelector('.fcount').textContent = !findQ ? '' : findHits.length ? `${findAt + 1} of ${findHits.length}` : 'None';
+    findEl.classList.toggle('none', !!findQ && !findHits.length);
+  }
+  function findGo(i) {
+    if (!findHits.length) return;
+    findAt = (i + findHits.length) % findHits.length;
+    markFind();
+    const b = rectOf(findHits[findAt]);
+    if (!b) return;
+    // Close enough to read (or the whole of it, if it's big), in the middle of what's left of the screen.
+    const W = cork.clientWidth, H = cork.clientHeight, top = findEl.offsetTop + findEl.offsetHeight - cork.offsetTop + 10, bottom = 70;
+    const z = clamp(Math.min(Math.max(view.z, 0.8), (W - 40) / b.w, (H - top - bottom) / b.h), MIN_Z, MAX_Z);
+    const sx = W / 2, sy = top + (H - top - bottom) / 2, from = { ...view }, t0 = performance.now();
+    const fc = { x: (sx - from.x) / from.z, y: (sy - from.y) / from.z }, tc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    cancelAnimationFrame(findTween);
+    const step = () => {
+      const p = Math.min(1, (performance.now() - t0) / 380), e = p * p * (3 - 2 * p);
+      const lz = Math.exp(Math.log(from.z) + (Math.log(z) - Math.log(from.z)) * e);
+      const cx = fc.x + (tc.x - fc.x) * e, cy = fc.y + (tc.y - fc.y) * e;
+      view = { z: lz, x: sx - cx * lz, y: sy - cy * lz }; applyView();
+      if (p < 1) findTween = requestAnimationFrame(step); else saveView();
+    };
+    findTween = requestAnimationFrame(step);
+  }
+  findBtn.addEventListener('click', () => (findEl.hidden ? openFind() : closeFind()));
+  findIn.addEventListener('input', () => runFind(findIn.value));
+  findIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); findGo(findAt + (e.shiftKey ? -1 : 1)); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFind(); }
+  });
+  findEl.addEventListener('click', e => {
+    const f = e.target.closest('[data-f]')?.dataset.f;
+    if (f === 'prev') findGo(findAt - 1);
+    else if (f === 'next') findGo(findAt + 1);
+    else if (f === 'close') closeFind();
+  });
+
   return {
     exportSVG,
+    find: openFind,
     show(boardKey) {
       if (boardKey !== key) {
         if (recMode) setRecMode(false);
+        if (!findEl.hidden) closeFind();
         key = boardKey;
         tipToken++; hideTip();
         heights.clear();
