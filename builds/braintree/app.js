@@ -21,7 +21,7 @@ import { createTimeline } from './timeline.js';
 import * as remind from './remind.js';
 import { widgetScript } from './widget.js';
 
-const VERSION = '0.9.5';
+const VERSION = '0.9.6';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -801,6 +801,7 @@ function costLine(p) {
 // (0.9.0) The weekly review: once a week, a look back (what got done) and forward (what's late,
 // what's stuck, what's gone quiet), with a button on each to sort it there and then.
 const QUIET_DAYS = 14;
+let rvAllLate = false;   // (0.9.6) the review's Late list opened out past the first 8
 function reviewDue() {
   const last = readLocal('bt-reviewed', null);
   if (!last) { if (!readLocal('bt-review-start', null)) writeLocal('bt-review-start', today()); return daysBetween(readLocal('bt-review-start', today()), today()) >= 7; }
@@ -827,7 +828,9 @@ function reviewList() {
       <p class="hint">${last ? `Last review: ${esc(fmtDay(last))}.` : 'Once a week: sort out what’s late, what’s stuck and what’s gone quiet.'} Each button sorts that one out there and then.</p>
       <button class="primary" data-act="review-done">${ICON.check}<span>Done for this week</span></button></div>`;
   const groups = [];
-  if (late.length) groups.push({ html: block('Late', 'Do it, move it, or take its date off.', late.map(r => `<div class="rvrow">${rowHTML(r)}<div class="rvacts">${btn('today', r.id, 'Today')}${btn('week', r.id, 'Next week')}${btn('nodate', r.id, 'No date')}${btn('done', r.id, 'Done', 'ok')}</div></div>`), 'late'), items: [] });
+  const lateShown = rvAllLate ? late : late.slice(0, 8);
+  if (late.length) groups.push({ html: block('Late', 'Do it, move it, or take its date off.', [...lateShown.map(r => `<div class="rvrow">${rowHTML(r)}<div class="rvacts">${btn('today', r.id, 'Today')}${btn('week', r.id, 'Next week')}${btn('nodate', r.id, 'No date')}${btn('done', r.id, 'Done', 'ok')}</div></div>`),
+    ...(late.length > 8 ? [`<button class="foot toggle" data-act="rv-more">${rvAllLate ? 'Show fewer' : `Show ${late.length - 8} more`}</button>`] : [])], 'late'), items: [] });
   if (waiting.length) groups.push({ html: block('Waiting on something', 'Still waiting? Open it to see on what, or cut the string if it isn’t.', waiting.map(r => rowHTML(r))), items: [] });
   if (quiet.length) groups.push({ html: block(`Gone quiet (nothing changed in ${QUIET_DAYS} days)`, 'Still going, finished, or one for later?', quiet.map(r => `<div class="rvrow">${rowHTML(r)}<div class="rvacts">${btn('going', r.id, 'Still going')}${btn('finish', r.id, 'Finished', 'ok')}${btn('pause', r.id, 'Make it a template')}</div></div>`)), items: [] });
   if (soon.length) groups.push({ html: block('Coming up in the next 7 days', '', soon.map(r => rowHTML(r))), items: [] });
@@ -1996,7 +1999,7 @@ async function settingsModal(focus) {
       <div class="setrow"><span>Text style</span>${seg('font', Object.fromEntries(Object.entries(theme.FONTS).map(([k, f]) => [k, `<span style="font-family:${f.stack.replace(/"/g, "'")}">${f.name}</span>`])))}</div>
       <div class="setrow"><span>Text size</span>${seg('size', { small: 'Small', normal: 'Normal', large: 'Large' })}</div>
       <h3>Boards</h3>
-      <div class="lookpick">${Object.entries(theme.LOOKS).map(([id, l]) => `
+      <div class="lookpick">${Object.entries(theme.LOOKS).filter(([id]) => id !== 'iceberg' || p.look === 'iceberg').map(([id, l]) => `
         <button data-pick-look="${id}" class="${p.look === id ? 'on' : ''}">${lookPreview(id)}<span>${l.name}</span></button>`).join('')}</div>
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
       <div class="setrow"><span>Backgrounds</span>${seg('motion', { on: 'Moving', off: 'Still' })}</div>
@@ -2932,6 +2935,7 @@ document.addEventListener('click', async e => {
     else if (a === 'new-project') { const pid = await newItem('project', null); go({ project: pid, view: null, item: pid }); }
     else if (a === 'example') showExample();
     else if (a === 'from-template') fromTemplateSheet(x.dataset.id);
+    else if (a === 'rv-more') { rvAllLate = !rvAllLate; renderList(); }
     else if (a === 'review-done') { writeLocal('bt-reviewed', today()); toast('Review done. See you next week.'); go({ view: 'today', project: null, item: null }); }
     else if (id && a === 'waiton') waitOnPicker(id);
     else if (a === 'lock-now') lockNow(x.dataset.id);
