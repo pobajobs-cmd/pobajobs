@@ -258,6 +258,15 @@ The user asked for every idea from a list of "things that would complement the a
 - **Themes**: Ocean (offers Blueprint), Sunset, Sakura (rounded text), Mocha (offers Corkboard), Arctic (offers Whiteboard), Newspaper (serif text, offers Notebook), Amber terminal (mono text).
 - Tested in the Browser pane: quick add by GET `?text=`, form and JSON; the widget feed (templates left out, a wrong key gets 401); the generated script parses, and runs against a stand-in for Scriptable's objects in all seven sizes and in the app; the theme picker. Not tested: the real Scriptable app or Shortcuts on the user's iPhone.
 
+## 0.9.2 Every theme brings its board look
+
+The user wanted the themes to carry through to the boards. Picking a theme now switches the board look to the theme's own (toast with Undo; any look can still be picked under Boards), and every theme has one: Notepad → Notebook, Corkboard → Corkboard, Blueprint → Blueprint, Forest → Chalkboard, Ink → Minimal, Dusk → Space, plus the 0.7 ones. The seven 0.9.1 themes get looks of their own:
+
+- **Ocean** (deep water, sea-glass cards, curving lines), **Postcards** (a sunset sky, white-bordered postcards, dotted flight paths; dusk colours in dark mode), **Sakura** (pink paper with petals, rounded cards, ribbons with a white edge), **Café** (a dark wooden wall, kraft tags and receipts, twine, a "Today's special" banner), **Frost** (snowy blue, frosted panels, crisp right-angled lines; a dark version), **Newsprint** (newspaper columns, clippings, a masthead banner, the editor's red pen), **Amber** (Hacker in amber).
+- How: board.js `LOOK_BASE` says which older look each draws its strings like (Ocean and Sakura: Neon; Postcards: Minimal; Café: Notebook; Frost: Blueprint; Newsprint: Whiteboard; Amber: Hacker), so routing, arrows and labels need nothing new; `look()` returns the base, the words (WORDS) are the look's own. The rest is CSS under `:root[data-look="…"]`. Amber's rules were made from Hacker's with the colours swapped, and the shared dark-look rules also name Amber and Ocean. Whole-picture backgrounds set their own `background-size` (with !important) because the board otherwise tiles and pans its background at 220 px.
+- Settings has a little picture of each new look; theme.js `LOOKS` has their names and string colours.
+- Tested in the Browser pane: each look on a real board, in light and dark mode; picking a theme switches the look (with Undo); the board picture export; the Settings previews. Not tested on the iPhone.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
