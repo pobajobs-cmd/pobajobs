@@ -274,6 +274,17 @@ The user wanted the themes to carry through to the boards. Picking a theme now s
 - Settings → Boards → Backgrounds: Moving or Still (`motion` in the appearance pref; `html[data-still]`). The phone's Reduce Motion also stops them.
 - Tested headless (Edge): panning before/after shots of every changed look, a phone shot of Frost and Postcards far from the cards (no edges), the keyframes resolving to one tile at the current zoom. The Browser pane has Reduce Motion on, which correctly kept them still there.
 
+## 0.9.4 Iceberg charts, and a look for each board
+
+The user asked for an iceberg theme for iceberg-meme charts (tiers from the well known at the tip to the obscure in the depths).
+
+- **A board can have its own look** (project `data.look`): hold a project → Board look (or "Same as my other boards"). While that board shows, `theme.showBoardLook` gives the page that look and its string colour; leaving puts yours back. `boardApi.style()` returns it.
+- **Iceberg look**: the sections are the tiers, top to bottom in list order. board.js `drawBerg()` draws an `svg.berg` at the back of the board: a rough iceberg round the tiers (a peak over the first, widening down the sides, a ragged foot), white above the waterline and see-through blue below (clip paths at the waterline), the waterline across the whole board, and depths beside the tiers ("The tip", "20 m down" … "11,000 m down"). The waterline (`--wl`) is between the first and second tiers; the background is sky above it and water darkening with depth below it, pinned to the board like 0.9.3's. Board pictures (and Record and share links) include the sky, water and ice.
+- **Arrange as an iceberg** (Tidy menu, Iceberg boards): tiers stacked and centred, each at least as wide as the one above (1 to 6 columns, more if a tier has lots), cards in rows, loose cards floating above the tip, a wider gap at the waterline.
+- **+ → Iceberg chart**: asks what it's about, makes "Iceberg: …" with six tiers (Level 1: Everyone knows this … Level 6: The abyss), the Iceberg look, and a recording, "The dive" (16:9): the whole iceberg, then each tier in turn with its level as a lower-third caption, then the whole thing again.
+- **Iceberg theme** (app colours icy blue; its boards are Frost, since an iceberg drawn round ordinary sections makes no sense: iceberg charts carry their own look).
+- Tested headless (Edge): making a chart through + → Iceberg chart, filling the tiers, arranging, desktop and phone; leaving the board puts the usual look back; the dive recording's eight shots. Not tested: playing the dive to a video on the iPhone.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
