@@ -23,5 +23,8 @@
     }
   ],
 
+  // Brain Tree's reminders: every minute, send any that have come due (worker.js "scheduled").
+  "triggers": { "crons": ["* * * * *"] },
+
   "observability": { "enabled": true }
 }

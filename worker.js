@@ -3,7 +3,7 @@
 // in worker-braintree.js).
 // Only /api/... addresses reach this code (see wrangler.jsonc); everything else is a plain file.
 
-import { handleBraintree } from './worker-braintree.js';
+import { handleBraintree, braintreeCron } from './worker-braintree.js';
 //
 // Both are stored in the "pobajobs" D1 database. To read them:
 //   Cloudflare dashboard > Storage & databases > D1 > pobajobs > Console, then run
@@ -24,6 +24,10 @@ export default {
     if (url.pathname === '/api/braintree' || url.pathname.startsWith('/api/braintree/')) return handleBraintree(request, env, url);
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found.' }, 404);
     return env.ASSETS.fetch(request);
+  },
+  // Every minute (wrangler.jsonc "triggers"): Brain Tree's reminders that have come due.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(braintreeCron(env));
   },
 };
 

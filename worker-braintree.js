@@ -35,11 +35,18 @@ export async function handleBraintree(request, env, url) {
 
     // Claude's connector (0.7.3): its own key, in its address (see "Claude" below).
     if (path === '/mcp' || path.startsWith('/mcp/')) return await mcp(request, env, url, path.slice('/mcp/'.length));
+    // (0.9.0) A read-only link anyone can open, and quick add from Siri (its own key, in its address).
+    if (path.startsWith('/share/') && request.method === 'GET') return await shareGet(env, path.slice('/share/'.length));
+    if (path.startsWith('/capture/')) return await capture(request, env, path.slice('/capture/'.length));
 
     if (path === '/login') return await login(request, env);
     if (!(await signedIn(request, env))) return json({ error: 'Please sign in.' }, 401);
 
     if (path === '/claude') return await claudeKey(request, env, url);
+    if (path === '/capture-key') return await captureKey(request, env, url);
+    if (path === '/share' || path.startsWith('/share/')) return await shareSet(request, env, url, path.slice('/share/'.length));
+    if (path === '/shares') return await shareList(env);
+    if (path.startsWith('/push/')) return await pushApi(request, env, path.slice('/push/'.length));
     if (path === '/sync') return await sync(request, env);
     if (path === '/files') return await putFile(request, env, url);
     if (path.startsWith('/files/')) return await getFile(env, path.slice('/files/'.length));
@@ -337,7 +344,7 @@ const MCP_TOOLS = [
       color: { type: 'string', enum: COLOURS }, move_to: { type: 'string', description: 'Id of the project, section or to-do to move it into.' },
       chat_url: { type: 'string' },
     }, required: ['id'] } },
-  { name: 'tie_string', title: 'Tie a string', description: 'Tie a string between two things (it shows on the board, and under Strings on each). Tying two already tied changes its label and/or arrow.',
+  { name: 'tie_string', title: 'Tie a string', description: 'Tie a string between two things (it shows on the board, and under Strings on each). Tying two already tied changes its label and/or arrow. An arrow from an unfinished to-do (or project) into a to-do means that to-do waits for it: it stays out of Today until the first is done, so use arrows for real "this before that" order.',
     inputSchema: { type: 'object', properties: { from_id: { type: 'string' }, to_id: { type: 'string' }, label: { type: 'string' }, arrow: ARROW }, required: ['from_id', 'to_id'] } },
   { name: 'remove_item', title: 'Move to Recently deleted', description: 'Move a to-do, note, project or section to Recently deleted (the user can restore it). Removing a section keeps what was in it.',
     inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }, annotations: { destructiveHint: true } },
@@ -453,14 +460,14 @@ const text = (v, max, what) => {
   return s.slice(0, max);
 };
 
-async function saveItem(env, id, data) {
+async function saveItem(env, id, data, device = 'Claude') {
   data.updated = new Date().toISOString();
   const raw = JSON.stringify(data);
   if (raw.length > MAX_ITEM) throw new Error(`“${data.title || 'That'}” is too big to save.`);
   const rev = await nextRev(env.DB);
-  await env.DB.prepare(`INSERT INTO bt_items (id, rev, data, deleted, updated_at, device) VALUES (?, ?, ?, 0, ?, 'Claude')
+  await env.DB.prepare(`INSERT INTO bt_items (id, rev, data, deleted, updated_at, device) VALUES (?, ?, ?, 0, ?, ?)
     ON CONFLICT(id) DO UPDATE SET rev = excluded.rev, data = excluded.data, deleted = 0, updated_at = excluded.updated_at, device = excluded.device`)
-    .bind(id, rev, raw, data.updated).run();
+    .bind(id, rev, raw, data.updated, device).run();
   return rev;
 }
 
@@ -721,6 +728,222 @@ const TOOL_FNS = {
   },
 };
 
+// ---------- (0.9.0) Read-only links ----------
+// The app sends a snapshot of a project (its list, and a picture of its board) to keep here under a
+// long random token; /builds/braintree/share.html#<token> shows it to anyone with the link. Nothing
+// else of Brain Tree can be reached with it. Sending it again with the same token updates it;
+// DELETE stops it working.
+
+const SHARE_RE = /^[A-Za-z0-9_-]{20,48}$/;
+const SHARE_PART = 1_500_000;
+const SHARE_MAX = 12_000_000;
+
+async function shareGet(env, token) {
+  if (!SHARE_RE.test(token)) return json({ error: 'That link isn’t right.' }, 404);
+  const { results } = await env.DB.prepare('SELECT data FROM bt_shares WHERE token = ? ORDER BY part').bind(token).all();
+  if (!results.length) return json({ error: 'This link has been switched off, or never existed.' }, 404);
+  return new Response(results.map(r => r.data).join(''), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' } });
+}
+
+async function shareSet(request, env, url, token) {
+  if (request.method === 'DELETE') {
+    if (!SHARE_RE.test(token)) return json({ error: 'Bad link.' }, 400);
+    await env.DB.prepare('DELETE FROM bt_shares WHERE token = ?').bind(token).run();
+    return json({ ok: true });
+  }
+  if (request.method !== 'POST') return json({ error: 'POST or DELETE.' }, 405);
+  const raw = await request.text();
+  if (raw.length > SHARE_MAX + 2000) return json({ error: 'That’s too big to share (the board picture is huge). Try a smaller board.' }, 413);
+  let body;
+  try { body = JSON.parse(raw); } catch (e) { return json({ error: 'Unexpected format.' }, 400); }
+  const data = String(body.data || '');
+  if (!data || data.length > SHARE_MAX) return json({ error: 'Nothing to share, or too much.' }, 400);
+  let tok = SHARE_RE.test(String(body.token || '')) ? String(body.token) : '';
+  if (!tok) tok = b64url(crypto.getRandomValues(new Uint8Array(24)));
+  const title = clean(body.title, 200) || 'Brain Tree', made = new Date().toISOString();
+  const parts = [];
+  for (let i = 0; i < data.length; i += SHARE_PART) parts.push(data.slice(i, i + SHARE_PART));
+  await env.DB.prepare('DELETE FROM bt_shares WHERE token = ?').bind(tok).run();
+  for (let i = 0; i < parts.length; i++) await env.DB.prepare('INSERT INTO bt_shares (token, part, title, made, data) VALUES (?, ?, ?, ?, ?)').bind(tok, i, title, made, parts[i]).run();
+  return json({ token: tok, made, url: `${url.origin}${APP_PATH}share.html#${tok}` });
+}
+
+async function shareList(env) {
+  const { results } = await env.DB.prepare('SELECT token, MAX(title) AS title, MAX(made) AS made, SUM(LENGTH(data)) AS bytes FROM bt_shares GROUP BY token ORDER BY made DESC').all();
+  return json({ shares: results });
+}
+
+// ---------- (0.9.0) Quick add from Siri ----------
+// An iPhone Shortcut ("Add to Brain Tree") posts what you said to /capture/<key>: it lands in the
+// Inbox, and the app reads a date or price out of it ("… tomorrow", "… £12") when it next opens.
+
+async function captureKey(request, env, url) {
+  if (request.method === 'GET') {
+    const row = await env.DB.prepare("SELECT created_at, last_used FROM bt_keys WHERE name = 'capture'").first();
+    return json({ on: !!row, created: row?.created_at || null, lastUsed: row?.last_used || null });
+  }
+  if (request.method === 'POST') {
+    const key = 'bq' + b64url(crypto.getRandomValues(new Uint8Array(24)));
+    await env.DB.prepare(`INSERT INTO bt_keys (name, hash, created_at, last_used) VALUES ('capture', ?, ?, NULL)
+      ON CONFLICT(name) DO UPDATE SET hash = excluded.hash, created_at = excluded.created_at, last_used = NULL`)
+      .bind(await sha256('braintree-capture:' + key), new Date().toISOString()).run();
+    return json({ url: `${url.origin}/api/braintree/capture/${key}` });
+  }
+  if (request.method === 'DELETE') {
+    await env.DB.prepare("DELETE FROM bt_keys WHERE name = 'capture'").run();
+    return json({ ok: true });
+  }
+  return json({ error: 'Not allowed.' }, 405);
+}
+
+async function capture(request, env, key) {
+  const said = (t, status = 200) => new Response(t, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+  if (request.method !== 'POST') return said('Send it with POST.', 405);
+  const row = /^[A-Za-z0-9_-]{20,60}$/.test(key) ? await env.DB.prepare("SELECT hash FROM bt_keys WHERE name = 'capture'").first() : null;
+  if (!row || !(await sameText(await sha256('braintree-capture:' + key), row.hash))) return said('Brain Tree doesn’t know this address. Set quick add up again in Brain Tree’s Settings.', 401);
+  const raw = (await request.text()).slice(0, 20000);
+  let t = raw;
+  try { const j = JSON.parse(raw); t = typeof j === 'string' ? j : j.text ?? j.title ?? j.Text ?? ''; } catch (e) {}
+  t = String(t || '').replace(/\s+/g, ' ').trim();
+  if (!t) return said('Nothing was said, so nothing was added.', 400);
+  const id = newItemId(), now = new Date().toISOString();
+  // Long things become notes; short ones to-dos (with a date or price read out of them in the app).
+  const note = t.length > 140;
+  await saveItem(env, id, note ? { type: 'note', title: '', body: notesHtml(t), created: now, order: Date.now() } : { type: 'task', title: t.slice(0, 300), body: '', created: now, order: Date.now(), parse: true }, 'Siri');
+  await env.DB.prepare("UPDATE bt_keys SET last_used = ? WHERE name = 'capture'").bind(now).run();
+  return said(`Added to Brain Tree: ${note ? 'a note' : t.slice(0, 120)}`);
+}
+
+// ---------- (0.9.0) Reminders (web push) ----------
+// The app works out what to remind you of and when (each to-do's own time, and a morning summary)
+// for the next couple of weeks, and sends that list (POST /push/plan) whenever things change. Every
+// minute, Cloudflare's cron runs braintreeCron, which sends whatever has come due to every device
+// that switched reminders on. Messages are encrypted for each device (RFC 8291) and signed with this
+// server's own key (VAPID, RFC 8292), made the first time it's needed and kept in bt_push_meta.
+
+async function pushApi(request, env, what) {
+  const body = request.method === 'POST' || request.method === 'DELETE' ? await request.json().catch(() => ({})) : {};
+  if (what === 'key') return json({ key: (await vapid(env)).pub });
+  if (what === 'sub' && request.method === 'POST') {
+    const s = body.sub;
+    if (!s || typeof s.endpoint !== 'string' || !/^https:\/\//.test(s.endpoint) || !s.keys?.p256dh || !s.keys?.auth) return json({ error: 'That isn’t a push subscription.' }, 400);
+    await env.DB.prepare(`INSERT INTO bt_push_subs (endpoint, sub, device, created_at, fails) VALUES (?, ?, ?, ?, 0)
+      ON CONFLICT(endpoint) DO UPDATE SET sub = excluded.sub, device = excluded.device, fails = 0`).bind(s.endpoint, JSON.stringify({ endpoint: s.endpoint, keys: { p256dh: s.keys.p256dh, auth: s.keys.auth } }), clean(body.device, 60), new Date().toISOString()).run();
+    return json({ ok: true });
+  }
+  if (what === 'sub' && request.method === 'DELETE') {
+    await env.DB.prepare('DELETE FROM bt_push_subs WHERE endpoint = ?').bind(String(body.endpoint || '')).run();
+    return json({ ok: true });
+  }
+  if (what === 'status') {
+    const { results } = await env.DB.prepare('SELECT device, created_at, last_ok FROM bt_push_subs ORDER BY created_at').all();
+    const q = await env.DB.prepare('SELECT COUNT(*) AS n, MIN(at) AS next FROM bt_push_queue WHERE sent = 0').first();
+    return json({ devices: results, queued: q?.n || 0, next: q?.next || null });
+  }
+  if (what === 'test' && request.method === 'POST') {
+    const row = await env.DB.prepare('SELECT sub FROM bt_push_subs WHERE endpoint = ?').bind(String(body.endpoint || '')).first();
+    if (!row) return json({ error: 'This device isn’t signed up for reminders. Switch them on again.' }, 404);
+    const res = await sendPush(env, JSON.parse(row.sub), { title: 'Brain Tree', body: 'Reminders work on this device.', tag: 'test', url: '' });
+    if (!res.ok) return json({ error: `The notification service said ${res.status}${res.text ? ': ' + res.text.slice(0, 200) : ''}.` }, 502);
+    return json({ ok: true });
+  }
+  if (what === 'plan' && request.method === 'POST') {
+    const items = Array.isArray(body.items) ? body.items.slice(0, 400) : [];
+    const now = Date.now();
+    const stmts = [env.DB.prepare('DELETE FROM bt_push_queue WHERE sent = 0')];
+    for (const it of items) {
+      const at = Math.floor(Number(it.at));
+      if (!(at > now - 60e3) || at > now + 60 * 864e5) continue;
+      const payload = JSON.stringify({ title: clean(it.title, 120) || 'Brain Tree', body: clean(it.body, 300) || '', tag: clean(it.tag, 80) || '', url: clean(it.url, 200) || '' });
+      stmts.push(env.DB.prepare('INSERT INTO bt_push_queue (at, payload) VALUES (?, ?)').bind(at, payload));
+    }
+    await env.DB.batch(stmts);
+    return json({ ok: true, queued: stmts.length - 1 });
+  }
+  return json({ error: 'Not found.' }, 404);
+}
+
+// Run by Cloudflare every minute (see wrangler.jsonc "triggers" and worker.js "scheduled").
+export async function braintreeCron(env) {
+  if (!env.DB) return;
+  await ensureSchema(env.DB);
+  const now = Date.now();
+  const { results: due } = await env.DB.prepare('SELECT id, at, payload FROM bt_push_queue WHERE sent = 0 AND at <= ? ORDER BY at LIMIT 25').bind(now).all();
+  if (!due.length) return;
+  const { results: subs } = await env.DB.prepare('SELECT endpoint, sub, fails FROM bt_push_subs').all();
+  for (const q of due) {
+    await env.DB.prepare('UPDATE bt_push_queue SET sent = 1 WHERE id = ?').bind(q.id).run();
+    if (q.at < now - 3 * 3600e3) continue;   // (missed by hours: too late to be useful)
+    for (const s of subs) {
+      let res;
+      try { res = await sendPush(env, JSON.parse(s.sub), JSON.parse(q.payload)); } catch (e) { res = { ok: false, status: 0 }; }
+      if (res.ok) await env.DB.prepare('UPDATE bt_push_subs SET last_ok = ?, fails = 0 WHERE endpoint = ?').bind(new Date().toISOString(), s.endpoint).run();
+      else if (res.status === 404 || res.status === 410 || s.fails > 20) await env.DB.prepare('DELETE FROM bt_push_subs WHERE endpoint = ?').bind(s.endpoint).run();
+      else await env.DB.prepare('UPDATE bt_push_subs SET fails = fails + 1 WHERE endpoint = ?').bind(s.endpoint).run();
+    }
+  }
+  await env.DB.prepare('DELETE FROM bt_push_queue WHERE sent = 1 AND at < ?').bind(now - 3 * 864e5).run();
+}
+
+const b64urlDec = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4)), c => c.charCodeAt(0));
+const cat = (...arrs) => { const out = new Uint8Array(arrs.reduce((n, a) => n + a.length, 0)); let i = 0; for (const a of arrs) { out.set(a, i); i += a.length; } return out; };
+const utf8 = s => new TextEncoder().encode(s);
+
+// This server's VAPID key pair (made once).
+async function vapid(env) {
+  let row = await env.DB.prepare("SELECT v FROM bt_push_meta WHERE k = 'vapid'").first();
+  if (!row) {
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const pub = b64url(new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey)));
+    const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    await env.DB.prepare("INSERT OR IGNORE INTO bt_push_meta (k, v) VALUES ('vapid', ?)").bind(JSON.stringify({ pub, jwk })).run();
+    row = await env.DB.prepare("SELECT v FROM bt_push_meta WHERE k = 'vapid'").first();
+  }
+  return JSON.parse(row.v);
+}
+
+async function hkdf(salt, ikm, info, bytes) {
+  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, bytes * 8));
+}
+
+// RFC 8291 (aes128gcm): the message, readable only by the device that subscribed.
+export async function encryptPush(sub, text) {
+  const ua = b64urlDec(sub.keys.p256dh), auth = b64urlDec(sub.keys.auth);
+  const mine = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', mine.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', ua, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const secret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, mine.privateKey, 256));
+  const ikm = await hkdf(auth, secret, cat(utf8('WebPush: info\0'), ua, asPub), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, utf8('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, ikm, utf8('Content-Encoding: nonce\0'), 12);
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, cat(utf8(text), new Uint8Array([2]))));
+  const head = new Uint8Array(21);
+  head.set(salt); new DataView(head.buffer).setUint32(16, 4096); head[20] = 65;
+  return cat(head, asPub, ct);
+}
+
+// RFC 8292: who's sending (signed with this server's key, for the push service the device uses).
+export async function vapidAuth(env, endpoint) {
+  const v = await vapid(env);
+  const key = await crypto.subtle.importKey('jwk', v.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const enc = o => b64url(utf8(JSON.stringify(o)));
+  const unsigned = enc({ typ: 'JWT', alg: 'ES256' }) + '.' + enc({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'https://pobajobs.co.uk/builds/braintree/' });
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, utf8(unsigned)));
+  return `vapid t=${unsigned}.${b64url(sig)}, k=${v.pub}`;
+}
+
+async function sendPush(env, sub, payload) {
+  const body = await encryptPush(sub, JSON.stringify(payload));
+  const res = await fetch(sub.endpoint, {
+    method: 'POST', body,
+    headers: { Authorization: await vapidAuth(env, sub.endpoint), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '14400', Urgency: 'high' },
+  });
+  return { ok: res.ok, status: res.status, text: res.ok ? '' : await res.text().catch(() => '') };
+}
+
 // ---------- Helpers ----------
 
 const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -750,6 +973,12 @@ async function ensureSchema(db) {
     db.prepare('CREATE TABLE IF NOT EXISTS bt_logins (ip_hash TEXT NOT NULL, at TEXT NOT NULL)'),
     db.prepare('CREATE INDEX IF NOT EXISTS bt_logins_ip_at ON bt_logins (ip_hash, at)'),
     db.prepare('CREATE TABLE IF NOT EXISTS bt_keys (name TEXT PRIMARY KEY, hash TEXT NOT NULL, created_at TEXT, last_used TEXT)'),
+    // (0.9.0) read-only links (a snapshot, in pieces), and reminders (devices, keys, what to send when)
+    db.prepare('CREATE TABLE IF NOT EXISTS bt_shares (token TEXT NOT NULL, part INTEGER NOT NULL, title TEXT, made TEXT, data TEXT NOT NULL, PRIMARY KEY (token, part))'),
+    db.prepare('CREATE TABLE IF NOT EXISTS bt_push_subs (endpoint TEXT PRIMARY KEY, sub TEXT NOT NULL, device TEXT, created_at TEXT, last_ok TEXT, fails INTEGER NOT NULL DEFAULT 0)'),
+    db.prepare('CREATE TABLE IF NOT EXISTS bt_push_meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)'),
+    db.prepare('CREATE TABLE IF NOT EXISTS bt_push_queue (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, payload TEXT NOT NULL, sent INTEGER NOT NULL DEFAULT 0)'),
+    db.prepare('CREATE INDEX IF NOT EXISTS bt_push_queue_at ON bt_push_queue (sent, at)'),
   ]);
   schemaReady = true;
 }
