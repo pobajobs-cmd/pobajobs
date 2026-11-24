@@ -267,6 +267,13 @@ The user wanted the themes to carry through to the boards. Picking a theme now s
 - Settings has a little picture of each new look; theme.js `LOOKS` has their names and string colours.
 - Tested in the Browser pane: each look on a real board, in light and dark mode; picking a theme switches the look (with Undo); the board picture export; the Settings previews. Not tested on the iPhone.
 
+## 0.9.3 Backgrounds that stay with the board, and some that move
+
+- The user saw some backgrounds slide separately from the cards: 0.9.2 had pinned whole-picture backgrounds to the screen (`background-size/position !important`). Now `applyView` also sets `--bx`, `--by`, `--bz` on `.cork`, and each of those looks sizes its layers by the zoom and places them by the view, so everything moves with the board. Skies and seas are very tall gradients pinned to the board (40000 px, flat at both ends, so no edge can be reached): the ocean gets darker the further down you go, the sunset turns to dusk. Space's stars now stay with the board too (they used to stay with the screen), with more scattered stars per tile so no grid shows.
+- Moving backgrounds (asked for on Ocean and Space): `.cork::before/::after` layers, oversized by 800 px, slide one tile and loop with transform animations (cheap to draw). Ocean: drifting light and rising bubbles. Space: twinkling stars and a shooting star now and then. Frost: falling snow in two layers. Sakura: petals drifting down. `.cork` is `isolation: isolate` with the layers at `z-index: -1`, so they sit between its background and the cards.
+- Settings → Boards → Backgrounds: Moving or Still (`motion` in the appearance pref; `html[data-still]`). The phone's Reduce Motion also stops them.
+- Tested headless (Edge): panning before/after shots of every changed look, a phone shot of Frost and Postcards far from the cards (no edges), the keyframes resolving to one tile at the current zoom. The Browser pane has Reduce Motion on, which correctly kept them still there.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
