@@ -16,8 +16,11 @@ import { linkService } from './attach.js';
 import * as ex from './export.js';
 import * as theme from './theme.js';
 import * as pv from './preview.js';
+import * as P from './plan.js';
+import { createTimeline } from './timeline.js';
+import * as remind from './remind.js';
 
-const VERSION = '0.8.1';
+const VERSION = '0.9.0';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -26,6 +29,8 @@ const SMART = [
   { id: 'inbox', name: 'Inbox', icon: 'tray' },
   { id: 'todos', name: 'All to-dos', icon: 'check' },
   { id: 'notes', name: 'Notes', icon: 'note' },
+  { id: 'timeline', name: 'Timeline', icon: 'timeline' },   // (0.9.0)
+  { id: 'review', name: 'Weekly review', icon: 'review' },  // (0.9.0)
 ];
 const ICON = {
   sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
@@ -58,6 +63,13 @@ const ICON = {
   unlock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>',
   share: '<svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
+  timeline: '<svg viewBox="0 0 24 24"><path d="M3 4v16M3 20h18"/><rect x="6" y="6" width="8" height="3" rx="1.5"/><rect x="10" y="11" width="9" height="3" rx="1.5"/><rect x="7" y="16" width="6" height="2.5" rx="1.25"/></svg>',
+  review: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>',
+  wait: '<svg viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/></svg>',
+  tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.6"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg>',
+  tpl: '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" stroke-dasharray="3 2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+  link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
 };
 // The small icons on a note's row for what it holds.
 const ROWIC = {
@@ -86,6 +98,7 @@ const projTabs = readLocal('bt-projtab', {});   // each project's list: everythi
 const projTab = id => (['today', 'upcoming'].includes(projTabs[id]) ? projTabs[id] : 'all');
 const wide = matchMedia('(min-width: 900px)');
 
+const write90 = (k, v) => writeLocal(k, v);
 function readLocal(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (e) { return fallback; } }
 function writeLocal(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
 
@@ -135,8 +148,8 @@ const DAY_RE = /\s+(?:(?:on|by|due|next|this)\s+)?(mon(?:day)?|tues?(?:day)?|wed
 const DAY_RE2 = /\s+(?:on|by|due|next|this)\s+(sat|sun)$/i;
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const MON = '(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*';
-function quickDate(text) {
-  const t = today(), s = text.trim();
+function quickDate(text, base) {
+  const t = base || today(), s = text.trim();
   const ofDate = (d, m, y) => {
     let year = y ? (y < 100 ? 2000 + y : y) : parseYmd(t).getFullYear();
     const make = yr => { const dt = new Date(yr, m, d); return dt.getMonth() === m && dt.getDate() === d ? ymd(dt) : null; };
@@ -242,7 +255,18 @@ function buildIndex() {
   const ancestors = r => { const out = []; let p = parentOf(r); while (p && out.length < 60 && !out.includes(p)) { out.unshift(p); p = parentOf(p); } return out; };
   const project = r => { let p = parentOf(r), n = 0; while (p && n++ < 60) { if (p.data.type === 'project') return p; p = parentOf(p); } return null; };
   const live = [...byId.values()].filter(r => alive(r));
-  return { byId, kids, trashed, alive: r => byId.has(r.id) && alive(r), parentOf, descendants, ancestors, project, live, hiddenIn };
+  // (0.9.0) Templates: a project marked as one (and what's in it) stays out of Today, Upcoming, the
+  // timeline and so on; it's only there to start new projects from.
+  const tplMemo = new Map();
+  const inTemplate = (r, depth = 0) => {
+    if (tplMemo.has(r.id)) return tplMemo.get(r.id);
+    const p = r.data.parent && byId.get(r.data.parent);
+    const out = r.data.type === 'project' && r.data.template ? r.id : !p || depth > 60 || p.id === r.id ? null : inTemplate(p, depth + 1);
+    tplMemo.set(r.id, out);
+    return out;
+  };
+  const work = live.filter(r => !inTemplate(r));
+  return { byId, kids, trashed, alive: r => byId.has(r.id) && alive(r), parentOf, descendants, ancestors, project, live, hiddenIn, work, inTemplate: r => inTemplate(r) };
 }
 
 function progress(id) {
@@ -263,6 +287,7 @@ const byOrder = bySectionOrder;
 const pinFirst = cmp => (a, b) => (b.data.pinned ? 1 : 0) - (a.data.pinned ? 1 : 0) || cmp(a, b);
 const byPinnedOrder = pinFirst(byOrder);
 const isTodo = r => isOpen(r) && r.data.type === 'task';
+const isWaiting = r => !!I.wait?.has(r.id);
 // Where a project sits in the sidebar: under the nearest unfinished project above it.
 const navUnder = p => { const up = I.project(p); return up && !up.data.done ? up.id : ''; };
 
@@ -307,6 +332,7 @@ function queueRender() {
 
 function render() {
   I = buildIndex();
+  I.wait = P.waitMap(I);                   // (0.9.0) to-dos waiting on something unfinished
   // Somewhere inside a locked project: go to the project (its list asks for the password).
   const hid = id => id && I.hiddenIn.get(id);
   if (hid(route.project) || (route.view === 'board' && hid(route.board))) { go({ project: hid(route.project) || hid(route.board), view: null, board: null, item: null }, true); return; }
@@ -320,17 +346,28 @@ function render() {
     if (p.id !== route.board) { go({ board: p.id }, true); return; }
   }
   const onBoard = route.view === 'board' && !search;
-  document.body.dataset.view = onBoard ? 'board' : 'lists';
-  document.body.toggleAttribute('data-drawer', onBoard && !!route.item);
+  const onTimeline = route.view === 'timeline' && !search;   // (0.9.0)
+  document.body.dataset.view = onBoard ? 'board' : onTimeline ? 'timeline' : 'lists';
+  document.body.toggleAttribute('data-drawer', (onBoard || onTimeline) && !!route.item);
   document.body.dataset.pane = route.item ? 'detail' : (route.view || route.project || searching()) ? 'list' : 'nav';
   renderNav();
   if (onBoard) {
     board ??= createBoard($('#board'), boardApi);
     board.show(route.board);
+  } else if (onTimeline) {
+    timeline ??= createTimeline($('#timeline'), timelineApi);
+    timeline.show();
   } else renderList();
   renderDetail();
   gest.restore();
 }
+
+let timeline = null;
+const timelineApi = {
+  store, index: () => I, locked: r => isLocked(r), isWaiting: r => isWaiting(r),
+  open: id => go({ item: id }), menu: id => itemMenu(id),
+  titleOf: r => titleOf(r), today: () => today(), fmtDay: s => fmtDay(s), toast: (...a) => toast(...a),
+};
 
 let board = null;
 const boardApi = {
@@ -343,6 +380,8 @@ const boardApi = {
   today: () => today(),
   fmtDay: s => fmtDay(s),
   progress: id => progress(id),
+  isWaiting: r => isWaiting(r),                     // (0.9.0)
+  waitingOn: r => (I.wait?.get(r.id) || []).map(id => titleOf(I.byId.get(id))),
   titleOf: r => titleOf(r),
   toast: (...a) => toast(...a),
   newItem: (type, parent, extra) => newItem(type, parent ?? null, extra),
@@ -364,18 +403,19 @@ const boardApi = {
 function renderNav() {
   const t = today();
   const counts = {
-    today: I.live.filter(r => isOpen(r) && r.data.due && r.data.due <= t).length,
-    inbox: I.live.filter(r => !I.parentOf(r) && r.data.type !== 'project' && r.data.type !== 'section' && !(r.data.type === 'task' && r.data.done)).length,
+    today: I.work.filter(r => isOpen(r) && !isWaiting(r) && r.data.due && r.data.due <= t).length,
+    inbox: I.work.filter(r => !I.parentOf(r) && r.data.type !== 'project' && r.data.type !== 'section' && !(r.data.type === 'task' && r.data.done)).length,
+    review: reviewDue() ? '•' : 0,
   };
   const active = id => !search && route.view === id && !route.project;
   $('#smart').innerHTML = SMART.map(s => `
     <a href="#/${s.id}" class="navrow ${active(s.id) ? 'on' : ''}" data-view="${s.id}">
       <span class="ic ic-${s.id}">${ICON[s.icon]}</span><span class="name">${s.name}</span>
-      ${counts[s.id] ? `<span class="count ${s.id === 'today' && I.live.some(r => isOpen(r) && r.data.due && r.data.due < t) ? 'late' : ''}">${counts[s.id]}</span>` : ''}
+      ${counts[s.id] ? `<span class="count ${s.id === 'today' && I.work.some(r => isOpen(r) && !isWaiting(r) && r.data.due && r.data.due < t) ? 'late' : ''} ${s.id === 'review' ? 'dot' : ''}" ${s.id === 'review' ? 'title="Time for a look back over the week"' : ''}>${counts[s.id]}</span>` : ''}
     </a>`).join('');
 
   // Project tree: projects nest under the nearest project above them; pinned ones first.
-  const projects = I.live.filter(r => r.data.type === 'project' && !r.data.done);
+  const projects = I.live.filter(r => r.data.type === 'project' && !r.data.done && !r.data.template);
   const under = new Map();
   for (const p of projects) { const k = navUnder(p); if (!under.has(k)) under.set(k, []); under.get(k).push(p); }
   const branch = (key, depth) => (under.get(key) || []).sort(byPinnedOrder).map(p => {
@@ -384,7 +424,7 @@ function renderNav() {
     const { total, done } = locked ? { total: 0, done: 0 } : progress(p.id);
     const shut = collapsed.has(p.id);
     // To-dos due today (or late) anywhere in it, so a glance at the sidebar shows where today's work is.
-    const due = locked ? [] : I.descendants(p.id).filter(r => isTodo(r) && r.data.due && r.data.due <= t);
+    const due = locked ? [] : I.descendants(p.id).filter(r => isTodo(r) && !isWaiting(r) && r.data.due && r.data.due <= t);
     const late = due.some(r => r.data.due < t);
     return `
       <div class="navrow proj ${(route.project === p.id || (route.view === 'board' && route.board === p.id)) && !search ? 'on' : ''}" data-project="${p.id}" data-under="${key}" data-depth="${depth}" style="--depth:${depth}">
@@ -397,13 +437,19 @@ function renderNav() {
       </div>${subs && !shut ? branch(p.id, depth + 1) : ''}`;
   }).join('');
   const doneProjects = I.live.filter(r => r.data.type === 'project' && r.data.done).length;
+  const templates = I.live.filter(r => r.data.type === 'project' && r.data.template).length;
   const hasExample = I.live.some(r => r.data.type === 'project' && r.data.title === EXAMPLE_TITLE);
   const tree = branch('', 0);
   $('#projects').innerHTML = (tree || '<p class="empty-nav">No projects yet. Tap + to start one, or <button class="link" data-act="example">add an example project</button> to see what Brain Tree can do.</p>')
+    + (templates ? `<a href="#/templates" class="navrow small ${route.view === 'templates' && !search ? 'on' : ''}"><span class="ic">${ICON.tpl}</span><span class="name">Templates</span><span class="count">${templates}</span></a>` : '')
     + (doneProjects ? `<a href="#/done-projects" class="navrow small ${route.view === 'done-projects' && !search ? 'on' : ''}"><span class="ic">${ICON.check}</span><span class="name">Finished projects</span><span class="count">${doneProjects}</span></a>` : '')
     // Until there's one, an easy way to see what's possible (it's in Settings too).
     + (tree && !hasExample ? `<button class="navrow small example" data-act="example"><span class="ic">${ICON.plus}</span><span class="name">Add the example project</span></button>` : '');
 
+  // (0.9.0) Tags in use, most used first.
+  const tags = P.allTags(I.work).slice(0, 15);
+  $('#tags').innerHTML = tags.length ? `<div class="secthead"><span>Tags</span></div>` + tags.map(([tg, n]) => `
+    <a href="#/tag:${encodeURIComponent(tg)}" class="navrow small tagrow ${route.view === 'tag:' + tg && !search ? 'on' : ''}"><span class="ic">${ICON.tag}</span><span class="name">#${esc(tg)}</span><span class="count">${n}</span></a>`).join('') : '';
   const conflicts = store.conflicts().filter(r => !I.hiddenIn.has(r.id)).length;
   $('#lower').innerHTML = `
     ${conflicts ? `<a href="#/conflicts" class="navrow warn ${route.view === 'conflicts' ? 'on' : ''}"><span class="ic">${ICON.warn}</span><span class="name">Conflicts</span><span class="count late">${conflicts}</span></a>` : ''}
@@ -427,10 +473,13 @@ function renderSyncBar() {
 
 // Today and Upcoming, for everything (the smart lists) or for one project's contents.
 function todayGroups(pool) {
-  const t = today(), open = pool.filter(r => isOpen(r));
+  const t = today(), all = pool.filter(r => isOpen(r) && ((r.data.due && r.data.due <= t) || (r.data.start === t && !r.data.due)));
+  const open = all.filter(r => !isWaiting(r));
   return [
     { name: 'Overdue', items: open.filter(r => r.data.due && r.data.due < t).sort(pinFirst(byDueThenOrder)), late: true },
     { name: 'Today', items: open.filter(r => r.data.due === t || (r.data.start === t && !r.data.due)).sort(pinFirst(byDueThenOrder)) },
+    // (0.9.0) due, but waiting on something that isn't done yet
+    { name: 'Waiting on something', items: all.filter(isWaiting).sort(byDueThenOrder), waiting: true },
     { name: 'Done today', items: pool.filter(r => r.data.type === 'task' && r.data.done && (r.data.doneAt || '').startsWith(t)), done: true },
   ];
 }
@@ -525,9 +574,11 @@ function renderList() {
         ${total ? `<span class="n">${done}/${total}</span><span class="bar"><i style="width:${Math.round(100 * done / total)}%"></i></span>` : '<span class="grow"></span>'}
         ${end ? `<span class="${!p.data.done && p.data.due && p.data.due < t ? 'late' : ''}">${esc(end)}</span>` : ''}
         ${p.data.done ? '<span class="ok">Finished</span>' : ''}
+        ${costLine(p)}
         <b>${textOf(p.data.body) ? 'Notes' : 'Details'} ›</b>
       </button>
-      ${p.data.lock ? `<button class="lockbtn" data-act="lock-now" data-id="${p.id}" title="Lock it again now">${ICON.lock}<span>Lock</span></button>` : ''}</div>`;
+      ${p.data.lock ? `<button class="lockbtn" data-act="lock-now" data-id="${p.id}" title="Lock it again now">${ICON.lock}<span>Lock</span></button>` : ''}</div>
+      ${p.data.template ? `<div class="tplbar">${ICON.tpl}<span>This is a template: what’s in it stays out of Today and the timeline.</span><button class="primary" data-act="from-template" data-id="${p.id}">Start a project from it</button></div>` : ''}`;
     // Everything in it, or just what's due today / coming up (from anywhere inside, sections and sub-projects too).
     const tab = projTab(p.id), pool = I.descendants(p.id);
     if (pfind.id === p.id && pfind.q) {
@@ -536,7 +587,7 @@ function renderList() {
       head = `<p class="findall">${groups.length ? '' : 'Nothing in this project matches that. '}<button class="link" data-act="find-everywhere">Search everywhere for “${esc(pfind.q)}”</button></p>`;
       canAdd = false;
     } else {
-    const nToday = pool.filter(r => isOpen(r) && ((r.data.due && r.data.due <= t) || (r.data.start === t && !r.data.due))).length;
+    const nToday = pool.filter(r => isOpen(r) && !isWaiting(r) && ((r.data.due && r.data.due <= t) || (r.data.start === t && !r.data.due))).length;
     const nSoon = pool.filter(r => isUpcoming(r, t)).length;
     head += `<div class="seg projtabs" role="tablist" aria-label="Show">${[['all', 'Everything'], ['today', 'Today', nToday], ['upcoming', 'Upcoming', nSoon]]
       .map(([k, label, n]) => `<button role="tab" aria-selected="${tab === k}" data-projtab="${k}" class="${tab === k ? 'on' : ''}">${label}${n ? ` <i>${n}</i>` : ''}</button>`).join('')}</div>`;
@@ -568,28 +619,45 @@ function renderList() {
     }
   } else {
     const v = route.view || 'today';
-    title = (SMART.find(s => s.id === v) || {}).name || { trash: 'Recently deleted', conflicts: 'Conflicts', 'done-projects': 'Finished projects' }[v] || 'Brain Tree';
-    if (v === 'today') {
-      groups = todayGroups(I.live);
+    title = (SMART.find(s => s.id === v) || {}).name || { trash: 'Recently deleted', conflicts: 'Conflicts', 'done-projects': 'Finished projects', templates: 'Templates' }[v] || 'Brain Tree';
+    if (v.startsWith('tag:')) {
+      // (0.9.0) One tag: what has it, by project.
+      const tg = P.tagKey(v.slice(4));
+      title = '#' + tg;
+      addHint = `Add a to-do tagged #${tg}`;
+      const has = I.work.filter(r => r.data.type !== 'section' && P.tagsOf(r).includes(tg));
+      const map = new Map();
+      for (const r of has.filter(r => !(r.data.type === 'task' && r.data.done))) { const p = I.project(r); const k = p ? titleOf(p) : ' No project'; if (!map.has(k)) map.set(k, []); map.get(k).push(r); }
+      groups = [...map].sort((a, b) => a[0].localeCompare(b[0])).map(([name, items]) => ({ name: name.trim(), items: items.sort(pinFirst(byDueThenOrder)) }));
+      groups.push({ name: 'Done', items: has.filter(r => r.data.type === 'task' && r.data.done), done: true });
+    } else if (v === 'templates') {
+      canAdd = false;
+      head = '<p class="hint">Projects you start new ones from. Open one and tap “Start a project from it”: everything in it is copied, and its dates move to fit the day you pick.</p>';
+      groups = [{ name: '', items: I.live.filter(r => r.data.type === 'project' && r.data.template).sort(byPinnedOrder) }];
+    } else if (v === 'review') {
+      canAdd = false;
+      ({ head, groups } = reviewList());
+    } else if (v === 'today') {
+      groups = todayGroups(I.work);
     } else if (v === 'upcoming') {
       addHint = 'Add a to-do for tomorrow';
-      groups = upcomingGroups(I.live);
+      groups = upcomingGroups(I.work);
       if (!groups.length) groups = [{ name: '', items: [], empty: 'Nothing with a future date yet. Give to-dos and projects a start or due date to see them here.' }];
     } else if (v === 'inbox') {
-      const loose = I.live.filter(r => !I.parentOf(r) && r.data.type !== 'project');
+      const loose = I.work.filter(r => !I.parentOf(r) && r.data.type !== 'project');
       groups = [
         { name: 'To-dos', items: loose.filter(r => r.data.type === 'task' && !r.data.done).sort(pinFirst(byDueThenOrder)) },
         { name: 'Notes', items: loose.filter(r => r.data.type === 'note').sort(byPinnedUpdated) },
         { name: 'Done', items: loose.filter(r => r.data.type === 'task' && r.data.done).sort((a, b) => (b.data.doneAt || '').localeCompare(a.data.doneAt || '')), done: true },
       ];
     } else if (v === 'todos') {
-      const open = I.live.filter(r => r.data.type === 'task' && !r.data.done);
+      const open = I.work.filter(r => r.data.type === 'task' && !r.data.done);
       const map = new Map();
       for (const r of open) { const p = I.project(r); const k = p ? titleOf(p) : ' No project'; if (!map.has(k)) map.set(k, []); map.get(k).push(r); }
       groups = [...map].sort((a, b) => a[0].localeCompare(b[0])).map(([name, items]) => ({ name: name.trim(), items: items.sort(pinFirst(byDueThenOrder)) }));
     } else if (v === 'notes') {
       addHint = 'New note title';
-      groups = [{ name: '', items: I.live.filter(r => r.data.type === 'note').sort(byPinnedUpdated) }];
+      groups = [{ name: '', items: I.work.filter(r => r.data.type === 'note').sort(byPinnedUpdated) }];
     } else if (v === 'done-projects') {
       canAdd = false;
       groups = [{ name: '', items: I.live.filter(r => r.data.type === 'project' && r.data.done).sort((a, b) => (b.data.doneAt || '').localeCompare(a.data.doneAt || '')) }];
@@ -631,11 +699,12 @@ function renderList() {
       const s = g.section, n = (I.kids.get(s.id) || []).length;
       return `<div class="group sec ${s.data.color ? 'c-' + s.data.color : ''}" data-drop="${s.id}" data-kind="any">
         <div class="sechead ${route.item === s.id ? 'on' : ''}" data-open="${s.id}" role="button" tabindex="0">
-          <span class="sname">${esc(g.name)}</span>${n ? `<span class="scount">${n}</span>` : ''}
+          <span class="sname">${esc(g.name)}</span>${(c => (c.n ? `<span class="scost" title="${esc(P.money(c.spent))} spent of ${esc(P.money(c.planned))}">${esc(P.money(c.planned))}</span>` : ''))(P.costOf(I, s.id))}${n ? `<span class="scount">${n}</span>` : ''}
           <button class="secadd" data-new="task" data-parent="${s.id}" aria-label="Add a to-do to ${esc(g.name)}" title="Add a to-do here">${ICON.plus}</button>
         </div>
         ${g.items.length ? g.items.map(r => rowHTML(r, { inProject: true })).join('') : '<p class="secempty">Nothing open in this section.</p>'}</div>`;
     }
+    if (g.html) return g.html;   // (0.9.0) the weekly review's own blocks
     if (!g.items.length) return g.empty ? `<p class="empty">${esc(g.empty)}</p>` : '';
     const doneKey = key + ':' + g.name;
     if (g.done) {
@@ -644,13 +713,120 @@ function renderList() {
       return `<div class="group done"><button class="foot toggle" data-done="${esc(doneKey)}">${g.items.length} ${g.name === 'Done today' ? 'done today' : 'done'} · <span>${isOpenSec ? 'Hide' : 'Show'}</span></button>
         ${isOpenSec ? g.items.map(r => rowHTML(r, { trash: g.trash, inProject: !!route.project, where: g.where })).join('') : ''}</div>`;
     }
-    const band = g.name && !g.bare ? `<div class="gname band ${g.late ? 'late' : ''}"><span>${esc(g.name)}</span><small>${g.items.length}</small></div>` : '';
+    const band = g.name && !g.bare ? `<div class="gname band ${g.late ? 'late' : ''} ${g.waiting ? 'wait' : ''}">${g.waiting ? ICON.wait : ''}<span>${esc(g.name)}</span><small>${g.items.length}</small></div>` : '';
     const rowOf = r => rowHTML(r, g.hits ? { inProject: true, hit: g.hits.get(r.id), under: g.under } : { trash: g.trash, inProject: !!route.project, where: g.where });
     return `<div class="group ${g.late ? 'late' : ''} ${g.bare ? 'bare' : ''} ${g.hits ? 'found' : ''}" ${g.drop ? `data-drop="${g.drop}" data-kind="${g.kind}"` : ''}>${band}${g.items.map(rowOf).join('')}</div>`;
   }).join('');
-  const nothing = !groups.some(g => g.items.length);
+  const nothing = !groups.some(g => g.items.length || g.html);
   $('#listBody').innerHTML = html || (nothing ? `<p class="empty">${emptyText()}</p>` : '');
   hydrateThumbs($('#listBody'));
+}
+
+// (0.9.0) A project's money: what its to-dos add up to, what's spent (ticked), against its budget.
+function costLine(p) {
+  const c = P.costOf(I, p.id), b = +p.data.budget;
+  if (!c.n && !b) return '';
+  const over = b && c.planned > b;
+  const txt = b ? `${P.money(c.spent)} spent · ${P.money(c.planned)} of ${P.money(b)}` : `${P.money(c.spent)} of ${P.money(c.planned)} spent`;
+  return `<span class="money ${over ? 'late' : ''}" title="${over ? 'More than the budget' : 'Ticked to-dos count as spent'}">${esc(txt)}</span>`;
+}
+
+// (0.9.0) The weekly review: once a week, a look back (what got done) and forward (what's late,
+// what's stuck, what's gone quiet), with a button on each to sort it there and then.
+const QUIET_DAYS = 14;
+function reviewDue() {
+  const last = readLocal('bt-reviewed', null);
+  if (!last) { if (!readLocal('bt-review-start', null)) writeLocal('bt-review-start', today()); return daysBetween(readLocal('bt-review-start', today()), today()) >= 7; }
+  return daysBetween(last, today()) >= 7;
+}
+function lastTouched(p) {
+  let m = p.data.updated || p.data.created || '';
+  for (const r of I.descendants(p.id)) if ((r.data.updated || '') > m) m = r.data.updated;
+  return m;
+}
+function reviewList() {
+  const t = today(), weekAgo = addDays(t, -7), last = readLocal('bt-reviewed', null);
+  const doneWeek = I.work.filter(r => r.data.type === 'task' && r.data.done && (r.data.doneAt || '').slice(0, 10) > weekAgo).sort((a, b) => (b.data.doneAt || '').localeCompare(a.data.doneAt || ''));
+  const late = I.work.filter(r => isOpen(r) && r.data.type === 'task' && r.data.due && r.data.due < t && !isWaiting(r)).sort(byDueThenOrder);
+  const waiting = I.work.filter(r => isWaiting(r)).sort(byDueThenOrder);
+  const quietBefore = new Date(Date.now() - QUIET_DAYS * 864e5).toISOString();
+  const quiet = I.work.filter(r => r.data.type === 'project' && !r.data.done && !isLocked(r) && lastTouched(r) < quietBefore);
+  const soon = I.work.filter(r => isOpen(r) && !isWaiting(r) && r.data.due && r.data.due >= t && r.data.due <= addDays(t, 7)).sort(byDueThenOrder);
+  const finished = I.live.filter(r => r.data.type === 'project' && r.data.done && (r.data.doneAt || '').slice(0, 10) > weekAgo).length;
+  const btn = (k, id, label, cls = '') => `<button class="${cls}" data-rv="${k}" data-id="${id}">${label}</button>`;
+  const block = (name, note, rows, cls = '') => `<div class="group rvblock ${cls}"><div class="gname band ${cls}"><span>${esc(name)}</span><small>${rows.length}</small></div>${note ? `<p class="rvnote">${note}</p>` : ''}${rows.join('')}</div>`;
+  const head = `<div class="review">
+      <p class="rvbig"><b>${doneWeek.length}</b> to-do${doneWeek.length === 1 ? '' : 's'} done in the last 7 days${finished ? `, and <b>${finished}</b> project${finished === 1 ? '' : 's'} finished` : ''}.</p>
+      <p class="hint">${last ? `Last review: ${esc(fmtDay(last))}.` : 'Once a week: sort out what’s late, what’s stuck and what’s gone quiet.'} Each button sorts that one out there and then.</p>
+      <button class="primary" data-act="review-done">${ICON.check}<span>Done for this week</span></button></div>`;
+  const groups = [];
+  if (late.length) groups.push({ html: block('Late', 'Do it, move it, or take its date off.', late.map(r => `<div class="rvrow">${rowHTML(r)}<div class="rvacts">${btn('today', r.id, 'Today')}${btn('week', r.id, 'Next week')}${btn('nodate', r.id, 'No date')}${btn('done', r.id, 'Done', 'ok')}</div></div>`), 'late'), items: [] });
+  if (waiting.length) groups.push({ html: block('Waiting on something', 'Still waiting? Open it to see on what, or cut the string if it isn’t.', waiting.map(r => rowHTML(r))), items: [] });
+  if (quiet.length) groups.push({ html: block(`Gone quiet (nothing changed in ${QUIET_DAYS} days)`, 'Still going, finished, or one for later?', quiet.map(r => `<div class="rvrow">${rowHTML(r)}<div class="rvacts">${btn('going', r.id, 'Still going')}${btn('finish', r.id, 'Finished', 'ok')}${btn('pause', r.id, 'Make it a template')}</div></div>`)), items: [] });
+  if (soon.length) groups.push({ html: block('Coming up in the next 7 days', '', soon.map(r => rowHTML(r))), items: [] });
+  groups.push({ name: 'Done in the last 7 days', items: doneWeek, done: true });
+  if (!late.length && !waiting.length && !quiet.length) groups.unshift({ html: '<p class="empty">Nothing late, stuck or gone quiet. Nice.</p>', items: [] });
+  return { head, groups };
+}
+async function reviewAct(k, id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  const was = { ...r.data };
+  if (k === 'today') await store.update(id, { due: today() });
+  else if (k === 'week') await store.update(id, { due: nextDow(today(), 1) });
+  else if (k === 'nodate') await store.update(id, { due: undefined });
+  else if (k === 'done' || k === 'finish') { await toggleDone(id); return; }
+  else if (k === 'going') { await store.update(id, { reviewed: today() }); toast(`Kept going: ${titleOf(r)}`); return; }
+  else if (k === 'pause') { await store.update(id, { template: true }); toast(`Made a template: ${titleOf(r)}`, 'Undo', () => store.update(id, { template: was.template })); return; }
+  toast(`Moved: ${titleOf(r)}`, 'Undo', () => store.update(id, { due: was.due }));
+}
+
+// (0.9.0) A new project from a template: everything in it copied, with all its dates moved by the
+// same amount so the last one lands on the day you pick.
+function fromTemplateSheet(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  const all = [r, ...I.descendants(id)];
+  const dates = all.flatMap(x => [x.data.due, x.data.start]).filter(Boolean).sort();
+  const end = r.data.due || dates[dates.length - 1] || null;
+  const t = today();
+  const pick = !end ? null : end >= t ? end : addDays(t, Math.max(1, daysBetween(dates[0], end)));
+  const eg = end && all.find(x => x !== r && x.data.type === 'task' && x.data.due && x.data.due < end);
+  const name = titleOf(r).replace(/[\s(–-]*template\)?\s*$/i, '').trim() || titleOf(r);
+  modal(`
+    <h2>New project from “${esc(titleOf(r))}”</h2>
+    <form class="tplform">
+      <label class="field">Name<input class="tname" value="${esc(name)}" maxlength="200" autocomplete="off" enterkeyhint="done"></label>
+      ${end ? `<label class="field">${r.data.due ? 'Finish by' : 'The last date in it'}<input type="date" class="tdate" value="${pick}" required></label>
+      <p class="hint">Every date in it moves by the same amount${eg ? `, so “${esc(titleOf(eg))}” stays ${daysBetween(eg.data.due, end)} day${daysBetween(eg.data.due, end) === 1 ? '' : 's'} before the end` : ''}.</p>` : '<p class="hint">Nothing in it has a date, so there are no dates to move.</p>'}
+      <div class="mbtns"><button type="button" data-close>Cancel</button><button class="primary">Make it</button></div>
+    </form>`, el => {
+    const f = el.querySelector('form'), nm = el.querySelector('.tname');
+    if (wide.matches) { nm.focus(); nm.select(); }
+    f.addEventListener('submit', async e => {
+      e.preventDefault();
+      const d = el.querySelector('.tdate')?.value;
+      f.querySelector('.primary').disabled = true;
+      const copy = await duplicate(id, { title: nm.value.trim() || name, shift: end && d ? daysBetween(end, d) : 0, fresh: true, quiet: true });
+      closeModal();
+      if (copy) { go({ project: copy, view: null, board: null, item: null }); toast('Project made from the template.'); }
+    });
+  });
+}
+
+// (0.9.0) Something said to Siri (see Settings → Quick add) lands in the Inbox as it was said: here it
+// gets its date and price read out of it, counted from the day it was said.
+let parsing = false;
+async function parseCaptured() {
+  if (parsing) return;
+  parsing = true;
+  try {
+    for (const r of [...store.all()]) {
+      if (r.deleted || !r.data.parse) continue;
+      const c = P.quickCost(r.data.title || ''), q = quickDate(c.title, r.data.created ? ymd(new Date(r.data.created)) : today());
+      await store.update(r.id, { title: q.title, parse: undefined, ...(q.due ? { due: q.due } : {}), ...(c.cost ? { cost: c.cost } : {}) });
+    }
+  } finally { parsing = false; }
 }
 
 function emptyText() {
@@ -665,7 +841,9 @@ function emptyText() {
     trash: 'Nothing deleted.',
     conflicts: 'No conflicts.',
     'done-projects': 'No finished projects yet.',
-  }[route.view] || '';
+    templates: 'No templates yet. Hold a project (or right-click it) and choose “Make it a template”.',
+    timeline: 'Nothing has dates yet.',
+  }[route.view] || (route.view?.startsWith('tag:') ? 'Nothing has that tag now.' : '');
 }
 
 // What a note holds besides text, for the little icon on its row.
@@ -704,11 +882,17 @@ function rowHTML(r, { trash = false, inProject = false, where = false, hit = nul
   if (where && route.project) { const par = I.parentOf(r); if (par && par.id !== route.project) bits.push('· ' + titleOf(par)); }
   // (0.8.1) A search result: inside something further down than its group says.
   if (hit) { const path = I.ancestors(r), at = under ? path.findIndex(x => x.id === under) : -1, rest = path.slice(at + 1); if (rest.length) bits.push('· ' + rest.map(titleOf).join(' › ')); }
+  // (0.9.0) its price; and what it's waiting on
+  if (type === 'task' && +d.cost) bits.unshift(P.money(d.cost));
+  if (type === 'project') { const c = P.costOf(I, r.id); if (c.n) bits.push('· ' + P.money(c.spent) + ' of ' + P.money(c.planned)); }
+  const waits = !trash && I.wait?.get(r.id);
+  if (waits) bits.unshift('waiting on ' + waits.map(w => '“' + shorten(titleOf(I.byId.get(w)), 30) + '”').join(', ') + (bits[0] && !bits[0].startsWith('·') ? ' ·' : ''));
   // One small icon: a conflict, a repeat, or what a note holds.
   const kind = type === 'note' && noteKind(d.body);
   const ic = r.conflict ? `<span class="meta late" title="Conflict: changed on two devices">${ICON.warn}</span>`
     : d.repeat && type === 'task' ? `<span class="meta" title="${esc(REPEATS[d.repeat] || 'Repeats')}">${ICON.repeat}</span>`
     : type === 'project' && d.lock ? `<span class="meta" title="${isLocked(r) ? 'Locked' : 'Unlocked for now'}">${isLocked(r) ? ICON.lock : ICON.unlock}</span>`
+    : type === 'project' && d.template ? `<span class="meta" title="Template">${ICON.tpl}</span>`
     : kind ? `<span class="meta" title="${kind[1]}">${ROWIC[kind[0]]}</span>` : '';
   // The date column: when it's due (or starts); a note shows when it was last changed.
   let when = '', wcls = '';
@@ -719,9 +903,9 @@ function rowHTML(r, { trash = false, inProject = false, where = false, hit = nul
   const lead = type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="${d.done ? 'Mark not done' : 'Mark done'}"></button>`
     : `<span class="ic t-${type}">${typeIcon(type)}</span>`;
   return `
-    <div class="row ${sel} t-${type} ${d.done ? 'is-done' : ''} ${d.color ? 'c-' + d.color : ''} ${hit?.inText ? 'hassnip' : ''}" data-open="${r.id}" role="button" tabindex="0">
+    <div class="row ${sel} t-${type} ${d.done ? 'is-done' : ''} ${d.color ? 'c-' + d.color : ''} ${hit?.inText ? 'hassnip' : ''} ${waits ? 'waiting' : ''}" data-open="${r.id}" role="button" tabindex="0">
       ${trash ? `<span class="ic">${typeIcon(type)}</span>` : lead}
-      <span class="title">${d.pinned ? `<span class="pinmark" title="Pinned">${ICON.pin}</span>` : ''}${hit ? S.markHTML(titleOf(r), hit.ts, esc) : esc(titleOf(r))}${bits.length ? ` <small>${esc(bits.join(' '))}</small>` : ''}</span>
+      <span class="title">${d.pinned ? `<span class="pinmark" title="Pinned">${ICON.pin}</span>` : ''}${waits ? `<span class="waitmark" title="Waiting">${ICON.wait}</span>` : ''}${hit ? S.markHTML(titleOf(r), hit.ts, esc) : P.tagChips(esc(titleOf(r)))}${d.remind && type === 'task' && !d.done ? `<span class="bellmark" title="Reminder at ${esc(d.remind)}">${ICON.bell}</span>` : ''}${bits.length ? ` <small>${esc(bits.join(' '))}</small>` : ''}</span>
       ${ic}${r.dirty && store.status.state !== 'signedout' ? '<span class="dot-pending" title="Not synced yet"></span>' : ''}
       ${trash ? `<span class="trashacts"><button data-restore="${r.id}">Restore</button><button class="danger" data-purge="${r.id}">Delete</button></span>` : `<span class="when ${wcls}">${esc(when)}</span>`}
       ${hit?.inText ? `<span class="snip">${S.snippetHTML(r, hit.ts, esc)}</span>` : ''}
@@ -788,6 +972,8 @@ function buildDetail(host, r) {
         <label class="chip date"><span>Start</span><input type="date" class="start"><button type="button" class="x" data-clear="start" aria-label="Clear start date">×</button></label>
         <label class="chip date"><span>Due</span><input type="date" class="due"><button type="button" class="x" data-clear="due" aria-label="Clear due date">×</button></label>
         <label class="chip sel rep">${ICON.repeat}<select class="repeat" aria-label="Repeat"><option value="">Repeat</option>${Object.entries(REPEATS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+        <label class="chip remind" title="A notification on its due date (switch reminders on in Settings)">${ICON.bell}<span>Remind</span><input type="time" class="remind" aria-label="Remind me at"><button type="button" class="x" data-clear="remind" aria-label="No reminder">×</button></label>
+        <label class="chip money"><span class="mlabel">£</span><input type="number" class="cost" inputmode="decimal" min="0" step="0.01" placeholder="Cost" aria-label="Cost in pounds"></label>
         <button class="chip where" data-act="move"></button>
       </div>
       <div class="swatchrow" role="group" aria-label="Colour">
@@ -823,6 +1009,16 @@ function buildDetail(host, r) {
   for (const k of ['start', 'due']) {
     $('.' + k, host).addEventListener('change', e => store.update(r.id, { [k]: e.target.value || undefined }));
   }
+  // (0.9.0) a price (to-dos) or a budget (projects); a reminder time on its due date (today, if it hasn't got one)
+  $('.cost', host).addEventListener('change', e => {
+    const v = Math.round(parseFloat(String(e.target.value).replace(',', '.')) * 100) / 100, k = I.byId.get(r.id)?.data.type === 'project' ? 'budget' : 'cost';
+    store.update(r.id, { [k]: v > 0 ? v : undefined });
+  });
+  $('input.remind', host).addEventListener('change', e => {
+    const v = e.target.value, cur = I.byId.get(r.id);
+    store.update(r.id, { remind: v || undefined, ...(v && !cur?.data.due ? { due: today() } : {}) });
+    if (v && !remind.enabled()) toast('Switch reminders on to get it.', 'Settings', () => settingsModal('remind'));
+  });
 
   editor = createEditor($('.editor', host), {
     onChange: html => { if (I.byId.get(r.id) && (I.byId.get(r.id).data.body || '') !== html) store.update(r.id, { body: html }); },
@@ -888,6 +1084,17 @@ function updateDetail(r) {
     input.closest('.chip').classList.toggle('late', k === 'due' && !d.done && !!d.due && d.due < today());
     input.closest('.chip').hidden = type === 'section';
   }
+  // (0.9.0) price / budget, reminder
+  const cost = $('.cost', host), money = cost.closest('.chip'), ck = type === 'project' ? 'budget' : 'cost';
+  money.hidden = type !== 'task' && type !== 'project';
+  $('.mlabel', money).textContent = type === 'project' ? 'Budget £' : '£';
+  cost.placeholder = type === 'project' ? '' : 'Cost';
+  if (document.activeElement !== cost) cost.value = +d[ck] ? d[ck] : '';
+  money.classList.toggle('set', !!+d[ck]);
+  const rm = $('input.remind', host);
+  rm.closest('.chip').hidden = type !== 'task';
+  if (document.activeElement !== rm) rm.value = d.remind || '';
+  rm.closest('.chip').classList.toggle('set', !!d.remind);
   const rep = $('.repeat', host);
   rep.value = d.repeat && REPEATS[d.repeat] ? d.repeat : '';
   rep.closest('.chip').hidden = type !== 'task';
@@ -926,7 +1133,7 @@ function updateDetail(r) {
     }
   }
   $('.links', host).innerHTML = `
-    <div class="ihead"><h3>Strings</h3><span class="add"><button data-act="tie">+ Tie to…</button></span></div>
+    <div class="ihead"><h3>Strings</h3><span class="add">${type === 'task' ? '<button data-act="waiton" title="It can’t start until that’s done">+ Waits for…</button>' : ''}<button data-act="tie">+ Tie to…</button></span></div>
     ${strings.length ? strings.map(x => { const o = I.byId.get(x.id); return `
       <div class="lrow" data-open="${x.id}" role="button" tabindex="0">
         <span class="ic t-${o.data.type}">${typeIcon(o.data.type)}</span>
@@ -965,6 +1172,9 @@ function updateDetail(r) {
   // Banners
   const banners = [];
   if (d.trashed) banners.push(`<div class="banner">${ICON.trash}<span>This is in Recently deleted.</span><button data-restore="${r.id}">Restore</button></div>`);
+  const waits = I.wait?.get(r.id);
+  if (waits) banners.push(`<div class="banner wait">${ICON.wait}<span>Waiting on ${waits.map(w => `<a data-open="${w}">${esc(titleOf(I.byId.get(w)))}</a>`).join(', ')}. It stays out of Today until ${waits.length === 1 ? 'that’s' : 'those are'} done.</span></div>`);
+  if (d.template && type === 'project') banners.push(`<div class="banner">${ICON.tpl}<span>A template: start new projects from it.</span><button data-act="from-template" data-id="${r.id}">Start one</button></div>`);
   if (r.conflict) {
     const c = r.conflict;
     banners.push(`<div class="banner warn">${ICON.warn}<span>${c.deleted ? 'Deleted' : 'Also changed'} on ${esc(c.device || 'another device')}${c.updated_at ? ' (' + esc(fmtWhen(c.updated_at)) + ')' : ''} before this device synced.</span><button data-act="compare">Compare</button></div>`);
@@ -1006,9 +1216,12 @@ async function toggleDone(id) {
     });
     return;
   }
+  // (0.9.0) what was waiting only on this
+  const freed = done ? [...(I.wait || [])].filter(([, ws]) => ws.length === 1 && ws[0] === id).map(([b]) => I.byId.get(b)).filter(Boolean) : [];
   await store.update(id, { done: done || undefined, doneAt: done ? new Date().toISOString() : undefined });
-  if (done && r.data.type === 'task') toast(`Done: ${titleOf(r)}`, 'Undo', () => store.update(id, { done: undefined, doneAt: undefined }));
-  if (done && r.data.type === 'project') toast(`Finished: ${titleOf(r)}`, 'Undo', () => store.update(id, { done: undefined, doneAt: undefined }));
+  const free = freed.length ? `. Now free: ${freed.slice(0, 2).map(f => '“' + shorten(titleOf(f), 40) + '”').join(', ')}${freed.length > 2 ? ` and ${freed.length - 2} more` : ''}` : '';
+  if (done && r.data.type === 'task') toast(`Done: ${titleOf(r)}${free}`, 'Undo', () => store.update(id, { done: undefined, doneAt: undefined }));
+  if (done && r.data.type === 'project') toast(`Finished: ${titleOf(r)}${free}`, 'Undo', () => store.update(id, { done: undefined, doneAt: undefined }));
 }
 
 async function setDue(id, due) {
@@ -1044,16 +1257,21 @@ async function toTop(id) {
 }
 
 // A copy, with everything inside it (to-dos come out unticked, so a project works as a template).
-async function duplicate(id) {
+// (0.9.0) opts: title for the copy, shift (days to move every date by), fresh (a new project from a
+// template: not itself a template), quiet (no toast).
+async function duplicate(id, opts = {}) {
   const r = I.byId.get(id);
   if (!r) return null;
   const all = [r, ...I.descendants(id)];   // each thing comes after the one it's in
   const ids = new Map();
   for (const x of all) {
     const data = structuredClone(x.data);
-    for (const k of ['created', 'updated', 'done', 'doneAt', 'trashed', 'lastDone', 'links']) delete data[k];
+    for (const k of ['created', 'updated', 'done', 'doneAt', 'trashed', 'lastDone', 'links', 'share', 'reviewed']) delete data[k];
+    if (opts.shift) for (const k of ['due', 'start']) if (data[k]) data[k] = addDays(data[k], opts.shift);
     if (x === r) {
-      if ((data.title || '').trim()) data.title = data.title.trim() + ' (copy)';
+      if (opts.title) data.title = opts.title;
+      else if ((data.title || '').trim()) data.title = data.title.trim() + ' (copy)';
+      if (opts.fresh) delete data.template;
       data.order = (x.data.order || 0) + 0.5;   // right after the original
       delete data.pinned;
     } else data.parent = ids.get(data.parent) || data.parent;
@@ -1077,7 +1295,15 @@ async function duplicate(id) {
       return y;
     }) });
   }
+  // (0.9.0) recordings follow the copied cards, not the originals
+  for (const x of all) {
+    if (!x.data.recs?.length) continue;
+    let j = JSON.stringify(x.data.recs);
+    for (const [o, n] of ids) j = j.split(o).join(n);
+    await store.update(ids.get(x.id), { recs: JSON.parse(j) });
+  }
   const copy = ids.get(id);
+  if (opts.quiet) return copy;
   toast(`Copied${all.length > 1 ? ` with ${all.length - 1} thing${all.length === 2 ? '' : 's'} inside` : ''}`, 'Open', () => (r.data.type === 'project' && !route.project ? go({ project: copy, view: null, item: null }) : openItem(copy)));
   return copy;
 }
@@ -1357,6 +1583,8 @@ function itemMenu(id) {
   if (type === 'project') items.push(mi('board', ICON.board, 'Open its board'), mi('add', ICON.plus, 'Add a to-do to it'), mi('done', ICON.check, d.done ? 'Reopen project' : 'Finish project'));
   if (type === 'project') items.push(...(d.lock ? [mi('locknow', ICON.lock, 'Lock it now'), mi('lockset', ICON.lock, 'Change its password…'), mi('unlockall', ICON.unlock, 'Take the lock off')] : [mi('lockset', ICON.lock, 'Lock with a password…')]));
   if (type === 'project' || type === 'section') items.push(mi('export', ICON.share, 'Print or export…'));
+  if (type === 'project') items.push(mi('share', ICON.link, d.share ? 'Read-only link…' : 'Share a read-only link…'));
+  if (type === 'project') items.push(mi('fromtpl', ICON.copy, d.template ? 'Start a project from this template…' : 'Start a new project like this…'), mi('tpl', ICON.tpl, d.template ? 'Stop it being a template' : 'Make it a template'));
   if (type !== 'section') items.push(mi('pin', ICON.pin, d.pinned ? 'Unpin' : `Pin to ${pinWhere(r)}`));
   if (canTop(r)) items.push(mi('top', ICON.top, 'Move to the top'));
   if (type !== 'section') items.push(mi('move', ICON.move, 'Move to another project…'));
@@ -1389,6 +1617,9 @@ function itemMenu(id) {
       else if (m === 'locknow') lockNow(id);
       else if (m === 'lockset') lockSheet(id);
       else if (m === 'unlockall') removeLock(id);
+      else if (m === 'share') shareSheet(id);
+      else if (m === 'fromtpl') fromTemplateSheet(id);
+      else if (m === 'tpl') { await store.update(id, { template: d.template ? undefined : true }); toast(d.template ? 'Not a template now: it’s back in Today and the timeline.' : 'Made a template: it’s under Templates in the sidebar, and stays out of Today and the timeline.', 'Undo', () => store.update(id, { template: d.template })); }
       else if (m === 'export') exportSheet({ project: type === 'project' ? id : I.project(r)?.id, section: type === 'section' ? id : null });
       else if (m === 'top') toTop(id);
       else if (m === 'move') movePicker(id);
@@ -1497,6 +1728,19 @@ const gest = createGestures({
   dragEnd: () => queueRender(),   // tidies away any drop zone that was added
   idle: () => { if (renderHeld) { renderHeld = false; queueRender(); } },
 });
+
+// (0.9.0) "Waits for…": a string with its arrow from the thing it waits for into this one.
+function waitOnPicker(id) {
+  // (not what it's inside: it would wait for itself)
+  const banned = new Set([id, ...I.descendants(id).map(k => k.id), ...I.ancestors(I.byId.get(id)).map(k => k.id)]);
+  pickItem({ title: 'It waits for…', exclude: banned, only: r => (r.data.type === 'task' || r.data.type === 'project') && !r.data.done, onPick: async by => {
+    const mine = store.get(id)?.data.links || [], theirs = store.get(by)?.data.links || [];
+    if (mine.some(l => l.to === by)) await store.update(id, { links: mine.map(l => (l.to === by ? { ...l, dir: 'from' } : l)) });
+    else if (theirs.some(l => l.to === id)) await store.update(by, { links: theirs.map(l => (l.to === id ? { ...l, dir: 'to' } : l)) });
+    else await store.update(id, { links: [...mine, { to: by, dir: 'from' }] });
+    toast(`Waits for “${titleOf(I.byId.get(by))}”. It stays out of Today until that’s done.`);
+  } });
+}
 
 function movePicker(id) {
   const r = store.get(id);
@@ -1620,7 +1864,7 @@ function lookPreview(id) {
   return `<svg viewBox="0 0 120 48" aria-hidden="true">${looks[id] || ''}</svg>`;
 }
 
-async function settingsModal() {
+async function settingsModal(focus) {
   const s = store.status;
   const p = theme.current(store);
   const dark = document.documentElement.dataset.mode === 'dark';
@@ -1644,6 +1888,19 @@ async function settingsModal() {
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
       <div class="setrow"><span>Card only strung outside its section</span>${seg('tidyMove', { ask: 'Tidy suggests moving it', move: 'Tidy moves it' })}</div>
       <p class="hint">When a card’s strings all go to things outside its section, Tidy tries it out of the section (or in the one its strings go to). If the board comes out tidier, it suggests the move, or just makes it if you choose that (Undo puts it back).</p>
+      <h3 id="set-remind">Reminders</h3>
+      <p class="hint">Notifications for to-dos with a reminder time (set it on the to-do, beside its dates), and a morning summary of what’s due. They come even when Brain Tree is closed.${remind.isIOS() && !remind.standalone() ? ' <b>On an iPhone they only work in the home-screen app</b> (Share → Add to Home Screen, then open it from there).' : ''}</p>
+      <div class="kv"><span>On this device</span><b class="pushstate">${!remind.supported() ? 'Not possible here' : remind.enabled() ? 'On' : 'Off'}</b></div>
+      <div class="btnrow pushbtns">${!remind.supported() ? '' : remind.enabled() ? '<button class="setbtn" data-s="push-test">Send a test</button><button class="setbtn" data-s="push-off">Switch off here</button>' : '<button class="setbtn" data-s="push-on">Switch reminders on</button>'}</div>
+      <div class="setrow"><span>Morning summary</span><label class="chip sel"><select class="morning" aria-label="Morning summary">${[['', 'Off'], ['06:30', '6:30'], ['07:00', '7:00'], ['07:30', '7:30'], ['08:00', '8:00'], ['08:30', '8:30'], ['09:00', '9:00'], ['10:00', '10:00']].map(([v, l]) => `<option value="${v}" ${(p.morning || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+      <p class="hint pushinfo"></p>
+      <h3>Quick add with Siri</h3>
+      <p class="hint">Say “Hey Siri, add to Brain Tree” and what you say lands in your Inbox, with any date or price you say at the end.</p>
+      <div class="kv"><span>Quick add</span><b class="capstate">${store.signedIn() ? 'Checking…' : 'Sign in to Brain Tree first'}</b></div>
+      <div class="btnrow capbtns"></div>
+      <h3>Read-only links</h3>
+      <p class="hint">Share a project with someone who doesn’t use Brain Tree: hold it (or right-click) and choose “Share a read-only link”.</p>
+      <div class="sharelist">${store.signedIn() ? '<p class="hint">Checking…</p>' : ''}</div>
       <h3>Claude</h3>
       <p class="hint">Connect Claude, and in any Claude chat you can say “block this out in Brain Tree”: it makes the project here, with its sections, to-dos, notes and strings, and links back to the chat. It can also add to projects and tick things off. It uses your Claude plan; nothing to pay here.</p>
       <div class="kv"><span>Claude</span><b class="claudestate">${store.signedIn() ? 'Checking…' : 'Sign in to Brain Tree first'}</b></div>
@@ -1676,6 +1933,8 @@ async function settingsModal() {
       ${store.signedIn() ? '<button data-s="logout">Sign out</button><button class="danger" data-s="erase">Sign out and wipe this device’s copy</button>' : '<button class="primary" data-s="login">Sign in</button>'}
     </div>`, el => {
     el.querySelector('.devname').addEventListener('change', e => store.setDevice(e.target.value));
+    el.querySelector('.morning').addEventListener('change', e => { setPref({ morning: e.target.value }); write90('bt-push-plan', ''); remind.schedule(makePlan); });
+    if (focus) setTimeout(() => el.querySelector('#set-' + focus)?.scrollIntoView({ block: 'start' }), 30);
     // Appearance changes show straight away and are saved (and synced) as you go.
     const setPref = async (patch, reopen) => {
       await theme.save(store, { ...theme.current(store), ...patch });
@@ -1708,6 +1967,33 @@ async function settingsModal() {
       if (!b) return;
       const a = b.dataset.s;
       if (a === 'example') { closeModal(); showExample(); }
+      if (a === 'push-on' || a === 'push-off' || a === 'push-test') {
+        b.disabled = true;
+        try {
+          if (a === 'push-on') { await remind.turnOn(); remind.schedule(makePlan); toast('Reminders are on for this device.', 'Send a test', () => remind.test().catch(x => toast(x.message))); }
+          else if (a === 'push-off') { await remind.turnOff(); toast('Reminders switched off on this device.'); }
+          else { await remind.test(); toast('Test sent. It should pop up in a few seconds.'); b.disabled = false; return; }
+          const top = el.scrollTop; await settingsModal(); $('#modal .sheet').scrollTop = top;
+        } catch (x) { b.disabled = false; toast(navigator.onLine ? x.message : 'You’re offline. Try again when there’s signal.'); }
+      }
+      if (a === 'cap-on') {
+        if (b.dataset.again && !confirm('Make a new quick-add address? The shortcut you have now stops working until you paste the new one into it.')) return;
+        b.disabled = true;
+        try { const k = await store.call('/capture-key', { method: 'POST' }); captureSheet(k.url); } catch (x) { b.disabled = false; toast(x.message); }
+      }
+      if (a === 'cap-off') {
+        if (!confirm('Switch quick add off? Your Siri shortcut stops working.')) return;
+        try { await store.call('/capture-key', { method: 'DELETE' }); const top = el.scrollTop; await settingsModal(); $('#modal .sheet').scrollTop = top; } catch (x) { toast(x.message); }
+      }
+      if (a === 'share-stop') {
+        if (!confirm('Stop sharing this link? Anyone with it sees “switched off” from now on.')) return;
+        try {
+          await store.call('/share/' + b.dataset.token, { method: 'DELETE' });
+          const owner = I.live.find(r => r.data.share?.token === b.dataset.token);
+          if (owner) await store.update(owner.id, { share: undefined });
+          b.closest('.sharerow')?.remove();
+        } catch (x) { toast(x.message); }
+      }
       if (a === 'claude-connect') {
         if (b.dataset.again && !confirm('Make a new connector address? The one Claude has now stops working, so you’ll paste the new one into Claude.')) return;
         b.disabled = true;
@@ -1740,6 +2026,22 @@ async function settingsModal() {
         ? '<button class="setbtn" data-s="claude-connect" data-again="1">Make a new connector address…</button><button class="setbtn danger" data-s="claude-off">Switch Claude off</button>'
         : '<button class="setbtn" data-s="claude-connect">Connect Claude…</button>';
     }).catch(err => { const x = el.querySelector('.claudestate'); if (x) x.textContent = navigator.onLine ? err.message : 'Needs signal to check'; });
+    // (0.9.0) reminders on other devices, quick add, links
+    if (store.signedIn()) store.call('/push/status').then(st => {
+      const x = el.querySelector('.pushinfo');
+      if (x) x.textContent = st.devices.length ? `Signed up: ${st.devices.map(d => d.device || 'a device').join(', ')}.${st.next ? ` Next one: ${fmtWhen(new Date(st.next).toISOString())}.` : ''}` : '';
+    }).catch(() => {});
+    if (store.signedIn()) store.call('/capture-key').then(c => {
+      const x = el.querySelector('.capstate'), btns = el.querySelector('.capbtns');
+      if (!x) return;
+      x.textContent = c.on ? `On${c.lastUsed ? `, last used ${fmtWhen(c.lastUsed)}` : ', not used yet'}` : 'Off';
+      btns.innerHTML = c.on ? '<button class="setbtn" data-s="cap-on" data-again="1">Make a new address…</button><button class="setbtn danger" data-s="cap-off">Switch it off</button>' : '<button class="setbtn" data-s="cap-on">Set it up…</button>';
+    }).catch(err => { const x = el.querySelector('.capstate'); if (x) x.textContent = navigator.onLine ? err.message : 'Needs signal to check'; });
+    if (store.signedIn()) store.call('/shares').then(({ shares }) => {
+      const x = el.querySelector('.sharelist');
+      if (!x) return;
+      x.innerHTML = shares.length ? shares.map(sh => `<div class="kv sharerow"><span><a href="${esc(shareUrl(sh.token))}" target="_blank" rel="noopener">${esc(sh.title || 'A project')}</a> <small>${esc(fmtWhen(sh.made))}</small></span><button class="setbtn danger" data-s="share-stop" data-token="${esc(sh.token)}">Stop</button></div>`).join('') : '<p class="hint">None shared.</p>';
+    }).catch(() => { const x = el.querySelector('.sharelist'); if (x) x.innerHTML = ''; });
     if (store.signedIn()) store.serverStats().then(st => {
       const mb = b => (b / 1048576).toFixed(1) + ' MB';
       const x = el.querySelector('.stats');
@@ -1803,6 +2105,110 @@ function downloadBackup() {
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
+
+// ---------- (0.9.0) Read-only links ----------
+// A snapshot of a project (its list, and a picture of its board) kept on the server under a long
+// random token: anyone with the link sees it on share.html, and nothing else. Update sends it again.
+
+// A note's text with its lists and checklists on lines of their own.
+const plainLines = body => noteLines(body).map(l => (l.t === 'check' ? (l.done ? '✓ ' : '○ ') + l.text : l.t === 'li' ? '• ' + l.text : l.t === 'rows' ? '(a spreadsheet)' : l.text)).join(String.fromCharCode(10));
+const shareUrl = token => `${location.origin}${location.pathname.replace(/[^/]*$/, '')}share.html#${token}`;
+async function buildSnapshot(pid) {
+  const p = I.byId.get(pid), t = today();
+  const item = r => {
+    const d = r.data, txt = plainLines(d.body);
+    return { type: d.type, title: titleOf(r), done: !!d.done, due: d.due || null, start: d.start || null, cost: +d.cost || null,
+      text: txt.length > 500 ? txt.slice(0, 500).replace(/\s+\S*$/, '') + '…' : txt, check: checkCount(d.body) || null,
+      kind: d.type === 'note' ? noteKind(d.body)?.[1] || null : null, waiting: (I.wait?.get(r.id) || []).map(w => titleOf(I.byId.get(w))),
+      steps: (I.kids.get(r.id) || []).filter(k => k.data.type === 'task').map(k => ({ title: titleOf(k), done: !!k.data.done })) };
+  };
+  const ord = list => [...list.filter(r => r.data.type === 'task' && !r.data.done).sort(byPinnedOrder), ...list.filter(r => r.data.type === 'project').sort(byPinnedOrder), ...list.filter(r => r.data.type === 'note').sort(byPinnedOrder), ...list.filter(r => r.data.type === 'task' && r.data.done)];
+  const kids = I.kids.get(pid) || [];
+  const groups = [{ name: '', items: ord(kids.filter(r => r.data.type !== 'section')).map(item) },
+    ...kids.filter(r => r.data.type === 'section').sort(bySectionOrder).map(s => ({ name: titleOf(s), items: ord(I.kids.get(s.id) || []).map(item) }))];
+  const { total, done } = progress(pid), c = P.costOf(I, pid);
+  const snap = { v: 1, title: titleOf(p), made: new Date().toISOString(), today: t, notes: plainLines(p.data.body).slice(0, 4000), start: p.data.start || null, due: p.data.due || null,
+    progress: { total, done }, cost: c.n ? { spent: c.spent, planned: c.planned, budget: +p.data.budget || null } : null, groups, board: null };
+  // A picture of its board (as on Print or export → board).
+  const back = location.hash;
+  try {
+    if (route.view !== 'board' || route.board !== pid) { go({ view: 'board', board: pid, project: null, item: null }); await new Promise(r => setTimeout(r, 500)); }
+    if (board && $('#board .cork')?.clientWidth && $('#board [data-card]:not([data-banner])')) {
+      const { svg, w, h } = await board.exportSVG();
+      const scale = Math.min(1.5, Math.sqrt(5e6 / (w * h)), 5000 / Math.max(w, h));
+      const canvas = await ex.svgToCanvas(svg, w, h, scale);
+      const blob = await ex.canvasBlob(canvas, 'image/jpeg', 0.82);
+      const url = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
+      snap.board = { img: url, w: canvas.width, h: canvas.height };
+    }
+  } finally { if (location.hash !== back) { location.hash = back; await new Promise(r => setTimeout(r, 50)); } }
+  return snap;
+}
+async function publishShare(pid) {
+  const r = I.byId.get(pid);
+  const snap = await buildSnapshot(pid);
+  const res = await store.call('/share', { method: 'POST', body: JSON.stringify({ token: r.data.share?.token || '', title: titleOf(r), data: JSON.stringify(snap) }), timeout: 90_000 });
+  await store.update(pid, { share: { token: res.token, at: res.made } });
+  return res;
+}
+function shareSheet(id) {
+  const r = I.byId.get(id);
+  if (!r) return;
+  if (r.data.lock) { toast('Take the lock off before sharing it.'); return; }
+  const sh = r.data.share;
+  modal(`
+    <div class="sethead"><button type="button" class="setdone" data-close>Done</button><h2>Read-only link</h2></div>
+    <p class="hint">Anyone with the link sees “${esc(titleOf(r))}” as it was when the link was made or last updated: its list and a picture of its board. They can’t change anything, or see anything else in Brain Tree.</p>
+    ${!store.signedIn() ? '<p class="cerr">Sign in to Brain Tree first: links are kept online.</p>' : sh ? `
+      <span class="copyrow"><input class="shareurl" readonly value="${esc(shareUrl(sh.token))}" aria-label="Link"><button type="button" class="setbtn" data-copy>Copy</button></span>
+      <p class="hint">As it was ${esc(fmtWhen(sh.at))}. Changes since then don’t show until you update it.</p>
+      <div class="mbtns col"><button class="primary" data-sh="update">Update it to how it is now</button>${navigator.share ? '<button data-sh="send">Send it…</button>' : ''}<a class="link" href="${esc(shareUrl(sh.token))}" target="_blank" rel="noopener">Open it ↗</a><button class="danger" data-sh="stop">Stop sharing (the link stops working)</button></div>`
+    : '<div class="mbtns col"><button class="primary" data-sh="make">Make the link</button><button data-close>Cancel</button></div>'}
+    <p class="cerr" role="alert"></p>`, el => {
+    el.querySelector('[data-copy]')?.addEventListener('click', async e => {
+      try { await navigator.clipboard.writeText(shareUrl(sh.token)); e.target.textContent = 'Copied'; } catch (err) { el.querySelector('.shareurl').select(); e.target.textContent = 'Selected: copy it'; }
+    });
+    el.addEventListener('click', async e => {
+      const b = e.target.closest('[data-sh]');
+      if (!b) return;
+      const err = el.querySelector('.cerr'), k = b.dataset.sh;
+      if (k === 'send') { navigator.share({ title: titleOf(r), url: shareUrl(sh.token) }).catch(() => {}); return; }
+      if (k === 'stop') {
+        if (!confirm('Stop sharing? Anyone with the link sees “switched off” from now on.')) return;
+        try { await store.call('/share/' + sh.token, { method: 'DELETE' }); await store.update(id, { share: undefined }); closeModal(); toast('Link switched off.'); }
+        catch (x) { err.textContent = x.message; }
+        return;
+      }
+      b.disabled = true; err.textContent = ''; b.textContent = 'Making it…';
+      try { await publishShare(id); shareSheet(id); toast(k === 'make' ? 'Link made.' : 'Link updated.'); }
+      catch (x) { b.disabled = false; b.textContent = 'Try again'; const e2 = $('#modal .cerr'); if (e2) e2.textContent = navigator.onLine ? x.message : 'You’re offline. Try again when there’s signal.'; else toast(x.message); }
+    });
+  });
+}
+
+// ---------- (0.9.0) Quick add with Siri ----------
+function captureSheet(url) {
+  modal(`
+    <div class="sethead"><button type="button" class="setdone" data-close>Done</button><h2>Quick add with Siri</h2></div>
+    <p>Make a Shortcut once on your iPhone. Then say <b>“Hey Siri, add to Brain Tree”</b>, say the to-do, and it lands in your Inbox. End with a date or price (“… tomorrow”, “… on Friday”, “… £12”) and Brain Tree sets them.</p>
+    <ol class="steps">
+      <li>Open the <b>Shortcuts</b> app and tap <b>+</b>.</li>
+      <li>Add the action <b>Dictate Text</b>.</li>
+      <li>Add <b>Get Contents of URL</b>, and paste this as its URL:
+        <span class="copyrow"><input class="capurl" readonly value="${esc(url)}" aria-label="Quick add address"><button type="button" class="setbtn" data-copy>Copy</button></span></li>
+      <li>Tap the arrow on it: <b>Method POST</b>, <b>Request Body JSON</b>, add a <b>Text</b> field called <b>text</b> and set it to <b>Dictated Text</b>.</li>
+      <li>Add <b>Show Result</b> (Siri reads back what was added).</li>
+      <li>Name the shortcut <b>Add to Brain Tree</b>. You can put it on your home screen too.</li>
+    </ol>
+    <p class="hint">Brain Tree shows this address only now. It works like a key (it can only add things), so keep it to yourself. If it gets out, set quick add up again and the old address stops working.</p>`, el => {
+    el.querySelector('[data-copy]').addEventListener('click', async e => {
+      try { await navigator.clipboard.writeText(url); e.target.textContent = 'Copied'; } catch (err) { el.querySelector('.capurl').select(); e.target.textContent = 'Selected: copy it'; }
+    });
+  });
+}
+
+// ---------- (0.9.0) Reminders ----------
+const makePlan = () => remind.planFor({ I, today, addDays, titleOf, isWaiting, morning: theme.current(store).morning || '' });
 
 // ---------- Files, links, print and export ----------
 
@@ -2136,12 +2542,14 @@ function newMenu(anchorParent) {
       <button class="primary" data-n="note">${ICON.note} Note</button>
       <button class="primary" data-n="project">${ICON.folder} Project</button>
       ${route.project && anchorParent === route.project ? `<button class="primary" data-n="section">${ICON.section} Section in this project</button>` : ''}
+      ${I.live.some(r => r.data.type === 'project' && r.data.template) ? `<button class="primary" data-n="tpl">${ICON.tpl} Project from a template</button>` : ''}
       <button data-close>Cancel</button>
     </div>`, el => {
     el.addEventListener('click', async e => {
       const b = e.target.closest('[data-n]');
       if (!b) return;
       closeModal();
+      if (b.dataset.n === 'tpl') { pickItem({ title: 'Start from which template?', only: r => r.data.type === 'project' && r.data.template, onPick: fromTemplateSheet }); return; }
       const id = await newItem(b.dataset.n, anchorParent);
       if (b.dataset.n === 'project' && !anchorParent && !route.project) go({ project: id, view: null, item: id });
       else openItem(id);
@@ -2308,6 +2716,7 @@ document.addEventListener('click', async e => {
     toast('Taken off the string.', 'Undo', () => store.update(from, { links }));
     return;
   }
+  if ((x = el('[data-rv]'))) { e.stopPropagation(); reviewAct(x.dataset.rv, x.dataset.id); return; }
   if ((x = el('[data-done]'))) { const k = x.dataset.done; openDone.has(k) ? openDone.delete(k) : openDone.add(k); render(); return; }
   if ((x = el('[data-projtab]')) && route.project) {
     projTabs[route.project] = x.dataset.projtab;
@@ -2324,7 +2733,7 @@ document.addEventListener('click', async e => {
     return;
   }
   if ((x = el('[data-project]'))) { search = ''; $('#search').value = ''; goProject(x.dataset.project); return; }
-  if ((x = el('#smart [data-view], #lower a, #projects a.navrow'))) {
+  if ((x = el('#smart [data-view], #lower a, #projects a.navrow, #tags a.navrow'))) {
     // The link's own address does the rest; clicking the list you're already on just clears the search.
     const wasSearching = !!search;
     search = ''; $('#search').value = '';
@@ -2338,7 +2747,7 @@ document.addEventListener('click', async e => {
   }
   if ((x = el('[data-open]'))) {
     const id = x.dataset.open;
-    if (x.closest('.crumbs') || x.closest('.inside') || x.closest('.links') || x.closest('#listBody') || x.closest('#listHead')) openItem(id);
+    if (x.closest('.crumbs') || x.closest('.inside') || x.closest('.links') || x.closest('#listBody') || x.closest('#listHead') || x.closest('.banners')) openItem(id);
     return;
   }
   if ((x = el('[data-act]'))) {
@@ -2363,6 +2772,9 @@ document.addEventListener('click', async e => {
     else if (a === 'new') newMenu(route.project || undefined);
     else if (a === 'new-project') { const pid = await newItem('project', null); go({ project: pid, view: null, item: pid }); }
     else if (a === 'example') showExample();
+    else if (a === 'from-template') fromTemplateSheet(x.dataset.id);
+    else if (a === 'review-done') { writeLocal('bt-reviewed', today()); toast('Review done. See you next week.'); go({ view: 'today', project: null, item: null }); }
+    else if (id && a === 'waiton') waitOnPicker(id);
     else if (a === 'lock-now') lockNow(x.dataset.id);
     else if (a === 'lock-forgot') forgotSheet(x.dataset.id);
     else if (a === 'export-list') exportSheet({ project: route.project && !search ? route.project : null, view: route.project ? null : route.view || 'today' });
@@ -2420,8 +2832,10 @@ document.addEventListener('submit', async e => {
     if (type === 'note') { openItem(await newItem('note', undefined, { title: typed })); return; }
     // In a project's Today or Upcoming tab, new to-dos are for today or tomorrow (unless you typed a date).
     const tab = route.project && !search ? projTab(route.project) : 'all';
-    const { title, due } = quickDate(typed);
-    const extra = { title, ...(due ? { due } : tab === 'today' ? { due: today() } : tab === 'upcoming' ? { due: addDays(today(), 1) } : {}) };
+    const tg = !route.project && route.view?.startsWith('tag:') ? P.tagKey(route.view.slice(4)) : '';
+    const c = P.quickCost(typed);
+    const { title, due } = quickDate(c.title);
+    const extra = { title: tg && !P.tagsOf({ id: '~', data: { title } }).includes(tg) ? `${title} #${tg}` : title, ...(c.cost ? { cost: c.cost } : {}), ...(due ? { due } : tab === 'today' ? { due: today() } : tab === 'upcoming' ? { due: addDays(today(), 1) } : {}) };
     const id = await newItem('task', undefined, extra);
     if (due) dateToast(id, typed, due);
   } else if (form.classList.contains('quick')) {
@@ -2429,8 +2843,9 @@ document.addEventListener('submit', async e => {
     const input = form.querySelector('input'), typed = input.value.trim();
     if (!typed) return;
     input.value = '';
-    const { title, due } = quickDate(typed);
-    const id = await newItem('task', form.dataset.parent, { title, ...(due ? { due } : {}) });
+    const c = P.quickCost(typed);
+    const { title, due } = quickDate(c.title);
+    const id = await newItem('task', form.dataset.parent, { title, ...(c.cost ? { cost: c.cost } : {}), ...(due ? { due } : {}) });
     if (due) dateToast(id, typed, due);
     requestAnimationFrame(() => $(`#detail form.quick[data-parent="${form.dataset.parent}"] input`)?.focus());
   }
@@ -2512,7 +2927,11 @@ if (['127.0.0.1', 'localhost'].includes(location.hostname)) window.btApp = { get
   });
   await migrate();
   onRoute();
-  store.onChange(() => { try { exampleRecUpgrade(); } catch (e) {} });
+  store.onChange(() => { try { exampleRecUpgrade(); } catch (e) {} setTimeout(parseCaptured, 0); remind.schedule(makePlan); });
+  remind.schedule(makePlan);
+  // (0.9.0) a reminder tapped while the app was open: go to what it's about
+  navigator.serviceWorker?.addEventListener('message', e => { if (typeof e.data?.go === 'string') location.hash = e.data.go || '#/today'; });
+  parseCaptured();
   try { exampleRecUpgrade(); } catch (e) {}
   if (!store.signedIn() && !readLocal('bt-skipped-login', false)) showLogin(true);
   else store.sync();

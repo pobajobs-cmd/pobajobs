@@ -233,6 +233,8 @@ async function api(path, opts = {}) {
 }
 
 export const serverStats = () => api('/stats');
+// (0.9.0) any other signed-in call (reminders, read-only links, quick add)
+export const call = (path, opts) => api(path, opts);
 // Claude's connector (0.7.3): is it on, make it a new address (the old one stops working), switch it off.
 export const claudeStatus = () => api('/claude');
 export const claudeConnect = () => api('/claude', { method: 'POST' });

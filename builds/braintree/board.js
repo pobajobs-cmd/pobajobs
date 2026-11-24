@@ -25,6 +25,7 @@ import { docInfo, linkInfo, docTileHTML, linkTileHTML, docDivHTML, linkDivHTML, 
 import { previewKind, KIND_ASPECT } from './preview.js';
 import { TRANS_NAMES, FX, LOOKS, SIZES, timeline, totalTime, openPlayer } from './record.js';
 import { terms, matchItem } from './search.js';
+import { money, costOf, tagChips } from './plan.js';
 
 const CARD_W = 220, GAP = 28, PAD = 24, HEAD = 46;
 const SECTION_W = 2 * PAD + 2 * CARD_W + GAP, SECTION_H = 320;
@@ -844,6 +845,11 @@ export function createBoard(host, api) {
       if (prog.total) chips.push(`<span class="chip">${prog.done}/${prog.total}</span>`);
       if (d.start || d.due) chips.push(`<span class="chip ${!d.done && d.due && d.due < t ? 'late' : ''}">${d.start ? api.fmtDay(d.start) : '…'} → ${d.due ? api.fmtDay(d.due) : '…'}</span>`);
     } else if (d.due && type === 'task') chips.push(`<span class="chip ${!d.done && d.due < t ? 'late' : d.due === t ? 'now' : ''}">${api.fmtDay(d.due)}</span>`);
+    // (0.9.0) what it costs, and what it's waiting on
+    if (type === 'task' && +d.cost) chips.push(`<span class="chip money">${money(d.cost)}</span>`);
+    if (type === 'project' && !locked) { const c = costOf(api.index(), r.id); if (c.n) chips.push(`<span class="chip money">${money(c.spent)} of ${money(c.planned)}</span>`); }
+    const waits = type === 'task' && !d.done && api.isWaiting?.(r) ? api.waitingOn(r) : null;
+    if (waits) chips.unshift(`<span class="chip wait" title="Waiting on ${esc(waits.join(', '))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/></svg>Waiting on ${esc(short(waits[0]))}${waits.length > 1 ? ` +${waits.length - 1}` : ''}</span>`);
     if (guests.has(r.id)) { const p = I.project(r); chips.push(`<span class="chip guest">From ${esc(p ? short(api.titleOf(p)) : 'Inbox')}</span>`); }
     // (a clip already shows its video's name, so a note named after it doesn't repeat it)
     const sameAsClip = media?.kind === 'clip' && (d.title || '').trim() === (media.clip.title || '').trim();
@@ -859,10 +865,10 @@ export function createBoard(host, api) {
       : media.kind === 'link' ? `<div class="ptile" data-linkopen title="Open the link">${linkTileHTML(media.link)}</div>`
       : `<div class="pdraw">${drawingSVG(media.d)}</div>`;
     return `
-      <div class="pcard t-${type} ${d.color ? 'c-' + d.color : ''} ${d.done ? 'is-done' : ''} ${sel === r.id ? 'on' : ''} ${tieFrom === r.id ? 'tiefrom' : ''} ${playing?.id === r.id ? 'playing' : ''} ${scales.has(r.id) ? 'scaled' : ''}" data-card="${r.id}" style="--tilt:${((n % 7) - 3) * 0.6}deg;--pin:${PINS[n % PINS.length]}${scales.has(r.id) ? ';--s:' + sc(r.id) : ''}">
+      <div class="pcard t-${type} ${d.color ? 'c-' + d.color : ''} ${d.done ? 'is-done' : ''} ${waits ? 'waiting' : ''} ${sel === r.id ? 'on' : ''} ${tieFrom === r.id ? 'tiefrom' : ''} ${playing?.id === r.id ? 'playing' : ''} ${scales.has(r.id) ? 'scaled' : ''}" data-card="${r.id}" style="--tilt:${((n % 7) - 3) * 0.6}deg;--pin:${PINS[n % PINS.length]}${scales.has(r.id) ? ';--s:' + sc(r.id) : ''}">
         <span class="pin" data-pin="${r.id}" title="Drag onto another card to connect"></span>
         ${pic}
-        ${showTitle ? `<div class="ptitle">${type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="Done"></button>` : ''}<span>${esc(api.titleOf(r))}</span></div>` : ''}
+        ${showTitle ? `<div class="ptitle">${type === 'task' ? `<button class="tick ${d.done ? 'done' : ''}" data-tick="${r.id}" aria-label="Done"></button>` : ''}<span>${tagChips(esc(api.titleOf(r)))}</span></div>` : ''}
         ${body ? `<div class="pbody">${body}</div>` : ''}
         ${minis.length ? `<div class="pminis">${minis.map(m => `<span class="pmini${m.doc ? ' paper' : ''}">${m.id ? `<img data-thumb="${esc(m.id)}" alt="">` : m.doc.pv ? `<img data-thumb="${esc(m.doc.pv)}" alt="">` : `<img data-docpv="${esc(m.doc.id)}" alt="">`}</span>`).join('')}</div>` : ''}
         ${more ? `<p class="pmore">${esc(more)}</p>` : ''}

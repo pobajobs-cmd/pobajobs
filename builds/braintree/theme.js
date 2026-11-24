@@ -63,7 +63,7 @@ export const LOOKS = {
 };
 // (tidyMove, 0.7.9: when Tidy finds a card strung only to things outside its section, 'ask' suggests
 // moving it, 'move' just does it)
-export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard', tidyMove: 'ask' };
+export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard', tidyMove: 'ask', morning: '' };   // (0.9.0) morning: the morning summary's time, or '' for none
 
 export const PREF_ID = 'pref-appearance';
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');

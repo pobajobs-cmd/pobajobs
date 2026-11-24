@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Shared from Brain Tree</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root { --bg: #F7F5F0; --card: #FFFFFF; --ink: #22201C; --soft: #6B655C; --faint: #A49D92; --line: rgba(0,0,0,.1); --accent: #2F6FC8; --late: #C62828; --ok: #2E7D4F; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17181B; --card: #212327; --ink: #ECEAE6; --soft: #A7A39C; --faint: #6F6C66; --line: rgba(255,255,255,.12); --accent: #7FB0FF; --late: #FF7B72; --ok: #6FD39A; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: max(1rem, env(safe-area-inset-top)) 16px 0.6rem; max-width: 960px; margin: 0 auto; }
+  .from { font-size: 0.8rem; color: var(--soft); margin: 0 0 0.2rem; }
+  h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; line-height: 1.2; }
+  .sub { color: var(--soft); font-size: 0.9rem; margin: 0.35rem 0 0; display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; align-items: center; }
+  .bar { display: inline-block; width: 90px; height: 6px; border-radius: 3px; background: var(--line); vertical-align: middle; margin-left: 0.4rem; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--ok); }
+  .tabs { display: flex; gap: 0.3rem; margin: 0.9rem 0 0; }
+  .tabs button { font: inherit; font-size: 0.9rem; font-weight: 600; border: 0; border-radius: 8px; padding: 0.4rem 0.9rem; background: transparent; color: var(--soft); cursor: pointer; }
+  .tabs button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  main { max-width: 960px; margin: 0 auto; padding: 0 16px 3rem; }
+  .notes { white-space: pre-wrap; color: var(--soft); margin: 0.8rem 0 0; font-size: 0.92rem; }
+  .group { margin-top: 1.2rem; }
+  .group h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--soft); margin: 0 0 0.3rem; }
+  .item { background: var(--card); border-radius: 10px; padding: 0.55rem 0.75rem; margin-bottom: 0.4rem; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .line { display: flex; gap: 0.55rem; align-items: flex-start; }
+  .tick { width: 18px; height: 18px; border-radius: 50%; border: 1.8px solid var(--faint); flex: none; margin-top: 3px; display: grid; place-items: center; }
+  .tick.done { background: var(--ok); border-color: var(--ok); }
+  .tick.done::after { content: ""; width: 7px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+  .kind { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); flex: none; margin-top: 4px; }
+  .t { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+  .done .t { color: var(--faint); text-decoration: line-through; font-weight: 500; }
+  .meta { font-size: 0.8rem; color: var(--soft); white-space: nowrap; }
+  .meta.late { color: var(--late); font-weight: 600; }
+  .txt { font-size: 0.88rem; color: var(--soft); margin: 0.25rem 0 0 1.6rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .steps { list-style: none; margin: 0.3rem 0 0 1.6rem; padding: 0; font-size: 0.86rem; color: var(--soft); }
+  .steps li.done { text-decoration: line-through; color: var(--faint); }
+  .wait { font-size: 0.8rem; color: var(--soft); margin: 0.15rem 0 0 1.6rem; font-style: italic; }
+  .board { margin-top: 0.9rem; background: var(--card); border-radius: 12px; overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.1); max-height: calc(100vh - 170px); -webkit-overflow-scrolling: touch; }
+  .board img { display: block; width: 100%; height: auto; cursor: zoom-in; }
+  .board.big img { width: auto; max-width: none; cursor: zoom-out; }
+  .hint { color: var(--soft); font-size: 0.8rem; margin: 0.4rem 0 0; }
+  .msg { text-align: center; color: var(--soft); margin: 4rem 1rem; }
+  footer { text-align: center; color: var(--faint); font-size: 0.75rem; padding: 1rem 16px 2rem; }
+</style>
+</head>
+<body>
+<header id="head"></header>
+<main id="main"><p class="msg">Loading…</p></main>
+<footer>Read-only. Shared from Brain Tree; it shows things as they were when the link was last updated.</footer>
+<script type="module" src="share.js"></script>
+</body>
+</html>
