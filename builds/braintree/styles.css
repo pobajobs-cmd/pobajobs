@@ -1284,3 +1284,58 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .lockbtn:hover { background: var(--hover); color: var(--ink); }
 .lockbtn svg { width: 15px; height: 15px; }
 .lockform .field { margin-bottom: 0.6rem; }
+/* ---------- (0.8.0) Record mode: the board as a video (see record.js) ---------- */
+.boardbar .recbtn::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: #E0312B; vertical-align: 1px; }
+#board.rec .boardbar, #board.rec .tidytip { display: none; }
+.recframe { position: absolute; z-index: 4; left: 0; top: 0; pointer-events: none; box-sizing: border-box; border: 0 solid rgba(0, 0, 0, 0.38); }
+.recframe::after { content: ''; position: absolute; inset: -2px; border: 2px solid #E0312B; border-radius: 4px; }
+.recframe::before { content: 'REC'; position: absolute; z-index: 1; left: 8px; top: 6px; padding: 1px 6px 1px 16px; border-radius: 4px; background: rgba(0, 0, 0, 0.55) radial-gradient(circle at 8px 50%, #E0312B 3.5px, transparent 4px); color: #FFF; font: 700 0.66rem/1.4 var(--font); letter-spacing: 0.06em; }
+.recpanel { position: absolute; z-index: 7; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); max-width: 900px; margin: 0 auto; padding: 6px 6px 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.recpanel .rprow, .recpanel .rpshots { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; align-items: stretch; }
+.recpanel .rprow::-webkit-scrollbar, .recpanel .rpshots::-webkit-scrollbar { display: none; }
+.recpanel .rprow button { flex-shrink: 0; white-space: nowrap; padding: 0.42rem 0.6rem; border-radius: 9px; font-size: 0.84rem; font-weight: 600; color: var(--ink); background: var(--hover); }
+.recpanel .rprow button.primary { background: #E0312B; color: #FFF; }
+.recpanel .rprow button:disabled { opacity: 0.45; }
+.recpanel .rpname { color: var(--accent-ink) !important; }
+.recpanel .rpshots { margin-top: 6px; padding-bottom: 2px; }
+.recpanel .rpshots button { flex-shrink: 0; display: grid; grid-template-columns: auto 1fr; column-gap: 6px; align-items: center; width: 132px; padding: 0.35rem 0.5rem; border-radius: 9px; border: 1px solid var(--line); text-align: left; background: var(--bg); }
+.recpanel .rpshots button b { grid-row: span 2; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--hover); font-size: 0.75rem; }
+.recpanel .rpshots button span { font-size: 0.78rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recpanel .rpshots button small { font-size: 0.7rem; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recpanel .rpshots button.on { border-color: #E0312B; box-shadow: 0 0 0 1px #E0312B; }
+.recpanel .rpshots button.on b { background: #E0312B; color: #FFF; }
+.recpanel .rpshots button.gone { opacity: 0.45; }
+.recpanel .rpshots .rpadd { width: auto; display: block; padding: 0.35rem 0.8rem; font-weight: 600; color: var(--accent-ink); border-style: dashed; }
+.recpanel .rphint { margin: 4px 4px 0; color: var(--soft); font-size: 0.74rem; }
+.recsheet { position: absolute; z-index: 7; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom) + var(--rp-h, 132px)); max-width: 900px; margin: 0 auto; max-height: 46%; overflow-y: auto; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); font-size: 0.85rem; }
+.recsheet .rshead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.recsheet .rshead span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--soft); }
+.recsheet .rshead button { color: var(--soft); padding: 0.1rem 0.4rem; }
+.recsheet .rsrow { display: flex; align-items: center; gap: 8px; margin: 4px 0; flex-wrap: wrap; }
+.recsheet .rsrow > span { width: 74px; color: var(--soft); font-size: 0.8rem; }
+.recsheet .rsdur { display: inline-flex; align-items: center; gap: 4px; }
+.recsheet .rsdur button { width: 30px; height: 28px; border-radius: 8px; background: var(--hover); font-weight: 700; }
+.recsheet .rsdur b { min-width: 52px; text-align: center; }
+.recsheet .rsseg button { font-size: 0.78rem; padding: 0.28rem 0.5rem; }
+.recsheet .rsfx { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.recsheet .rsfx button { padding: 0.3rem 0.6rem; border-radius: 999px; border: 1px solid var(--line); font-size: 0.78rem; color: var(--ink); }
+.recsheet .rsfx button.on { background: #E0312B; border-color: #E0312B; color: #FFF; font-weight: 600; }
+.recsheet .rscap { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.recsheet .rscap input { flex: 1 1 180px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 0.38rem 0.55rem; background: var(--bg); color: var(--ink); font-size: 16px; }
+.recsheet .rsbtns { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.recsheet .rsbtns button { padding: 0.36rem 0.6rem; border-radius: 8px; background: var(--hover); font-size: 0.8rem; font-weight: 600; color: var(--ink); }
+.recsheet .rsbtns button.danger { color: var(--string); margin-left: auto; }
+.recsheet .rsbtns button:disabled { opacity: 0.4; }
+/* The player: full screen, the video in the middle, its controls along the bottom. */
+.recplayer { position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column; background: #050505; color: #EEE; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.recplayer .rpstage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; padding: 10px; }
+.recplayer .rpcanvas { position: absolute; inset: 0; margin: auto; max-width: calc(100% - 20px); max-height: calc(100% - 20px); width: auto; height: auto; box-shadow: 0 0 0 1px #222; }
+.recplayer .rpwait, .recplayer .rpnote { margin: 0; color: #BBB; font-size: 0.95rem; }
+.recplayer .rpnote { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; }
+.recplayer.making .rpnote::before { content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 50%; background: #E0312B; animation: rpblink 1s infinite; }
+@keyframes rpblink { 50% { opacity: 0.2; } }
+.recplayer .rpbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px 12px; }
+.recplayer .rpbar button { color: #FFF; font-size: 1.05rem; padding: 0.35rem 0.7rem; border-radius: 9px; background: rgba(255, 255, 255, 0.1); white-space: nowrap; }
+.recplayer .rpbar .rpnext { background: #E0312B; font-weight: 700; padding: 0.55rem 1.1rem; }
+.recplayer .rpseek { flex: 1; min-width: 60px; accent-color: #E0312B; }
+.recplayer .rptime { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: #AAA; white-space: nowrap; }

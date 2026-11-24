@@ -23,6 +23,7 @@ import { cleanDrawing, drawingSVG, drawDivHTML, drawingBox, moveDrawing, openDra
 import { cleanSheet, sheetTableHTML, sheetDivHTML } from './sheet.js';
 import { docInfo, linkInfo, docTileHTML, linkTileHTML, docDivHTML, linkDivHTML, fileKind } from './attach.js';
 import { previewKind, KIND_ASPECT } from './preview.js';
+import { TRANS_NAMES, FX, LOOKS, SIZES, timeline, totalTime, openPlayer } from './record.js';
 
 const CARD_W = 220, GAP = 28, PAD = 24, HEAD = 46;
 const SECTION_W = 2 * PAD + 2 * CARD_W + GAP, SECTION_H = 320;
@@ -83,6 +84,7 @@ export function createBoard(host, api) {
       <button data-b="add" class="addbtn" title="Add a note, to-do, section, YouTube clip or drawing">+ Add</button>
       <button data-b="tie" title="Tap one card, then another, to connect them">String</button>
       <button data-b="draw" title="Draw straight onto the board">Draw</button>
+      <button data-b="rec" class="recbtn" title="Make a video of the board: shots, moves and effects">Record</button>
       <span class="sep"></span>
       <button data-b="tidy" title="Lay everything out neatly again">Tidy</button>
       <span class="sep"></span>
@@ -1709,7 +1711,8 @@ export function createBoard(host, api) {
       junctions.set(id, J);
       shown.set(id, s);
       const sel = selString === id, dir = DIRS.includes(l.dir) ? l.dir : null;
-      html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${sel ? `<path class="selglow" d="${s.d}"/>` : ''}${dir ? withArrows(s, dir, L) : s.html}`;
+      // (0.8.0: each string, with its branches, in a group of its own, data-sw, so a recording can trace it)
+      html += `<path class="wire hit" data-link="${id}" d="${s.d}"/>${sel ? `<path class="selglow" d="${s.d}"/>` : ''}<g data-sw="${id}">${dir ? withArrows(s, dir, L) : s.html}`;
       if (sel) handles = shapeHandles(id, s, via);
       // Branches: more cards joined to this string where its label is, like a T junction.
       const box = at ? { x: J.x - at.w / 2 - 2, y: J.y - at.h / 2 - 2, w: at.w + 4, h: at.h + 4 } : null;
@@ -1719,15 +1722,18 @@ export function createBoard(host, api) {
         if (!b) continue;
         html += `<path class="wire hit" data-branch="${id}|${esc(c)}" d="${b.d}"/><g class="branch">${dir ? withArrows(b, dir, L, box ? outOf(b.line || b.pts || [], box) + 2 : 0) : b.html}</g>`;
       }
+      html += '</g>';
       const picked = tieFrom === 'L:' + id ? ' picked' : '';
+      const lab = [];
       // (a label beside its string: a dotted line back to it)
       if (at?.anchor) {
         const A = at.anchor, bx = clamp(A.x, J.x - at.w / 2, J.x + at.w / 2), by = clamp(A.y, J.y - at.h / 2, J.y + at.h / 2);
-        if (Math.hypot(A.x - bx, A.y - by) > 4) labels.push(`<path class="leader" ${s.lc || ''} d="M${f(A.x)} ${f(A.y)}L${f(bx)} ${f(by)}"/><circle class="ldot" ${s.lc || ''} cx="${f(A.x)}" cy="${f(A.y)}" r="2.6"/>`);
+        if (Math.hypot(A.x - bx, A.y - by) > 4) lab.push(`<path class="leader" ${s.lc || ''} d="M${f(A.x)} ${f(A.y)}L${f(bx)} ${f(by)}"/><circle class="ldot" ${s.lc || ''} cx="${f(A.x)}" cy="${f(A.y)}" r="2.6"/>`);
       }
-      if (l.label) labels.push(`<g class="slabel${picked}" data-link="${id}" ${s.lc || ''} transform="translate(${f(J.x)} ${f(J.y)})"><rect x="${-l.label.length * 3.6 - 8}" y="-11" width="${l.label.length * 7.2 + 16}" height="22" rx="${LABEL_RX[L]}"/><text text-anchor="middle" y="4">${esc(l.label)}</text></g>`);
+      if (l.label) lab.push(`<g class="slabel${picked}" data-link="${id}" ${s.lc || ''} transform="translate(${f(J.x)} ${f(J.y)})"><rect x="${-l.label.length * 3.6 - 8}" y="-11" width="${l.label.length * 7.2 + 16}" height="22" rx="${LABEL_RX[L]}"/><text text-anchor="middle" y="4">${esc(l.label)}</text></g>`);
       // (no label: a knot where the branches meet, which works like a label)
-      else if (branches.length || picked) labels.push(`<circle class="junction${picked}" data-link="${id}" ${s.lc || ''} cx="${f(J.x)}" cy="${f(J.y)}" r="6"/>`);
+      else if (branches.length || picked) lab.push(`<circle class="junction${picked}" data-link="${id}" ${s.lc || ''} cx="${f(J.x)}" cy="${f(J.y)}" r="6"/>`);
+      if (lab.length) labels.push(`<g data-sl="${id}">${lab.join('')}</g>`);   // (0.8.0: its label, for a recording)
     }
     let pins = '';
     // (a drawing on the board only gets a pin when a string is tied to it)
@@ -2059,6 +2065,7 @@ export function createBoard(host, api) {
       g.el?.classList.remove('lifted');
       for (const fr of framesEl.querySelectorAll('.drop')) fr.classList.remove('drop');
       if (g.moved) await settle(g);
+      else if (up && recMode) recTap(g.line ? 'string' : 'card', g.line ? (g.line.dataset.link || stringOf(g.line.dataset.branch)) : g.id);   // (0.8.0)
       else if (up && tying) { if (g.id !== key) await tieTap(g.id); }
       else if (up && g.line) await tapLine(g.line, e.clientX, e.clientY);
       else if (up && isSketch(api.store.get(g.id))) drawOnBoard(g.id);    // a drawing on the board: change it there
@@ -2075,7 +2082,8 @@ export function createBoard(host, api) {
       else if (up && tying) await tieTap(g.from);           // in String mode a tap on a pin picks that card
       drawLines();
     } else if (g.kind === 'tap-line' && up && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 8) {
-      await tapLine(g.line, e.clientX, e.clientY);
+      if (recMode) recTap('string', g.line.dataset.link || stringOf(g.line.dataset.branch));
+      else await tapLine(g.line, e.clientX, e.clientY);
     } else if (g.kind === 'via') {
       viaDraft = null;
       selString = g.id;
@@ -2091,7 +2099,8 @@ export function createBoard(host, api) {
       if (g.moved) {
         const over = up && targetAt(e.clientX, e.clientY);
         if (!over || !(await addBranch(g.link, over))) drawLines();
-      } else if (up) await tapString(g.link, e.clientX, e.clientY);
+      } else if (up && recMode) recTap('string', g.link);
+      else if (up) await tapString(g.link, e.clientX, e.clientY);
     }
     flush();
   };
@@ -2645,6 +2654,7 @@ export function createBoard(host, api) {
     }
     else if (a === 'tie') setTying(!tying);
     else if (a === 'draw') drawOnBoard();
+    else if (a === 'rec') setRecMode(!recMode);
   });
 
   // (0.7.5) Tidy works the layout out once and saves it (see "Tidy" above). 'all': everything laid
@@ -2861,12 +2871,341 @@ export function createBoard(host, api) {
     else api.toast('Strings tidied. (They route themselves round the cards whenever something moves.)');
   }
 
+  // ---------- Record mode (0.8.0): the board as a video (see record.js) ----------
+  // Record on the board bar: a strip of shots along the bottom, and a frame over the board showing
+  // what the camera sees. Tap a card, section or string to add a shot of it (after the one picked);
+  // tap a shot to go to it and change it: how long, how it gets there, what happens, a caption, or
+  // "Use this view" to frame it as it is on screen. Recordings are kept on the project (data.recs).
+  let recMode = false, recId = null, recSel = -1, recTween = 0;
+  const recEls = {};
+  const recs = () => (api.store.get(key)?.data.recs || []).filter(r => r && Array.isArray(r.shots));
+  const recNow = () => recs().find(r => r.id === recId) || null;
+  const rid = () => Math.random().toString(36).slice(2, 10);
+  async function saveRec(rec) {
+    const all = recs(), i = all.findIndex(r => r.id === rec.id);
+    if (i < 0) all.push(rec); else all[i] = rec;
+    await api.store.update(key, { recs: all });
+  }
+  const recAspect = rec => { const [w, h] = SIZES[rec?.aspect] || SIZES['16:9']; return w / h; };
+
+  // What a shot is of, on the board now (null if it's gone).
+  const stringIds = () => { const out = new Map(), on = new Set([...cards, ...frames].map(r => r.id)); for (const r of [...frames, ...cards]) for (const l of r.data.links || []) if (on.has(l.to)) out.set(`${r.id}|${l.to}`, [r.id, l.to]); return out; };
+  function boardRect() {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const id of [key, ...cards.map(r => r.id), ...frames.map(r => r.id)]) { const b = rectOf(id); if (!b) continue; x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
+    return x0 === Infinity ? { x: 0, y: 0, w: 800, h: 600 } : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  function targetRect(s) {
+    if (s.k === 'board') return boardRect();
+    if (s.k === 'view') return { x: s.at.dx, y: s.at.dy, w: 0, h: 0 };
+    if (s.k === 'string') {
+      const sh = shown.get(s.tid), pts = sh?.pts || sh?.line;
+      const ends = (stringIds().get(s.tid) || []).map(rectOf).filter(Boolean);
+      if (!ends.length) return null;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const p of pts || []) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+      for (const b of ends) { x0 = Math.min(x0, b.x + b.w * 0.25); y0 = Math.min(y0, b.y + b.h * 0.25); x1 = Math.max(x1, b.x + b.w * 0.75); y1 = Math.max(y1, b.y + b.h * 0.75); }
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    }
+    return rectOf(s.tid);
+  }
+  // A frame round something: all of it in view, with some board round it.
+  function frameAround(r, A, k = 1.45) {
+    const w = Math.max(r.w * k, r.h * k * A, 300);
+    return { dx: 0, dy: 0, w: Math.round(w) };
+  }
+  function frameOf(s, A) {
+    const r = targetRect(s);
+    if (!r) return null;
+    if (s.k === 'view') return { cx: s.at.dx, cy: s.at.dy, w: s.at.w };
+    return { cx: r.x + r.w / 2 + (s.at?.dx || 0), cy: r.y + r.h / 2 + (s.at?.dy || 0), w: s.at?.w || frameAround(r, A).w };
+  }
+  // The strings a shot traces: a string's own, or every string to or from a card or section.
+  function tracedBy(s) {
+    if (!s.fx?.trace) return [];
+    const all = stringIds();
+    if (s.k === 'string') return all.has(s.tid) ? [s.tid] : [];
+    if (s.k === 'card' || s.k === 'section') return [...all].filter(([, ends]) => ends.includes(s.tid)).map(([id]) => id);
+    return [];
+  }
+  const shotName = s => s.k === 'board' ? 'The whole board' : s.k === 'view' ? 'A view' : s.k === 'string'
+    ? (() => { const [a, b] = s.tid.split('|'); const l = (api.store.get(a)?.data.links || []).find(x => x.to === b); return l?.label ? `“${l.label}”` : `${short(api.titleOf(api.store.get(a) || { data: {} }))} → ${short(api.titleOf(api.store.get(b) || { data: {} }))}`; })()
+    : short(api.titleOf(api.store.get(s.tid) || { data: {} }));
+
+  // Everything record.js needs to draw a recording: the board as a picture (without the strings it
+  // traces and the cards it drops in, which come separately), and where things are.
+  async function recordScene(rec) {
+    const A = recAspect(rec), shots = (rec.shots || []).filter(s => targetRect(s));
+    if (!shots.length) throw new Error('Add a shot first: tap a card, section or string.');
+    const seenL = new Set(), seenC = new Set();
+    const per = shots.map(s => ({
+      links: tracedBy(s).filter(id => !seenL.has(id) && seenL.add(id)),
+      reveal: s.fx?.reveal && s.k === 'card' && !seenC.has(s.tid) && seenC.add(s.tid) ? [s.tid] : [],
+    }));
+    const defs = host.querySelector('.strings defs');
+    const ex = await exportSVG({
+      hideLinks: seenL, hideCards: seenC,
+      collect: (ox, oy) => {
+        const w = r => ({ x: r.left - ox, y: r.top - oy, w: r.width, h: r.height });
+        const links = new Map();
+        for (const id of seenL) {
+          const g = lines.querySelector(`[data-sw="${id}"]`), hit = lines.querySelector(`path.hit[data-link="${id}"]`), lab = lines.querySelector(`[data-sl="${id}"]`);
+          if (!g || !hit) continue;
+          links.set(id, { d: hit.getAttribute('d'), len: hit.getTotalLength(), box: grow(w(g.getBoundingClientRect()), 26), markup: inlineNode(g),
+            label: lab ? { box: grow(w(lab.getBoundingClientRect()), 6), markup: inlineNode(lab) } : null });
+        }
+        const geo = new Map();
+        for (const s of shots) {
+          if (s.k !== 'card' || geo.has(s.tid)) continue;
+          const el = elOf(s.tid);
+          if (!el) continue;
+          const t = el.querySelector('.ptitle span'), titles = [];
+          if (t?.firstChild) { const rg = document.createRange(); rg.selectNodeContents(t); const seen = []; for (const r of rg.getClientRects()) { if (r.width < 2) continue; const last = seen[seen.length - 1]; if (last && Math.abs(last.top - r.top) < r.height / 2) { last.right = Math.max(last.right, r.right); last.left = Math.min(last.left, r.left); } else seen.push({ left: r.left, right: r.right, top: r.top, height: r.height }); } for (const r of seen) titles.push({ x: r.left - ox, y: r.top - oy, w: r.right - r.left, h: r.height }); }
+          const tick = el.querySelector(`.tick[data-tick="${s.tid}"]`), media = el.querySelector('.polaroid, .pdoc .dpage, .pclip, .pdraw, .psheet');
+          geo.set(s.tid, { titles, tick: tick && !tick.classList.contains('done') ? w(tick.getBoundingClientRect()) : null, media: media ? w(media.getBoundingClientRect()) : null, rect: w(el.getBoundingClientRect()) });
+        }
+        return { links, geo, defs: defs ? inlineNode(defs) : '' };
+      },
+    });
+    const { links: L, geo, defs: defsMarkup } = ex.extra;
+    const base = await svgImage(ex.svg);
+    const scene = { size: SIZES[rec.aspect] || SIZES['16:9'], bg: ex.bg && ex.bg !== 'rgba(0, 0, 0, 0)' ? ex.bg : getComputedStyle(cork).backgroundColor || '#222', look: rec.look || 'none',
+      base: { img: base, x0: ex.x0, y0: ex.y0, w: ex.w, h: ex.h }, links: new Map(), cards: new Map(), shots: [] };
+    for (const [id, l] of L) {
+      scene.links.set(id, { img: await svgImage(boxSVG(defsMarkup + l.markup, l.box)), box: l.box, path: new Path2D(l.d), len: l.len,
+        label: l.label ? { img: await svgImage(boxSVG(defsMarkup + l.label.markup, l.label.box)), box: l.label.box } : null });
+    }
+    for (const id of seenC) {
+      const g = geo.get(id), r = g?.rect || rectOf(id), box = grow(r, 30);
+      scene.cards.set(id, { img: await svgImage(boxSVG(ex.cards.get(id) || '', box)), box, rect: r });
+    }
+    scene.shots = shots.map((s, i) => {
+      const g = geo.get(s.tid) || {};
+      return { ...s, fx: s.fx || {}, frame: frameOf(s, A), rect: s.k === 'view' ? (() => { const f2 = frameOf(s, A); return { x: f2.cx - f2.w * 0.3, y: f2.cy - f2.w * 0.3 / A, w: f2.w * 0.6, h: f2.w * 0.6 / A }; })() : targetRect(s),
+        media: g.media || null, titles: g.titles || [], tick: s.fx?.tick ? g.tick || null : null, links: per[i].links, reveal: per[i].reveal };
+    });
+    return scene;
+  }
+  const grow = (r, p) => ({ x: r.x - p, y: r.y - p, w: r.w + p * 2, h: r.h + p * 2 });
+  const boxSVG = (markup, b) => `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${f(b.x)} ${f(b.y)} ${Math.ceil(b.w)} ${Math.ceil(b.h)}">${markup}</svg>`;
+  function svgImage(svg) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('The board couldn’t be drawn for the recording.')); };
+      img.src = url;
+    });
+  }
+
+  // ----- the editor -----
+  function setRecMode(on) {
+    recMode = on;
+    host.classList.toggle('rec', on);
+    if (!on) { for (const el of Object.values(recEls)) el.remove(); for (const k in recEls) delete recEls[k]; removeEventListener('resize', recLayout); render(); return; }
+    if (tying) setTying(false);
+    let all = recs();
+    if (!all.length) {
+      const rec = { id: rid(), name: 'Recording 1', aspect: cork.clientWidth < cork.clientHeight ? '9:16' : '16:9', look: 'none', audio: null, shots: [] };
+      all = [rec]; saveRec(rec);
+    }
+    if (!all.some(r => r.id === recId)) recId = all[0].id;
+    recSel = -1;
+    recEls.frame = Object.assign(document.createElement('div'), { className: 'recframe' });
+    recEls.panel = Object.assign(document.createElement('div'), { className: 'recpanel' });
+    recEls.sheet = Object.assign(document.createElement('div'), { className: 'recsheet', hidden: true });
+    cork.append(recEls.frame);
+    host.append(recEls.sheet, recEls.panel);
+    recEls.panel.addEventListener('click', recPanelClick);
+    recEls.sheet.addEventListener('click', recSheetClick);
+    recEls.sheet.addEventListener('change', recSheetChange);
+    addEventListener('resize', recLayout);
+    recDraw();
+  }
+  function recDraw() {
+    const rec = recNow();
+    if (!rec || !recEls.panel) return;
+    const tl = timeline(rec.shots);
+    recEls.panel.innerHTML = `
+      <div class="rprow">
+        <button data-r="pick" class="rpname" title="Recordings">● ${esc(short(rec.name || 'Recording'))} ▾</button>
+        <button data-r="aspect" title="Shape of the video">${rec.aspect === '9:16' ? '▯ 9:16' : '▭ 16:9'}</button>
+        <button data-r="look" title="A look over the whole video">${esc(LOOKS[rec.look] || 'Plain')}</button>
+        <button data-r="audio" title="A voiceover to time the shots to">♪ ${rec.audio ? esc(short(rec.audio.name.replace(/\.[a-z0-9]+$/i, ''))) : 'Voiceover'}</button>
+        <button data-r="play" class="primary" ${rec.shots.length ? '' : 'disabled'}>▶ Play</button>
+        <button data-r="video" ${rec.shots.length ? '' : 'disabled'}>Make video</button>
+        <button data-r="done">Done</button>
+      </div>
+      <div class="rpshots">${rec.shots.map((s, i) => `<button data-shot="${i}" class="${i === recSel ? 'on' : ''}${targetRect(s) ? '' : ' gone'}"><b>${i + 1}</b><span>${esc(shotName(s))}</span><small>${(tl[i].end - tl[i].t0).toFixed(1)} s${fxIcons(s)}</small></button>`).join('')}
+        <button data-r="add" class="rpadd">+ Shot</button></div>
+      <p class="rphint">${rec.shots.length ? `${rec.shots.length} shot${rec.shots.length === 1 ? '' : 's'}, ${totalTime(rec.shots).toFixed(1)} s. ` : ''}Tap a card, section or string to add a shot of it.</p>`;
+    recEls.panel.querySelector('.rpshots .on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    recSheet();
+    recLayout();
+  }
+  const fxIcons = s => { const f2 = s.fx || {}, ic = { spot: '◐', circle: '◯', focus: '◎', hl: '▬', under: '_', trace: '〰', tick: '✓', reveal: '↓', kb: '⤢', shake: '≈', flash: '✦' }; const t = Object.keys(ic).filter(k => f2[k]).map(k => ic[k]).join(''); return (t ? ' · ' + t : '') + (s.cap?.text ? ' · “”' : ''); };
+  function recSheet() {
+    const rec = recNow(), s = rec?.shots[recSel];
+    if (!s) { recEls.sheet.hidden = true; return; }
+    const isTask = s.k === 'card' && api.store.get(s.tid)?.data.type === 'task';
+    const fxOk = k => !((k === 'tick' && !isTask) || (k === 'reveal' && s.k !== 'card') || (k === 'trace' && !['card', 'section', 'string'].includes(s.k)) || (['hl', 'under'].includes(k) && s.k !== 'card'));
+    recEls.sheet.innerHTML = `
+      <div class="rshead"><b>Shot ${recSel + 1}</b><span>${esc(shotName(s))}</span><button data-q="close" aria-label="Close">✕</button></div>
+      <div class="rsrow"><span>Stays</span><div class="rsdur"><button data-q="dur-">−</button><b>${(s.dur || 3).toFixed(1)} s</b><button data-q="dur+">+</button></div></div>
+      ${recSel ? `<div class="rsrow"><span>Gets there</span><div class="seg rsseg">${Object.entries(TRANS_NAMES).map(([k, n]) => `<button data-trans="${k}" class="${(s.trans || 'glide') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>` : ''}
+      <div class="rsfx">${FX.filter(([k]) => fxOk(k)).map(([k, n]) => `<button data-fx="${k}" class="${s.fx?.[k] ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div class="rscap"><input data-cap="text" placeholder="Caption (optional)" maxlength="120" value="${esc(s.cap?.text || '')}">
+        <div class="seg rsseg"><button data-capstyle="type" class="${(s.cap?.style || 'type') === 'type' ? 'on' : ''}">Typewriter</button><button data-capstyle="lower" class="${s.cap?.style === 'lower' ? 'on' : ''}">Lower third</button></div>
+        ${s.cap?.style === 'lower' ? `<input data-cap="sub" placeholder="Second line (optional)" maxlength="80" value="${esc(s.cap?.sub || '')}">` : ''}</div>
+      <div class="rsbtns"><button data-q="frame" title="Frame this shot as the board is in the frame now">Use this view</button><button data-q="left" ${recSel ? '' : 'disabled'} aria-label="Earlier">◀</button><button data-q="right" ${recSel < rec.shots.length - 1 ? '' : 'disabled'} aria-label="Later">▶</button><button data-q="from">▶ From here</button><button data-q="del" class="danger">Delete</button></div>`;
+    recEls.sheet.hidden = false;
+  }
+  // The camera's frame: as big as fits above the panel (and the shot's settings).
+  function recFrameRect() {
+    const W = cork.clientWidth, H = cork.clientHeight, cb = cork.getBoundingClientRect();
+    const top = Math.min(...[recEls.panel, recEls.sheet].filter(el => el && !el.hidden).map(el => el.getBoundingClientRect().top)) - cb.top;
+    const avail = { x: 12, y: 12, w: W - 24, h: Math.max(80, Math.min(H, top) - 24) };
+    const A = recAspect(recNow());
+    const w = Math.min(avail.w, avail.h * A), h = w / A;
+    return { x: avail.x + (avail.w - w) / 2, y: avail.y + (avail.h - h) / 2, w, h };
+  }
+  function recLayout() {
+    if (!recEls.frame) return;
+    host.style.setProperty('--rp-h', recEls.panel.offsetHeight + 8 + 'px');
+    const r = recFrameRect();
+    // (the whole board, with the frame's edges as a dark border round it, so outside the frame is dimmed)
+    const W = cork.clientWidth, H = cork.clientHeight;
+    Object.assign(recEls.frame.style, { width: W + 'px', height: H + 'px', borderWidth: `${r.y}px ${W - r.x - r.w}px ${H - r.y - r.h}px ${r.x}px` });
+  }
+  // Show a shot: the board moved so its frame fills the camera frame.
+  function recShow(i, animate = true) {
+    const rec = recNow(), s = rec?.shots[i];
+    if (!s) return;
+    const fr = frameOf(s, recAspect(rec));
+    if (!fr) { api.toast('What this shot was of isn’t on the board any more.'); return; }
+    const o = recFrameRect(), z = o.w / fr.w;
+    const to = { z, x: o.x + o.w / 2 - fr.cx * z, y: o.y + o.h / 2 - fr.cy * z }, from = { ...view };
+    cancelAnimationFrame(recTween);
+    if (!animate) { view = to; applyView(); return; }
+    const t0 = performance.now();
+    const step = () => {
+      const p = Math.min(1, (performance.now() - t0) / 320), e = p * p * (3 - 2 * p);
+      const lz = Math.exp(Math.log(from.z) + (Math.log(to.z) - Math.log(from.z)) * e);
+      // (the frame's middle on the board, moved smoothly, at the zoom of the moment)
+      const fc = { x: (o.x + o.w / 2 - from.x) / from.z, y: (o.y + o.h / 2 - from.y) / from.z };
+      const cx = fc.x + (fr.cx - fc.x) * e, cy = fc.y + (fr.cy - fc.y) * e;
+      view = { z: lz, x: o.x + o.w / 2 - cx * lz, y: o.y + o.h / 2 - cy * lz }; applyView();
+      if (p < 1) recTween = requestAnimationFrame(step); else saveView();
+    };
+    recTween = requestAnimationFrame(step);
+  }
+  async function recAdd(k, tid) {
+    const rec = recNow();
+    if (!rec) return;
+    const s = { sid: rid(), k, tid: tid || null, at: { dx: 0, dy: 0, w: 0 }, dur: 3, trans: 'glide', fx: {}, cap: null };
+    const A = recAspect(rec);
+    if (k === 'view') { const o = recFrameRect(); s.at = { dx: Math.round((o.x + o.w / 2 - view.x) / view.z), dy: Math.round((o.y + o.h / 2 - view.y) / view.z), w: Math.round(o.w / view.z) }; }
+    else { const r = targetRect(s); if (!r) return; s.at = frameAround(r, A, k === 'board' ? 1.08 : k === 'section' ? 1.2 : 1.45); }
+    if (k === 'string') s.fx.trace = true;
+    const at = recSel >= 0 ? recSel + 1 : rec.shots.length;
+    rec.shots.splice(at, 0, s);
+    recSel = at;
+    await saveRec(rec);
+    recDraw(); recShow(at);
+  }
+  // A tap on the board in Record mode: a shot of what was tapped.
+  function recTap(kind, id) {
+    if (kind === 'string') return recAdd('string', id);
+    if (id === key) return recAdd('board');
+    return recAdd(isFrame(id) ? 'section' : 'card', id);
+  }
+  async function recPanelClick(e) {
+    const b = e.target.closest('[data-r], [data-shot]');
+    if (!b) return;
+    const rec = recNow();
+    if (b.dataset.shot != null) { const i = +b.dataset.shot; recSel = recSel === i ? -1 : i; recDraw(); if (recSel >= 0) recShow(recSel); return; }
+    const r = b.getBoundingClientRect(), a = b.dataset.r;
+    if (a === 'done') setRecMode(false);
+    else if (a === 'add') menu(r.left, r.top, [
+      { label: 'This view (as it is in the frame)', fn: () => recAdd('view') },
+      { label: 'The whole board', fn: () => recAdd('board') },
+    ], true);
+    else if (a === 'aspect') { rec.aspect = rec.aspect === '9:16' ? '16:9' : '9:16'; await saveRec(rec); recDraw(); if (recSel >= 0) recShow(recSel, false); }
+    else if (a === 'look') menu(r.left, r.top, Object.entries(LOOKS).map(([k, n]) => ({ label: (rec.look === k ? '✓ ' : '') + n, fn: async () => { rec.look = k; await saveRec(rec); recDraw(); } })), true);
+    else if (a === 'pick') menu(r.left, r.top, [
+      ...recs().map(x => ({ label: (x.id === recId ? '✓ ' : '') + x.name, fn: () => { recId = x.id; recSel = -1; recDraw(); } })),
+      { label: 'New recording', fn: async () => { const n = { id: rid(), name: `Recording ${recs().length + 1}`, aspect: rec.aspect, look: rec.look, audio: null, shots: [] }; await saveRec(n); recId = n.id; recSel = -1; recDraw(); } },
+      { label: 'Rename this recording', fn: async () => { const name = prompt('Name this recording', rec.name); if (name?.trim()) { rec.name = name.trim().slice(0, 60); await saveRec(rec); recDraw(); } } },
+      { label: 'Delete this recording', danger: true, fn: async () => { if (!confirm(`Delete “${rec.name}”? Its shots go too.`)) return; const left = recs().filter(x => x.id !== rec.id); await api.store.update(key, { recs: left.length ? left : undefined }); if (!left.length) { setRecMode(false); return; } recId = left[0].id; recSel = -1; recDraw(); api.toast('Recording deleted.', 'Undo', async () => { await saveRec(rec); }); } },
+    ], true);
+    else if (a === 'audio') {
+      const pick = () => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*,.mp3,.m4a,.wav,.aac,.ogg'; input.onchange = async () => { const file = input.files[0]; if (!file) return; try { rec.audio = await api.store.addDoc(file); await saveRec(rec); recDraw(); api.toast('Voiceover added. Tap it again to time the shots to it.'); } catch (err) { api.toast(err.message || String(err)); } }; input.click(); };
+      if (!rec.audio) pick();
+      else menu(r.left, r.top, [
+        { label: 'Time the shots to it (tap along)', fn: () => recPlay('time') },
+        { label: 'Use a different voiceover', fn: pick },
+        { label: 'Take the voiceover off', danger: true, fn: async () => { rec.audio = null; await saveRec(rec); recDraw(); } },
+      ], true);
+    }
+    else if (a === 'play') recPlay('play');
+    else if (a === 'video') recPlay('video');
+  }
+  async function recSheetClick(e) {
+    const rec = recNow(), s = rec?.shots[recSel];
+    if (!s) return;
+    const b = e.target.closest('[data-q], [data-trans], [data-fx], [data-capstyle]');
+    if (!b) return;
+    const q = b.dataset.q;
+    if (q === 'close') { recSel = -1; recDraw(); return; }
+    if (q === 'dur-' || q === 'dur+') s.dur = clamp(Math.round(((s.dur || 3) + (q === 'dur+' ? 0.5 : -0.5)) * 10) / 10, 0.5, 30);
+    else if (b.dataset.trans) s.trans = b.dataset.trans;
+    else if (b.dataset.fx) { s.fx = { ...(s.fx || {}) }; if (s.fx[b.dataset.fx]) delete s.fx[b.dataset.fx]; else s.fx[b.dataset.fx] = true; }
+    else if (b.dataset.capstyle) s.cap = { ...(s.cap || { text: '' }), style: b.dataset.capstyle };
+    else if (q === 'frame') {
+      const o = recFrameRect(), cx = (o.x + o.w / 2 - view.x) / view.z, cy = (o.y + o.h / 2 - view.y) / view.z, w = o.w / view.z;
+      if (s.k === 'view') s.at = { dx: Math.round(cx), dy: Math.round(cy), w: Math.round(w) };
+      else { const r = targetRect(s); if (r) s.at = { dx: Math.round(cx - r.x - r.w / 2), dy: Math.round(cy - r.y - r.h / 2), w: Math.round(w) }; }
+      api.toast('Shot framed as it is now.');
+    }
+    else if (q === 'left' || q === 'right') { const j = recSel + (q === 'left' ? -1 : 1); [rec.shots[recSel], rec.shots[j]] = [rec.shots[j], rec.shots[recSel]]; recSel = j; }
+    else if (q === 'del') { const was = [...rec.shots]; rec.shots.splice(recSel, 1); recSel = Math.min(recSel, rec.shots.length - 1); await saveRec(rec); recDraw(); api.toast('Shot deleted.', 'Undo', async () => { rec.shots = was; await saveRec(rec); recDraw(); }); return; }
+    else if (q === 'from') { recPlay('play', timeline(rec.shots)[recSel]?.t0 || 0); return; }
+    await saveRec(rec); recDraw();
+  }
+  async function recSheetChange(e) {
+    const rec = recNow(), s = rec?.shots[recSel], inp = e.target.closest('[data-cap]');
+    if (!s || !inp) return;
+    s.cap = { style: 'type', ...(s.cap || {}), [inp.dataset.cap]: inp.value.trim() };
+    if (!s.cap.text && !s.cap.sub) s.cap = null;
+    await saveRec(rec); recDraw();
+  }
+  async function recPlay(mode, from = 0) {
+    const rec = recNow();
+    if (!rec?.shots.length) return;
+    let audio = null;
+    if (rec.audio) { audio = await api.store.docBlob(rec.audio); if (!audio) api.toast('The voiceover isn’t on this device yet, and there’s no signal to fetch it.'); }
+    if (mode === 'time' && !audio) return;
+    openPlayer({
+      prepare: () => recordScene(rec), rec, from, mode, audio, toast: m => api.toast(m),
+      saveFile: (blob, name) => (api.saveFile ? api.saveFile(blob, name) : null),
+      onTimes: async ends => {
+        const tl = timeline(rec.shots);
+        let prev = 0;
+        rec.shots.forEach((s, i) => { if (ends[i] == null) return; s.dur = clamp(Math.round((ends[i] - prev - tl[i].tr) * 10) / 10, 0.5, 60); prev = ends[i]; });
+        await saveRec(rec); recDraw();
+        api.toast('Shots timed to the voiceover.');
+      },
+    });
+  }
+
   // ---------- The board as a picture (for export and print) ----------
   // Drawn from what's on screen: for a moment the board is shown flat (no tilt) at 100%, and each
   // section, card and the banner is copied into SVG: its boxes (fill, borders, corners), its text
   // line by line where the browser put it, its pictures, then the strings on top. (Shadows and
   // decorations like tape aren't copied.)
-  async function exportSVG() {
+  // (0.8.0, for a recording) opts: hideLinks (strings left off), hideCards (cards left off, their
+  // drawing given back in .cards), collect(ox, oy) (called while the board is flat at 100%, so where
+  // things are on screen, less ox, oy, is where they are on the board: its result is given back in .extra)
+  async function exportSVG(opts = {}) {
     if (!key || !cork.clientWidth) throw new Error('Open the board first.');
     stopPlay();
     const savedView = { ...view };
@@ -2875,6 +3214,9 @@ export function createBoard(host, api) {
     // (every string routed, and none showing its shaping dots)
     selString = null; pop.hidden = true; routeNow = true;
     try { drawLines(); } finally { routeNow = false; }
+    const hidden = [];
+    for (const id of opts.hideLinks || []) for (const el of lines.querySelectorAll(`[data-sw="${id}"], [data-sl="${id}"]`)) { el.style.display = 'none'; hidden.push(el); }
+    const cardsOut = new Map();
     try {
       const cb = cork.getBoundingClientRect(), ox = cb.left, oy = cb.top;
       // Pictures go inside the file (as data), so it stands on its own.
@@ -2970,7 +3312,8 @@ export function createBoard(host, api) {
         const r = el.getBoundingClientRect(); grow(r.left - ox, r.top - oy, r.width, r.height);
         const tilt = parseFloat(el.style.getPropertyValue('--tilt')) || 0, body = walk(el, 1, null);
         const keepTilt = ['corkboard', 'notebook', 'chalkboard'].includes(look()) && tilt && !el.dataset.banner;
-        out += keepTilt ? `<g transform="rotate(${tilt} ${f(r.left - ox + r.width / 2)} ${f(r.top - oy + r.height / 2)})">${body}</g>` : body;
+        const one = keepTilt ? `<g transform="rotate(${tilt} ${f(r.left - ox + r.width / 2)} ${f(r.top - oy + r.height / 2)})">${body}</g>` : body;
+        if (opts.hideCards?.has(el.dataset.card)) cardsOut.set(el.dataset.card, one); else out += one;
       }
       // Strings on top, with their look written onto each line.
       const strings = host.querySelector('.strings');
@@ -2985,8 +3328,11 @@ export function createBoard(host, api) {
       const tex = look() === 'corkboard' ? cork.style.getPropertyValue('--cork-tex').replace(/^url\(["']?|["']?\)$/g, '') : '';
       const bg = `<rect x="${f(x0)}" y="${f(y0)}" width="${W}" height="${H}" fill="${bgc}"/>` + (tex ? `<defs><pattern id="bt-cork" width="220" height="220" patternUnits="userSpaceOnUse"><image href="${tex}" width="220" height="220"/></pattern></defs><rect x="${f(x0)}" y="${f(y0)}" width="${W}" height="${H}" fill="url(#bt-cork)"/>` : '');
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="${f(x0)} ${f(y0)} ${W} ${H}">${bg}${out}</svg>`;
-      return { svg, w: W, h: H };
+      for (const el of hidden) el.style.display = '';
+      const extra = opts.collect ? await opts.collect(ox, oy) : null;
+      return { svg, w: W, h: H, x0, y0, bg: bgc, cards: cardsOut, extra };
     } finally {
+      for (const el of hidden) el.style.display = '';
       host.classList.remove('exporting');
       view = savedView; applyView();
     }
@@ -2996,6 +3342,7 @@ export function createBoard(host, api) {
     exportSVG,
     show(boardKey) {
       if (boardKey !== key) {
+        if (recMode) setRecMode(false);
         key = boardKey;
         tipToken++; hideTip();
         heights.clear();
@@ -3072,10 +3419,20 @@ const dataURL = blob => new Promise((resolve, reject) => { const r = new FileRea
 // outside the app. (strings: leaves out the invisible lines that only catch taps)
 function inlineSVG(svg, strings = false) {
   const clone = svg.cloneNode(true);
-  const src = [...svg.querySelectorAll('*')], dst = [...clone.querySelectorAll('*')];
+  copyLook([...svg.querySelectorAll('*')], [...clone.querySelectorAll('*')], strings);
+  return clone.innerHTML;
+}
+// (0.8.0) One element of an SVG, with its look written onto it and everything in it (for a recording).
+function inlineNode(el) {
+  const clone = el.cloneNode(true);
+  copyLook([el, ...el.querySelectorAll('*')], [clone, ...clone.querySelectorAll('*')], true);
+  return clone.outerHTML;
+}
+function copyLook(src, dst, strings) {
   dst.forEach((d, i) => {
     const s = src[i], cs = getComputedStyle(s);
     if (strings && (s.classList.contains('hit') || s.classList.contains('live'))) { d.remove(); return; }
+    if (cs.display === 'none') { d.remove(); return; }   // (0.8.0: what's not showing stays out)
     for (const p of ['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'font-family', 'font-size', 'font-weight', 'letter-spacing']) {
       const v = cs.getPropertyValue(p);
       if (p === 'fill' || p === 'stroke' || (v && v !== 'none' && v !== 'normal')) d.setAttribute(p, v);
@@ -3083,7 +3440,6 @@ function inlineSVG(svg, strings = false) {
     if (cs.textTransform === 'uppercase' && s.tagName.toLowerCase() === 'text') d.textContent = d.textContent.toUpperCase();
     d.removeAttribute('class'); d.removeAttribute('style'); d.removeAttribute('data-link');
   });
-  return clone.innerHTML;
 }
 
 const short = s => (s.length > 28 ? s.slice(0, 26) + '…' : s);

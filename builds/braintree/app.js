@@ -16,7 +16,7 @@ import * as ex from './export.js';
 import * as theme from './theme.js';
 import * as pv from './preview.js';
 
-const VERSION = '0.7.9';
+const VERSION = '0.8.0';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -352,6 +352,7 @@ const boardApi = {
   openDoc: d => openDoc(d),
   addDoc: file => addDocWithPreview(file),
   docPreview: d => docPreviewUrl(d),
+  saveFile: (blob, name) => deliver(blob, name),   // (0.8.0: a recording's video)
 };
 
 function renderNav() {
