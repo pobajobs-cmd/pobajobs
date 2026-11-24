@@ -38,12 +38,14 @@ export async function handleBraintree(request, env, url) {
     // (0.9.0) A read-only link anyone can open, and quick add from Siri (its own key, in its address).
     if (path.startsWith('/share/') && request.method === 'GET') return await shareGet(env, path.slice('/share/'.length));
     if (path.startsWith('/capture/')) return await capture(request, env, path.slice('/capture/'.length));
+    if (path.startsWith('/widget/') && request.method === 'GET') return await widgetFeed(request, env, url, path.slice('/widget/'.length));
 
     if (path === '/login') return await login(request, env);
     if (!(await signedIn(request, env))) return json({ error: 'Please sign in.' }, 401);
 
     if (path === '/claude') return await claudeKey(request, env, url);
     if (path === '/capture-key') return await captureKey(request, env, url);
+    if (path === '/widget-key') return await widgetKey(request, env, url);
     if (path === '/share' || path.startsWith('/share/')) return await shareSet(request, env, url, path.slice('/share/'.length));
     if (path === '/shares') return await shareList(env);
     if (path.startsWith('/push/')) return await pushApi(request, env, path.slice('/push/'.length));
@@ -796,14 +798,18 @@ async function captureKey(request, env, url) {
   return json({ error: 'Not allowed.' }, 405);
 }
 
+// (0.9.1) What was said can come in the address (…?text=…, the simplest Shortcut: GET), as a form
+// field or JSON field called "text", or as the whole body.
 async function capture(request, env, key) {
   const said = (t, status = 200) => new Response(t, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
-  if (request.method !== 'POST') return said('Send it with POST.', 405);
+  if (request.method !== 'POST' && request.method !== 'GET') return said('Send it with GET or POST.', 405);
   const row = /^[A-Za-z0-9_-]{20,60}$/.test(key) ? await env.DB.prepare("SELECT hash FROM bt_keys WHERE name = 'capture'").first() : null;
   if (!row || !(await sameText(await sha256('braintree-capture:' + key), row.hash))) return said('Brain Tree doesn’t know this address. Set quick add up again in Brain Tree’s Settings.', 401);
-  const raw = (await request.text()).slice(0, 20000);
-  let t = raw;
-  try { const j = JSON.parse(raw); t = typeof j === 'string' ? j : j.text ?? j.title ?? j.Text ?? ''; } catch (e) {}
+  const q = new URL(request.url).searchParams.get('text');
+  const raw = request.method === 'POST' ? (await request.text()).slice(0, 20000) : '';
+  let t = q ?? raw;
+  if (q == null && /x-www-form-urlencoded/.test(request.headers.get('Content-Type') || '')) t = new URLSearchParams(raw).get('text') ?? raw;
+  else if (q == null) { try { const j = JSON.parse(raw); t = typeof j === 'string' ? j : j.text ?? j.title ?? j.Text ?? ''; } catch (e) {} }
   t = String(t || '').replace(/\s+/g, ' ').trim();
   if (!t) return said('Nothing was said, so nothing was added.', 400);
   const id = newItemId(), now = new Date().toISOString();
@@ -812,6 +818,68 @@ async function capture(request, env, key) {
   await saveItem(env, id, note ? { type: 'note', title: '', body: notesHtml(t), created: now, order: Date.now() } : { type: 'task', title: t.slice(0, 300), body: '', created: now, order: Date.now(), parse: true }, 'Siri');
   await env.DB.prepare("UPDATE bt_keys SET last_used = ? WHERE name = 'capture'").bind(now).run();
   return said(`Added to Brain Tree: ${note ? 'a note' : t.slice(0, 120)}`);
+}
+
+// ---------- (0.9.1) Home screen widget ----------
+// iPhone home-screen web apps can't have widgets of their own, so a small script in the free
+// Scriptable app draws one (any size, home or lock screen) from GET /widget/<key>?day=YYYY-MM-DD
+// (the phone's own today). It's read only: the open to-dos that are late, due that day or in the
+// next week, with their project. Not what's in locked projects or templates; waiting ones apart.
+
+async function widgetKey(request, env, url) {
+  if (request.method === 'GET') {
+    const row = await env.DB.prepare("SELECT created_at, last_used FROM bt_keys WHERE name = 'widget'").first();
+    return json({ on: !!row, created: row?.created_at || null, lastUsed: row?.last_used || null });
+  }
+  if (request.method === 'POST') {
+    const key = 'bw' + b64url(crypto.getRandomValues(new Uint8Array(24)));
+    await env.DB.prepare(`INSERT INTO bt_keys (name, hash, created_at, last_used) VALUES ('widget', ?, ?, NULL)
+      ON CONFLICT(name) DO UPDATE SET hash = excluded.hash, created_at = excluded.created_at, last_used = NULL`)
+      .bind(await sha256('braintree-widget:' + key), new Date().toISOString()).run();
+    return json({ url: `${url.origin}/api/braintree/widget/${key}` });
+  }
+  if (request.method === 'DELETE') {
+    await env.DB.prepare("DELETE FROM bt_keys WHERE name = 'widget'").run();
+    return json({ ok: true });
+  }
+  return json({ error: 'Not allowed.' }, 405);
+}
+
+async function widgetFeed(request, env, url, key) {
+  const row = /^[A-Za-z0-9_-]{20,60}$/.test(key) ? await env.DB.prepare("SELECT hash, last_used FROM bt_keys WHERE name = 'widget'").first() : null;
+  if (!row || !(await sameText(await sha256('braintree-widget:' + key), row.hash))) return json({ error: 'Brain Tree doesn’t know this widget address. Set the widget up again in Brain Tree’s Settings.' }, 401);
+  if (!row.last_used || Date.parse(row.last_used) < Date.now() - 3600e3) await env.DB.prepare("UPDATE bt_keys SET last_used = ? WHERE name = 'widget'").bind(new Date().toISOString()).run();
+  const q = url.searchParams.get('day') || '';
+  const day0 = DAY_RE.test(q) ? q : new Date().toISOString().slice(0, 10);
+  const plus = (s, n) => { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const week = plus(day0, 7);
+  const T = await loadTree(env);
+  const inTemplate = r => { let p = r, n = 0; while (p && n++ < 60) { if (p.data.type === 'project' && p.data.template) return true; p = T.parentOf(p); } return false; };
+  // waiting: an arrow from something unfinished into the to-do (as in the app)
+  const open = r => r && (r.data.type === 'task' || r.data.type === 'project') && !r.data.done;
+  const waiting = new Set();
+  for (const x of T.byId.values()) for (const l of x.data.links || []) {
+    if (!T.get(x.id)) continue;
+    if (l.dir === 'to' && open(x)) for (const b of [l.to, ...(l.also || [])]) waiting.add(b);
+    else if (l.dir === 'from' && open(T.get(l.to))) waiting.add(x.id);
+  }
+  const items = [];
+  for (const r of T.byId.values()) {
+    const d = r.data;
+    if (d.type !== 'task' || d.done || !d.due || d.due > week || !T.get(r.id) || inTemplate(r)) continue;
+    const p = T.projectOf(r);
+    items.push({ title: titleOf(r), due: d.due, project: p ? titleOf(p) : '', waiting: waiting.has(r.id) || undefined, pinned: !!d.pinned || undefined });
+  }
+  items.sort((a, b) => a.due.localeCompare(b.due) || (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || a.title.localeCompare(b.title));
+  const now = items.filter(i => i.due <= day0 && !i.waiting);
+  return json({
+    day: day0,
+    late: now.filter(i => i.due < day0).length,
+    today: now.slice(0, 30),
+    waiting: items.filter(i => i.due <= day0 && i.waiting).length,
+    soon: items.filter(i => i.due > day0).slice(0, 20),
+    app: `${url.origin}${APP_PATH}#/today`,
+  });
 }
 
 // ---------- (0.9.0) Reminders (web push) ----------
