@@ -19,8 +19,9 @@ import * as pv from './preview.js';
 import * as P from './plan.js';
 import { createTimeline } from './timeline.js';
 import * as remind from './remind.js';
+import { widgetScript } from './widget.js';
 
-const VERSION = '0.9.0';
+const VERSION = '0.9.1';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -1898,6 +1899,10 @@ async function settingsModal(focus) {
       <p class="hint">Say “Hey Siri, add to Brain Tree” and what you say lands in your Inbox, with any date or price you say at the end.</p>
       <div class="kv"><span>Quick add</span><b class="capstate">${store.signedIn() ? 'Checking…' : 'Sign in to Brain Tree first'}</b></div>
       <div class="btnrow capbtns"></div>
+      <h3>Home screen widget</h3>
+      <p class="hint">Web apps can’t have iPhone widgets of their own, so this uses the free <b>Scriptable</b> app: a widget in any size (home screen or lock screen) showing what’s due today, what’s late and what’s coming up, in this theme’s colours.</p>
+      <div class="kv"><span>Widget</span><b class="widstate">${store.signedIn() ? 'Checking…' : 'Sign in to Brain Tree first'}</b></div>
+      <div class="btnrow widbtns"></div>
       <h3>Read-only links</h3>
       <p class="hint">Share a project with someone who doesn’t use Brain Tree: hold it (or right-click) and choose “Share a read-only link”.</p>
       <div class="sharelist">${store.signedIn() ? '<p class="hint">Checking…</p>' : ''}</div>
@@ -1981,6 +1986,15 @@ async function settingsModal(focus) {
         b.disabled = true;
         try { const k = await store.call('/capture-key', { method: 'POST' }); captureSheet(k.url); } catch (x) { b.disabled = false; toast(x.message); }
       }
+      if (a === 'wid-on') {
+        if (b.dataset.again && !confirm('Make a new widget address? Widgets using the old one stop working until you paste the new script into Scriptable.')) return;
+        b.disabled = true;
+        try { const k = await store.call('/widget-key', { method: 'POST' }); widgetSheet(k.url); } catch (x) { b.disabled = false; toast(x.message); }
+      }
+      if (a === 'wid-off') {
+        if (!confirm('Switch the widget off? It shows “doesn’t know this widget address” from now on.')) return;
+        try { await store.call('/widget-key', { method: 'DELETE' }); const top = el.scrollTop; await settingsModal(); $('#modal .sheet').scrollTop = top; } catch (x) { toast(x.message); }
+      }
       if (a === 'cap-off') {
         if (!confirm('Switch quick add off? Your Siri shortcut stops working.')) return;
         try { await store.call('/capture-key', { method: 'DELETE' }); const top = el.scrollTop; await settingsModal(); $('#modal .sheet').scrollTop = top; } catch (x) { toast(x.message); }
@@ -2037,6 +2051,12 @@ async function settingsModal(focus) {
       x.textContent = c.on ? `On${c.lastUsed ? `, last used ${fmtWhen(c.lastUsed)}` : ', not used yet'}` : 'Off';
       btns.innerHTML = c.on ? '<button class="setbtn" data-s="cap-on" data-again="1">Make a new address…</button><button class="setbtn danger" data-s="cap-off">Switch it off</button>' : '<button class="setbtn" data-s="cap-on">Set it up…</button>';
     }).catch(err => { const x = el.querySelector('.capstate'); if (x) x.textContent = navigator.onLine ? err.message : 'Needs signal to check'; });
+    if (store.signedIn()) store.call('/widget-key').then(c => {
+      const x = el.querySelector('.widstate'), btns = el.querySelector('.widbtns');
+      if (!x) return;
+      x.textContent = c.on ? `On${c.lastUsed ? `, last updated ${fmtWhen(c.lastUsed)}` : ', not used yet'}` : 'Off';
+      btns.innerHTML = c.on ? '<button class="setbtn" data-s="wid-on" data-again="1">Make a new script…</button><button class="setbtn danger" data-s="wid-off">Switch it off</button>' : '<button class="setbtn" data-s="wid-on">Set it up…</button>';
+    }).catch(err => { const x = el.querySelector('.widstate'); if (x) x.textContent = navigator.onLine ? err.message : 'Needs signal to check'; });
     if (store.signedIn()) store.call('/shares').then(({ shares }) => {
       const x = el.querySelector('.sharelist');
       if (!x) return;
@@ -2190,19 +2210,41 @@ function shareSheet(id) {
 function captureSheet(url) {
   modal(`
     <div class="sethead"><button type="button" class="setdone" data-close>Done</button><h2>Quick add with Siri</h2></div>
-    <p>Make a Shortcut once on your iPhone. Then say <b>“Hey Siri, add to Brain Tree”</b>, say the to-do, and it lands in your Inbox. End with a date or price (“… tomorrow”, “… on Friday”, “… £12”) and Brain Tree sets them.</p>
+    <p>Make a Shortcut once on your iPhone: two actions. Then say <b>“Hey Siri, add to Brain Tree”</b>, Siri asks what to add, you say it, and it lands in your Inbox. End with a date or price (“… tomorrow”, “… on Friday”, “… £12”) and Brain Tree sets them.</p>
     <ol class="steps">
       <li>Open the <b>Shortcuts</b> app and tap <b>+</b>.</li>
-      <li>Add the action <b>Dictate Text</b>.</li>
-      <li>Add <b>Get Contents of URL</b>, and paste this as its URL:
-        <span class="copyrow"><input class="capurl" readonly value="${esc(url)}" aria-label="Quick add address"><button type="button" class="setbtn" data-copy>Copy</button></span></li>
-      <li>Tap the arrow on it: <b>Method POST</b>, <b>Request Body JSON</b>, add a <b>Text</b> field called <b>text</b> and set it to <b>Dictated Text</b>.</li>
-      <li>Add <b>Show Result</b> (Siri reads back what was added).</li>
-      <li>Name the shortcut <b>Add to Brain Tree</b>. You can put it on your home screen too.</li>
+      <li>Add the action <b>Ask for Input</b> (search for “Ask”). Leave it on <b>Text</b> and make its question <b>What should I add?</b> When Siri runs it, it asks out loud and listens; tapped, it gives you a box to type in.</li>
+      <li>Add <b>Get Contents of URL</b>. Tap its URL, paste this, then tap right at the end and pick the blue <b>Provided Input</b> from the bar above the keyboard:
+        <span class="copyrow"><input class="capurl" readonly value="${esc(url + '?text=')}" aria-label="Quick add address"><button type="button" class="setbtn" data-copy>Copy</button></span></li>
+      <li>Optional: add <b>Show Result</b>, so Siri reads back what was added.</li>
+      <li>Name the shortcut <b>Add to Brain Tree</b>. You can put it on your home screen or the Action button too.</li>
     </ol>
+    <p class="hint">Rather send it in the body? Set the URL action to Method <b>POST</b>, Request Body <b>Form</b> (or JSON) with a field called <b>text</b>, and leave “?text=” off the address. That works too.</p>
     <p class="hint">Brain Tree shows this address only now. It works like a key (it can only add things), so keep it to yourself. If it gets out, set quick add up again and the old address stops working.</p>`, el => {
     el.querySelector('[data-copy]').addEventListener('click', async e => {
-      try { await navigator.clipboard.writeText(url); e.target.textContent = 'Copied'; } catch (err) { el.querySelector('.capurl').select(); e.target.textContent = 'Selected: copy it'; }
+      try { await navigator.clipboard.writeText(url + '?text='); e.target.textContent = 'Copied'; } catch (err) { el.querySelector('.capurl').select(); e.target.textContent = 'Selected: copy it'; }
+    });
+  });
+}
+
+// ---------- (0.9.1) Home screen widget (Scriptable) ----------
+function widgetSheet(url) {
+  const p = theme.current(store), th = theme.THEMES.find(t => t.id === p.theme) || theme.THEMES[0];
+  const light = { ...th.light, ...(p.accent ? { accent: p.accent } : {}) }, dark = { ...th.dark, ...(p.accent ? { accent: p.accent } : {}) };
+  const code = widgetScript({ url, light, dark });
+  modal(`
+    <div class="sethead"><button type="button" class="setdone" data-close>Done</button><h2>Home screen widget</h2></div>
+    <ol class="steps">
+      <li>Install <b>Scriptable</b> from the App Store (free, by Simon Støvring).</li>
+      <li>Tap <b>Copy the script</b> below. In Scriptable tap <b>+</b>, paste it, and name it <b>Brain Tree</b> (tap the title at the top).</li>
+      <li>Tap ▶ to see it. On your home screen, hold an empty spot → <b>Edit</b> → <b>Add Widget</b> → <b>Scriptable</b>, pick a size, add it, then hold it → <b>Edit Widget</b> → Script: <b>Brain Tree</b>. For the lock screen, add Scriptable there the same way.</li>
+    </ol>
+    <div class="mbtns col"><button class="primary" data-copyscript>Copy the script</button></div>
+    <textarea class="widcode" readonly rows="6" aria-label="The widget script">${esc(code)}</textarea>
+    <p class="hint">It updates about every 15 minutes (iPhones decide exactly when) and shows the last one it got when there’s no signal. Tapping it opens Brain Tree in Safari: iPhones don’t let widgets open home-screen apps. The script has a private read-only address in it, so keep it to yourself; “Make a new script” in Settings stops the old one working. Change theme? Make a new script to bring the widget’s colours along.</p>`, el => {
+    el.querySelector('[data-copyscript]').addEventListener('click', async e => {
+      try { await navigator.clipboard.writeText(code); e.target.textContent = 'Copied: now paste it into Scriptable'; }
+      catch (err) { const t = el.querySelector('.widcode'); t.focus(); t.select(); e.target.textContent = 'Selected: copy it'; }
     });
   });
 }

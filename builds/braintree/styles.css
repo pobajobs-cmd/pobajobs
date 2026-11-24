@@ -1485,3 +1485,6 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 .tlh.l { left: -3px; } .tlh.r { right: -3px; }
 .tlhint { margin: 2rem 1rem; color: var(--soft); text-align: center; }
 @media (max-width: 599px) { .tlhead .back span { display: none; } .tlhead h2 { font-size: 1.1rem; } .tlhead { gap: 0.4rem; } }
+
+/* (0.9.1) the widget script */
+.widcode { width: 100%; margin-top: 0.6rem; font: 0.72rem/1.35 ui-monospace, Menlo, Consolas, monospace; color: var(--soft); background: var(--hover); border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem; resize: vertical; }

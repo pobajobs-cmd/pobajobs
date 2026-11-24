@@ -37,6 +37,28 @@ export const THEMES = [
   { id: 'hacker', name: 'Hacker', look: 'hacker', font: 'mono',
     light: { bg: '#F1F7F1', side: '#E5EFE5', card: '#FFFFFF', ink: '#0B2410', soft: '#4A6B50', accent: '#11823B', string: '#C0392B', on: '#FFFFFF', proj: '#1F6F8B', ok: '#11823B' },
     dark: { bg: '#050805', side: '#020402', card: '#0B120B', ink: '#B8FFC8', soft: '#5FAF72', accent: '#33FF66', string: '#FF5F57', on: '#021006', proj: '#5CD6FF', ok: '#33FF66' } },
+  // 0.9.1
+  { id: 'ocean', name: 'Ocean', look: 'blueprint',
+    light: { bg: '#EEF6F8', side: '#E1EEF2', card: '#FFFFFF', ink: '#0F2A33', soft: '#4D6C77', accent: '#0E8AA0', string: '#E4572E', on: '#FFFFFF', proj: '#2E5FA8', ok: '#2F8A4E' },
+    dark: { bg: '#0C1C22', side: '#08151A', card: '#12272F', ink: '#E2F1F5', soft: '#93B4BF', accent: '#3CC6DD', string: '#FF7A57', on: '#04171C', proj: '#7FB2F0', ok: '#5CC283' } },
+  { id: 'sunset', name: 'Sunset',
+    light: { bg: '#FFF5EE', side: '#FBE8DC', card: '#FFFFFF', ink: '#2E1A14', soft: '#7A5A4D', accent: '#E8623A', string: '#B8325E', on: '#FFFFFF', proj: '#7A4FD0', ok: '#2F8A4E' },
+    dark: { bg: '#1F1512', side: '#18100D', card: '#2A1D18', ink: '#F8E8DF', soft: '#C5A596', accent: '#FF8A5C', string: '#FF6B9A', on: '#200C04', proj: '#B39BFF', ok: '#5CC283' } },
+  { id: 'sakura', name: 'Sakura', font: 'rounded',
+    light: { bg: '#FFF6F8', side: '#FBEAF0', card: '#FFFFFF', ink: '#2E1B24', soft: '#7D5F6D', accent: '#D9487A', string: '#C0392B', on: '#FFFFFF', proj: '#5D7FC4', ok: '#3C8D5A' },
+    dark: { bg: '#1E1519', side: '#171013', card: '#291D23', ink: '#F7E6EE', soft: '#C7A3B4', accent: '#FF7EAA', string: '#FF6B5A', on: '#2A0614', proj: '#94B4F0', ok: '#6CC28A' } },
+  { id: 'mocha', name: 'Mocha', look: 'corkboard',
+    light: { bg: '#F5EFE8', side: '#ECE2D6', card: '#FFFCF8', ink: '#2A1F17', soft: '#6F5E50', accent: '#8A5A3B', string: '#B23A2E', on: '#FFFFFF', proj: '#4F6F5A', ok: '#4E7D3A' },
+    dark: { bg: '#1D1712', side: '#16110D', card: '#282019', ink: '#EFE3D6', soft: '#B8A390', accent: '#D4A373', string: '#E8705E', on: '#1E1208', proj: '#9CC1A6', ok: '#8CC46A' } },
+  { id: 'arctic', name: 'Arctic', look: 'whiteboard',
+    light: { bg: '#F3F6F9', side: '#E8EDF2', card: '#FFFFFF', ink: '#1E2633', soft: '#5E6B7D', accent: '#4C7FCC', string: '#D3505A', on: '#FFFFFF', proj: '#5E81AC', ok: '#4F9A6A' },
+    dark: { bg: '#1F2430', side: '#191D27', card: '#272D3A', ink: '#E5E9F0', soft: '#A3ADBD', accent: '#88C0D0', string: '#BF616A', on: '#0F1A20', proj: '#81A1C1', ok: '#A3BE8C' } },
+  { id: 'newspaper', name: 'Newspaper', look: 'notebook', font: 'serif',
+    light: { bg: '#F4F1EA', side: '#EAE5DA', card: '#FBF9F4', ink: '#1A1A1A', soft: '#5C5850', accent: '#1A1A1A', string: '#A4161A', on: '#FFFFFF', proj: '#2B4C7E', ok: '#2E6B3F' },
+    dark: { bg: '#161513', side: '#11100E', card: '#1F1E1B', ink: '#ECE8DF', soft: '#A39E93', accent: '#ECE8DF', string: '#E35D5B', on: '#161513', proj: '#8FA9D6', ok: '#7DBB8A' } },
+  { id: 'amber', name: 'Amber terminal', font: 'mono',
+    light: { bg: '#FBF6EC', side: '#F3EAD6', card: '#FFFDF7', ink: '#2B1E05', soft: '#77643F', accent: '#C77700', string: '#B03A2E', on: '#FFFFFF', proj: '#5A6F2B', ok: '#4E7D3A' },
+    dark: { bg: '#0B0803', side: '#070502', card: '#15100A', ink: '#FFC266', soft: '#B38A45', accent: '#FFB000', string: '#FF6A3D', on: '#1A1000', proj: '#E6D27A', ok: '#C8E06B' } },
 ];
 
 export const FONTS = {
