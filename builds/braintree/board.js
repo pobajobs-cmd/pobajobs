@@ -57,10 +57,15 @@ const WORDS = {
   newspaper: words('Mark it up', 'Mark struck out.', 'Marked up.'),
   amber: words('Pipe one into the other', 'Pipe killed.', 'Piped.'),
   iceberg: words('Draw a line', 'Line removed.', 'Line drawn.'),   // (0.9.4)
+  // (0.9.5)
+  studio: words('Run a cable', 'Cable pulled.', 'Cable run.'),
+  workshop: words('Run a cable', 'Cable pulled.', 'Cable run.'),
+  woodland: words('Grow a vine', 'Vine cut back.', 'Vine grown.'),
+  goldenhour: words('Draw a line', 'Line removed.', 'Line drawn.'),
 };
 // (0.9.2) Each newer look draws its strings the way an older one does (smooth curves, a pen line,
 // right angles…) and has its own colours, cards, sections and banner in styles.css.
-const LOOK_BASE = { ocean: 'neon', sunset: 'minimal', sakura: 'neon', mocha: 'notebook', arctic: 'blueprint', newspaper: 'whiteboard', amber: 'hacker', iceberg: 'minimal' };
+const LOOK_BASE = { ocean: 'neon', sunset: 'minimal', sakura: 'neon', mocha: 'notebook', arctic: 'blueprint', newspaper: 'whiteboard', amber: 'hacker', iceberg: 'minimal', studio: 'neon', workshop: 'blueprint', woodland: 'notebook', goldenhour: 'minimal' };
 function words(tie, cut, done) {
   return { ...TIE, tie, cut, done, hint: 'Drag the dot on a card’s edge onto another card, or tap String, to tie them together.' };
 }
@@ -3032,7 +3037,7 @@ export function createBoard(host, api) {
     if (!findEl.hidden) closeFind();
     let all = recs();
     if (!all.length) {
-      const rec = { id: rid(), name: 'Recording 1', aspect: cork.clientWidth < cork.clientHeight ? '9:16' : '16:9', look: 'none', audio: null, shots: [] };
+      const rec = { id: rid(), name: 'Recording 1', aspect: cork.clientWidth < cork.clientHeight ? '9:16' : '16:9', look: api.recLook?.() || 'none', audio: null, shots: [] };   // (0.9.5: Case file starts true-crime)
       all = [rec]; saveRec(rec);
     }
     if (!all.some(r => r.id === recId)) recId = all[0].id;

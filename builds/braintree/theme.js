@@ -12,15 +12,16 @@ export const THEMES = [
   { id: 'blueprint', name: 'Blueprint', look: 'blueprint',
     light: { bg: '#EEF3F7', side: '#E2EAF1', card: '#FFFFFF', ink: '#14324A', soft: '#4F6A80', accent: '#FF6B1A', string: '#D0402B', on: '#111111', proj: '#1F6FB2', ok: '#2F8A4E' },
     dark: { bg: '#11263A', side: '#0C1D2D', card: '#183149', ink: '#E6EEF5', soft: '#9DB3C6', accent: '#FF8A3D', string: '#FF6B57', on: '#111111', proj: '#6FB0F0', ok: '#5CC283' } },
-  { id: 'forest', name: 'Forest', look: 'chalkboard',
+  { id: 'forest', name: 'Forest', look: 'woodland',
     light: { bg: '#F2F5EF', side: '#E6ECE1', card: '#FFFFFF', ink: '#1D2A20', soft: '#5D6B5F', accent: '#2F7D4F', string: '#B5452B', on: '#FFFFFF', proj: '#3D6E8F', ok: '#2F7D4F' },
     dark: { bg: '#151C17', side: '#101511', card: '#1F2821', ink: '#E3EBE3', soft: '#9DB0A0', accent: '#5CC283', string: '#E86A50', on: '#0E1A12', proj: '#7FB3D5', ok: '#5CC283' } },
   { id: 'ink', name: 'Ink', look: 'minimal',
     light: { bg: '#FAFAFA', side: '#F0F0F0', card: '#FFFFFF', ink: '#111111', soft: '#555555', accent: '#111111', string: '#D32F2F', on: '#FFFFFF', proj: '#333333', ok: '#2F8A4E' },
     dark: { bg: '#0E0E0E', side: '#080808', card: '#1A1A1A', ink: '#F2F2F2', soft: '#A0A0A0', accent: '#F2F2F2', string: '#FF5A4F', on: '#111111', proj: '#CCCCCC', ok: '#5CC283' } },
-  { id: 'dusk', name: 'Dusk', look: 'space',
-    light: { bg: '#F6F3FA', side: '#ECE6F4', card: '#FFFFFF', ink: '#221B2E', soft: '#675C78', accent: '#7A4FD0', string: '#D9466F', on: '#FFFFFF', proj: '#3E7CC9', ok: '#2F8A4E' },
-    dark: { bg: '#19151F', side: '#131018', card: '#241E2C', ink: '#ECE6F5', soft: '#ABA0BC', accent: '#A98BF0', string: '#F06A90', on: '#160F22', proj: '#7FB0F0', ok: '#5CC283' } },
+  // (0.9.5: Dusk became Night sky: the Space board, stars in the side panel; same id, so it's still picked)
+  { id: 'dusk', name: 'Night sky', look: 'space',
+    light: { bg: '#F3F2FA', side: '#E7E5F4', card: '#FFFFFF', ink: '#1C1A33', soft: '#5F5C80', accent: '#5B4FD0', string: '#D9466F', on: '#FFFFFF', proj: '#3E6CC9', ok: '#2F8A4E' },
+    dark: { bg: '#0B0D1E', side: '#070915', card: '#141734', ink: '#E8E9FF', soft: '#A2A6D0', accent: '#9FA8FF', string: '#FF7A9A', on: '#0B0D1E', proj: '#8EC5FF', ok: '#6FD3A0' } },
   // 0.7: each of these has a board look to match (offered when you pick one).
   { id: 'circuit', name: 'Circuit board', look: 'circuit',
     light: { bg: '#EEF4EF', side: '#E1EBE3', card: '#FFFFFF', ink: '#10261B', soft: '#4E6A5A', accent: '#B8862B', string: '#C0392B', on: '#1A1305', proj: '#1F7A55', ok: '#2F8A4E' },
@@ -41,7 +42,7 @@ export const THEMES = [
   { id: 'ocean', name: 'Ocean', look: 'ocean',
     light: { bg: '#EEF6F8', side: '#E1EEF2', card: '#FFFFFF', ink: '#0F2A33', soft: '#4D6C77', accent: '#0E8AA0', string: '#E4572E', on: '#FFFFFF', proj: '#2E5FA8', ok: '#2F8A4E' },
     dark: { bg: '#0C1C22', side: '#08151A', card: '#12272F', ink: '#E2F1F5', soft: '#93B4BF', accent: '#3CC6DD', string: '#FF7A57', on: '#04171C', proj: '#7FB2F0', ok: '#5CC283' } },
-  { id: 'sunset', name: 'Sunset', look: 'sunset',
+  { id: 'sunset', name: 'Sunset', look: 'goldenhour',
     light: { bg: '#FFF5EE', side: '#FBE8DC', card: '#FFFFFF', ink: '#2E1A14', soft: '#7A5A4D', accent: '#E8623A', string: '#B8325E', on: '#FFFFFF', proj: '#7A4FD0', ok: '#2F8A4E' },
     dark: { bg: '#1F1512', side: '#18100D', card: '#2A1D18', ink: '#F8E8DF', soft: '#C5A596', accent: '#FF8A5C', string: '#FF6B9A', on: '#200C04', proj: '#B39BFF', ok: '#5CC283' } },
   { id: 'sakura', name: 'Sakura', look: 'sakura', font: 'rounded',
@@ -56,6 +57,24 @@ export const THEMES = [
   { id: 'newspaper', name: 'Newspaper', look: 'newspaper', font: 'serif',
     light: { bg: '#F4F1EA', side: '#EAE5DA', card: '#FBF9F4', ink: '#1A1A1A', soft: '#5C5850', accent: '#1A1A1A', string: '#A4161A', on: '#FFFFFF', proj: '#2B4C7E', ok: '#2E6B3F' },
     dark: { bg: '#161513', side: '#11100E', card: '#1F1E1B', ink: '#ECE8DF', soft: '#A39E93', accent: '#ECE8DF', string: '#E35D5B', on: '#161513', proj: '#8FA9D6', ok: '#7DBB8A' } },
+  // 0.9.5: theme packs (each styles the lists, timeline and recordings too: styles.css "Theme packs")
+  { id: 'casefile', name: 'Case file', look: 'corkboard', font: 'typewriter',
+    light: { bg: '#F4EEDF', side: '#E9DFC4', card: '#FFFCF4', ink: '#2A2118', soft: '#6E604C', accent: '#B3261E', string: '#B3261E', on: '#FFFFFF', proj: '#6B4F2A', ok: '#3E6B3A' },
+    dark: { bg: '#1C1814', side: '#15120F', card: '#27211B', ink: '#F0E6D2', soft: '#B8A88E', accent: '#E05A4E', string: '#E05A4E', on: '#1A0B08', proj: '#D9B77E', ok: '#7FBF75' } },
+  { id: 'studio', name: 'Studio', look: 'studio',
+    light: { bg: '#E9EAEE', side: '#DCDEE4', card: '#FFFFFF', ink: '#16171B', soft: '#5B5F6B', accent: '#E5372C', string: '#E5372C', on: '#FFFFFF', proj: '#2F6FE0', ok: '#2E9B5F' },
+    dark: { bg: '#141519', side: '#0E0F12', card: '#1D1F25', ink: '#ECEDF1', soft: '#9A9EAB', accent: '#FF453A', string: '#FF453A', on: '#1A0302', proj: '#5E9BFF', ok: '#4CD38A' } },
+  { id: 'workshop', name: 'Workshop', look: 'workshop',
+    light: { bg: '#EEEDEA', side: '#E2E0DB', card: '#FFFFFF', ink: '#1F1F1D', soft: '#5E5D58', accent: '#E66A00', string: '#E66A00', on: '#FFFFFF', proj: '#3A5F7D', ok: '#3C7D4A' },
+    dark: { bg: '#1A1A19', side: '#131312', card: '#252523', ink: '#EEEDE8', soft: '#A9A79F', accent: '#FF8A1F', string: '#FF8A1F', on: '#1C0D00', proj: '#86AFD0', ok: '#6CC28A' } },
+  { id: 'fieldnotes', name: 'Field notes', look: 'notebook',   // (handwritten headings: styles.css)
+    light: { bg: '#F1EADB', side: '#E7DDC7', card: '#FBF7EE', ink: '#23261C', soft: '#636552', accent: '#4F7A3A', string: '#B5452B', on: '#FFFFFF', proj: '#3D6278', ok: '#4F7A3A' },
+    dark: { bg: '#1C1D17', side: '#151611', card: '#262820', ink: '#ECE7D8', soft: '#ABA893', accent: '#8DBE6E', string: '#E8795E', on: '#0F160B', proj: '#8DB8D0', ok: '#8DBE6E' } },
+  // Seasons: Sakura in spring, Sunset (golden hour) in summer, Forest (woodland) in autumn and Arctic
+  // (frost) in winter, changing with the month by itself (see seasonal() below).
+  { id: 'seasons', name: 'Seasons', look: 'seasons',
+    light: { bg: '#FFF6F8', side: '#FBEAF0', card: '#FFFFFF', ink: '#2E1B24', soft: '#7D5F6D', accent: '#7A9A3A', string: '#C0392B', on: '#FFFFFF', proj: '#5D7FC4', ok: '#3C8D5A' },
+    dark: { bg: '#1B1A16', side: '#141310', card: '#26241E', ink: '#F0EBDD', soft: '#B5AE98', accent: '#C9A23A', string: '#E8705E', on: '#1A1203', proj: '#94B4F0', ok: '#6CC28A' } },
   { id: 'iceberg', name: 'Iceberg', look: 'arctic',   // 0.9.4 (boards: Frost; iceberg charts have the Iceberg look on their own boards)
     light: { bg: '#F2F8FC', side: '#E4EFF6', card: '#FFFFFF', ink: '#0F2233', soft: '#557086', accent: '#1F7AB8', string: '#D6455D', on: '#FFFFFF', proj: '#1D5C8C', ok: '#2F8A6E' },
     dark: { bg: '#071522', side: '#050F19', card: '#0E2133', ink: '#E3F1FA', soft: '#8FB0C6', accent: '#6CC3F0', string: '#FF7088', on: '#04121D', proj: '#8DC8F0', ok: '#5CC2A0' } },
@@ -65,6 +84,9 @@ export const THEMES = [
 ];
 
 export const FONTS = {
+  // 0.9.5 (Case file and Field notes bring these)
+  typewriter: { name: 'Typewriter', stack: "'American Typewriter', 'Courier Prime', 'Courier New', Courier, monospace" },
+  hand: { name: 'Handwritten', stack: "'Noteworthy', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive" },
   system: { name: 'System', stack: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, Roboto, sans-serif" },
   rounded: { name: 'Rounded', stack: "ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', 'Segoe UI', system-ui, sans-serif" },
   serif: { name: 'Serif', stack: "ui-serif, 'New York', 'Iowan Old Style', Georgia, serif" },
@@ -94,7 +116,18 @@ export const LOOKS = {
   newspaper: { name: 'Newsprint', wire: () => '#B3261E' },          // an editor's red pen
   amber: { name: 'Amber', wire: () => '#FFB000' },                  // an old amber screen
   iceberg: { name: 'Iceberg', wire: () => '#7CC4EC' },              // 0.9.4: iceberg charts, tiers from the tip down
+  // 0.9.5
+  studio: { name: 'Studio', wire: () => null, lines: true },        // a storyboard on the edit-suite wall, cables between
+  workshop: { name: 'Workshop', wire: () => '#FF6D00' },             // tags on a pegboard, orange cable
+  woodland: { name: 'Woodland', wire: () => '#8DBE5A' },             // a forest floor, vines
+  goldenhour: { name: 'Golden hour', wire: dark => (dark ? '#FFD39A' : '#B5651D') },   // low sun (dusk in dark mode)
+  seasons: { name: 'Seasons', wire: dark => LOOKS[SEASONS[season()].look].wire(dark) },   // follows the month
 };
+// (0.9.5) The Seasons theme and look: which they are this month (northern hemisphere).
+export const SEASONS = { spring: { theme: 'sakura', look: 'sakura' }, summer: { theme: 'sunset', look: 'goldenhour' }, autumn: { theme: 'forest', look: 'woodland' }, winter: { theme: 'arctic', look: 'arctic' } };
+export const season = (d = new Date()) => ['winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'autumn', 'autumn', 'autumn', 'winter'][d.getMonth()];
+export const realLook = l => (l === 'seasons' ? SEASONS[season()].look : l);
+const realTheme = id => (id === 'seasons' ? SEASONS[season()].theme : id);
 // (tidyMove, 0.7.9: when Tidy finds a card strung only to things outside its section, 'ask' suggests
 // moving it, 'move' just does it)
 export const DEFAULTS = { theme: 'notepad', mode: 'auto', accent: null, string: null, font: 'system', size: 'normal', look: 'corkboard', tidyMove: 'ask', morning: '', motion: 'on' };   // (0.9.3) motion: board backgrounds move ('on') or stay still ('off')   // (0.9.0) morning: the morning summary's time, or '' for none
@@ -116,7 +149,7 @@ export function current(store) {
 // showing, the page takes that look and its string colour; leaving it puts yours back.
 export function showBoardLook(prefs, look) {
   const p = { ...DEFAULTS, ...prefs }, root = document.documentElement;
-  const want = look && look in LOOKS ? look : (p.look in LOOKS ? p.look : 'corkboard');
+  const want = realLook(look && look in LOOKS ? look : (p.look in LOOKS ? p.look : 'corkboard'));
   if (root.dataset.look === want && root.dataset.boardLook === (look || '')) return;
   root.dataset.look = want;
   root.dataset.boardLook = look || '';
@@ -125,17 +158,17 @@ export function showBoardLook(prefs, look) {
 
 // The colour of the strings and lines on the board right now.
 export function wireColour(p, dark) {
-  const theme = THEMES.find(t => t.id === p.theme) || THEMES[0];
-  return p.string || LOOKS[p.look]?.wire(dark) || (dark ? theme.dark : theme.light).string;
+  const theme = THEMES.find(t => t.id === realTheme(p.theme)) || THEMES[0];
+  return p.string || LOOKS[realLook(p.look)]?.wire(dark) || (dark ? theme.dark : theme.light).string;
 }
 
 export function apply(prefs) {
   const p = { ...DEFAULTS, ...prefs };
-  const theme = THEMES.find(t => t.id === p.theme) || THEMES[0];
+  const theme = THEMES.find(t => t.id === realTheme(p.theme)) || THEMES[0];
   const dark = p.mode === 'dark' || (p.mode === 'auto' && darkQuery.matches);
   const c = { ...(dark ? theme.dark : theme.light) };
   if (p.accent) { c.accent = p.accent; c.on = readableOn(p.accent); }
-  const look = p.look in LOOKS ? p.look : 'corkboard';
+  const look = p.look in LOOKS ? realLook(p.look) : 'corkboard';
   const vars = {
     '--bg': c.bg, '--side': c.side, '--card': c.card, '--ink': c.ink, '--soft': c.soft,
     '--accent': c.accent, '--on-accent': c.on, '--string': c.string, '--proj': c.proj, '--ok': c.ok,

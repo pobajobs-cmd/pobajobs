@@ -1668,7 +1668,6 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 /* Newsprint: newspaper columns, clippings, a masthead, the editor's red pen. */
 :root[data-look="newspaper"] .cork { background-color: #EFEBE1; background-size: 240px 100%, 7px 7px;
   background-image: linear-gradient(90deg, transparent 0 238px, rgba(0, 0, 0, 0.07) 238px 240px), radial-gradient(circle, rgba(0, 0, 0, 0.05) 0.6px, transparent 1px); }
-:root[data-look="newspaper"][data-mode="dark"] .cork { background-color: #1E1D1A; background-image: linear-gradient(90deg, transparent 0 238px, rgba(255, 255, 255, 0.06) 238px 240px), radial-gradient(circle, rgba(255, 255, 255, 0.04) 0.6px, transparent 1px); }
 :root[data-look="newspaper"] .pcard { --paper-ink: #1A1A1A; --paper-soft: #57534B;
   border-radius: 0; padding: 15px 14px 13px; background: #F9F6EE; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.18), 0 6px 14px rgba(0, 0, 0, 0.14); font-family: ui-serif, 'New York', Georgia, serif; }
 :root[data-look="newspaper"] .pcard .ptitle { font-weight: 800; font-size: 1.05rem; border-bottom: 1px solid #1A1A1A; padding-bottom: 4px; }
@@ -1681,15 +1680,12 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 :root[data-look="newspaper"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 22%, #F9F6EE); }
 :root[data-look="newspaper"] .pcard .pbar i { background: #1A1A1A; }
 :root[data-look="newspaper"] .pbanner { color: #111111; font-family: 'Old English Text MT', 'UnifrakturMaguntia', ui-serif, Georgia, serif; padding: 0.35rem 2.2rem 0.45rem; border-top: 4px double #111111; border-bottom: 4px double #111111; }
-:root[data-look="newspaper"][data-mode="dark"] .pbanner { color: #ECE8DF; border-color: #ECE8DF; }
 :root[data-look="newspaper"] .pbanner .bcap { display: block; font-size: 0; }
 :root[data-look="newspaper"] .pbanner .bcap::before { content: "The Brain Tree Times · Late edition"; font-family: ui-serif, Georgia, serif; font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase; }
 :root[data-look="newspaper"] .pbanner .btitle { font-size: 3rem; font-weight: 700; }
 :root[data-look="newspaper"] .pbanner .bsub { font-family: ui-serif, Georgia, serif; text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.72rem; }
 :root[data-look="newspaper"] .frame { border: 1px solid #1A1A1A; border-radius: 0; background: color-mix(in srgb, var(--sticky) 9%, rgba(255, 255, 255, 0.25)); }
 :root[data-look="newspaper"] .fhead { top: -1px; left: -1px; height: 30px; padding: 0 2.4rem 0 0.7rem; background: #1A1A1A; color: #F4F1EA; font-family: ui-serif, Georgia, serif; font-size: 0.8rem; letter-spacing: 0.14em; text-transform: uppercase; }
-:root[data-look="newspaper"][data-mode="dark"] .frame { border-color: #CFCAC0; background: color-mix(in srgb, var(--sticky) 7%, rgba(255, 255, 255, 0.03)); }
-:root[data-look="newspaper"][data-mode="dark"] .fhead { background: #CFCAC0; color: #161513; }
 :root[data-look="newspaper"] .fsize { border-radius: 0; }
 :root[data-look="newspaper"] .strings .marker { stroke-width: 2.6; opacity: 0.9; }
 :root[data-look="newspaper"] .strings .slabel rect { fill: #F9F6EE; stroke: #B3261E; stroke-width: 1.2; }
@@ -1773,7 +1769,6 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 :root[data-look="newspaper"] .cork { background-repeat: repeat !important;
   background-image: linear-gradient(90deg, transparent 0 99.2%, rgba(0, 0, 0, 0.07) 99.2%), radial-gradient(circle, rgba(0, 0, 0, 0.05) 9%, transparent 14%);
   background-size: calc(240px * var(--bz, 1)) 100%, max(3px, calc(7px * var(--bz, 1))) max(3px, calc(7px * var(--bz, 1))) !important; background-position: var(--bx, 0px) 0, var(--bx, 0px) var(--by, 0px) !important; }
-:root[data-look="newspaper"][data-mode="dark"] .cork { background-image: linear-gradient(90deg, transparent 0 99.2%, rgba(255, 255, 255, 0.06) 99.2%), radial-gradient(circle, rgba(255, 255, 255, 0.04) 9%, transparent 14%); }
 
 /* Space: the stars stay put on the board (they used to stay put on the screen); some twinkle, and now and then one shoots past. */
 :root[data-look="space"] .cork { background-image: radial-gradient(circle at 33.1% 16.5%, rgba(255, 255, 255, 0.9) 0.8px, transparent 1.4px), radial-gradient(circle at 80.8% 11.0%, rgba(200, 220, 255, 0.8) 0.8px, transparent 1.4px), radial-gradient(circle at 5.6% 43.6%, rgba(200, 220, 255, 0.8) 0.8px, transparent 1.4px), radial-gradient(circle at 10.7% 42.8%, rgba(200, 220, 255, 0.8) 0.8px, transparent 1.4px), radial-gradient(circle at 62.5% 58.0%, rgba(255, 255, 255, 0.6) 0.8px, transparent 1.4px), radial-gradient(circle at 6.8% 23.2%, rgba(255, 240, 220, 0.85) 1px, transparent 1.7px), radial-gradient(circle at 42.2% 53.9%, rgba(200, 220, 255, 0.8) 1.2px, transparent 2.0px), radial-gradient(circle at 11.9% 56.8%, rgba(255, 240, 220, 0.85) 1px, transparent 1.7px), radial-gradient(circle at 11.4% 70.4%, rgba(200, 220, 255, 0.8) 0.8px, transparent 1.4px), radial-gradient(circle at 49.7% 53.0%, rgba(255, 255, 255, 0.6) 1.2px, transparent 2.0px), radial-gradient(circle at 58.2% 45.5%, rgba(200, 220, 255, 0.8) 1.2px, transparent 2.0px), radial-gradient(circle at 78.3% 69.1%, rgba(255, 255, 255, 0.9) 1px, transparent 1.7px), radial-gradient(circle at 57.1% 52.4%, rgba(255, 255, 255, 0.6) 1.2px, transparent 2.0px), radial-gradient(circle at 29.6% 96.1%, rgba(255, 255, 255, 0.6) 0.8px, transparent 1.4px), radial-gradient(circle at 17.8% 34.8%, rgba(200, 220, 255, 0.45) 0.8px, transparent 1.4px), radial-gradient(circle at 5.8% 66.1%, rgba(200, 220, 255, 0.45) 1px, transparent 1.7px), radial-gradient(circle at 34.7% 35.6%, rgba(200, 220, 255, 0.45) 0.8px, transparent 1.4px), radial-gradient(circle at 8.6% 11.0%, rgba(200, 220, 255, 0.45) 0.8px, transparent 1.4px), radial-gradient(circle at 68.9% 8.2%, rgba(200, 220, 255, 0.45) 1px, transparent 1.7px), radial-gradient(circle at 64.1% 97.3%, rgba(200, 220, 255, 0.45) 0.8px, transparent 1.4px), radial-gradient(circle at 70.8% 87.2%, rgba(255, 255, 255, 0.5) 0.8px, transparent 1.4px), radial-gradient(circle at 92.3% 36.1%, rgba(255, 255, 255, 0.5) 1px, transparent 1.7px), radial-gradient(circle at 49.4% 22.9%, rgba(255, 255, 255, 0.5) 0.8px, transparent 1.4px), radial-gradient(circle at 72.9% 40.2%, rgba(255, 255, 255, 0.5) 0.8px, transparent 1.4px) !important;
@@ -1819,3 +1814,198 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 :root[data-look="iceberg"] .strings .thin { stroke-width: 2; }
 :root[data-look="iceberg"] .strings .slabel rect { fill: #0F2233; stroke: none; }
 :root[data-look="iceberg"] .strings .slabel text { fill: #E3F1FA; }
+
+/* ====================== (0.9.5) New board looks: Studio, Workshop, Woodland, Golden hour ====================== */
+:root[data-look="studio"] { --pin-bg: #1A1B1F; --pin-edge: #FF453A; }
+:root[data-look="workshop"] { --pin-bg: #F2E2B6; --pin-edge: #FF6D00; }
+:root[data-look="woodland"] { --pin-bg: #2F4A2A; --pin-edge: #8DBE5A; }
+:root[data-look="goldenhour"] { --pin-bg: #FFF8EC; --pin-edge: #E8A33D; }
+:root[data-look="studio"], :root[data-look="woodland"] { --sketch-ink: #F2F1EC; --sketch-paper: rgba(16, 16, 20, 0.88); }
+
+/* Studio: a storyboard on the edit-suite wall. Cards are numbered shots, sections are film strips,
+   strings are coloured cables, the banner is a clapperboard. */
+:root[data-look="studio"] .cork { background-color: #17181C; background-repeat: repeat !important;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: calc(110px * var(--bz, 1)) calc(110px * var(--bz, 1)) !important; background-position: var(--bx, 0px) var(--by, 0px) !important; }
+:root[data-look="studio"] .cards { counter-reset: bt-shot; }
+:root[data-look="studio"] .pcard { --paper-ink: #16171B; --paper-soft: #5B5F6B; counter-increment: bt-shot;
+  transform: none; border-radius: 4px; padding: 34px 13px 12px; background: #FAFAF7; border: 2px solid #0B0B0D; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5); }
+:root[data-look="studio"] .pcard:not(.sketch)::after { content: "SHOT " counter(bt-shot, decimal-leading-zero); position: absolute; left: 0; right: 0; top: 0; height: 22px; padding: 4px 10px 0;
+  background: #E7E7E2; border-bottom: 2px solid #0B0B0D; font: 700 10px var(--mono); letter-spacing: 0.14em; color: #16171B; pointer-events: none; }
+:root[data-look="studio"] .pcard.t-task::after { background: linear-gradient(90deg, #E5372C 0 6px, #E7E7E2 6px); }
+:root[data-look="studio"] .pcard.t-task { border-top: 2px solid #0B0B0D; padding-top: 34px; }
+:root[data-look="studio"] .pcard.t-project { background: #FFF4D6; }
+:root[data-look="studio"] .pcard.t-project::before { display: none; }
+:root[data-look="studio"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 24%, #FAFAF7); }
+:root[data-look="studio"] .pcard .pin { top: 50%; }
+:root[data-look="studio"] .pcard .pbar i { background: #E5372C; }
+:root[data-look="studio"] .pbanner { color: #F5F5F5; background: #1D1F25; border-radius: 6px; padding: 0.5rem 1.8rem 0.7rem; border-top: 16px solid #F5F5F5; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  border-image: repeating-linear-gradient(-45deg, #F5F5F5 0 14px, #0B0B0D 14px 28px) 16 0 0 0; }
+:root[data-look="studio"] .pbanner .bcap { display: block; font-size: 0; }
+:root[data-look="studio"] .pbanner .bcap::before { content: "PRODUCTION"; font: 700 0.7rem var(--mono); letter-spacing: 0.3em; opacity: 0.6; }
+:root[data-look="studio"] .pbanner .btitle { font-size: 2.2rem; font-weight: 800; }
+:root[data-look="studio"] .frame { border: 0; border-radius: 4px; background-color: rgba(255, 255, 255, 0.025);
+  background-image: repeating-linear-gradient(90deg, transparent 0 9px, #3A3B40 9px 19px, transparent 19px 28px), repeating-linear-gradient(90deg, transparent 0 9px, #3A3B40 9px 19px, transparent 19px 28px), linear-gradient(#0B0B0D, #0B0B0D), linear-gradient(#0B0B0D, #0B0B0D);
+  background-size: 100% 8px, 100% 8px, 100% 24px, 100% 24px; background-position: 0 8px, 0 calc(100% - 8px), 0 0, 0 100%; background-repeat: no-repeat; }
+:root[data-look="studio"] .fhead { top: 28px; left: 12px; height: 26px; padding: 0 2.4rem 0 0.6rem; border-radius: 3px; background: #0B0B0D; color: #ECEDF1; font: 700 0.75rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+:root[data-look="studio"] .frame[class*=" c-"] .fhead { box-shadow: inset 4px 0 0 var(--sticky); }
+:root[data-look="studio"] .strings .tube { stroke: var(--lc, var(--wire)); stroke-width: 3.6; }
+:root[data-look="studio"] .strings .tube.glow { stroke: #0B0B0D; stroke-width: 8; opacity: 1; filter: none; }
+:root[data-look="studio"] .strings .slabel rect { fill: #0B0B0D; stroke: var(--lc, var(--wire)); stroke-width: 1.5; }
+:root[data-look="studio"] .strings .slabel text { fill: #ECEDF1; font-family: var(--mono); font-size: 11px; }
+
+/* Workshop: manila tags hanging on a pegboard, sections painted like a tool shadow board with a
+   stencilled sign, strings as orange cable at right angles. */
+:root[data-look="workshop"] .cork { background-color: #C9A97A; background-repeat: repeat !important;
+  background-image: radial-gradient(circle, #4E3820 0 2.6px, rgba(0, 0, 0, 0.22) 3.2px, transparent 4.4px);
+  background-size: calc(30px * var(--bz, 1)) calc(30px * var(--bz, 1)) !important; background-position: var(--bx, 0px) var(--by, 0px) !important; }
+:root[data-look="workshop"][data-mode="dark"] .cork { background-color: #7C6342; }
+:root[data-look="workshop"] .pcard { --paper-ink: #2A2216; --paper-soft: #6B5D45;
+  border-radius: 4px 14px 4px 4px; padding: 26px 14px 13px; background: #F2E2B6; border: 1px solid #C8B07A; box-shadow: 0 8px 18px rgba(40, 25, 5, 0.35); }
+:root[data-look="workshop"] .pcard:not(.sketch)::before { content: ""; position: absolute; left: 12px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: #C9A97A; box-shadow: 0 0 0 3px #E3CB8C, inset 0 1px 2px rgba(0, 0, 0, 0.4); }
+:root[data-look="workshop"] .pcard.t-task { border-top: 1px solid #C8B07A; padding-top: 26px; background: #FFFFFF; }
+:root[data-look="workshop"] .pcard.t-project { background: #FFD54F; }
+:root[data-look="workshop"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 32%, #F2E2B6); }
+:root[data-look="workshop"] .pcard .tick { border-radius: 3px; border-color: #6B5D45; }
+:root[data-look="workshop"] .pcard .pbar i { background: #E66A00; }
+:root[data-look="workshop"] .pbanner { color: #111111; background: #F5B700; border-radius: 4px; padding: 0.4rem 2rem 0.5rem; border-top: 10px solid #111; border-bottom: 10px solid #111;
+  border-image: repeating-linear-gradient(-45deg, #111 0 10px, #F5B700 10px 20px) 10 0; box-shadow: 0 10px 24px rgba(40, 25, 5, 0.35); }
+:root[data-look="workshop"] .pbanner .btitle { font-size: 2.2rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; }
+:root[data-look="workshop"] .frame { border: 3px dashed rgba(30, 30, 30, 0.55); border-radius: 10px; background: color-mix(in srgb, var(--sticky) 12%, rgba(255, 255, 255, 0.12)); }
+:root[data-look="workshop"] .fhead { top: -16px; left: 14px; height: 30px; padding: 0 2.4rem 0 0.7rem; border-radius: 3px; background: #F5B700; color: #111; font-size: 0.82rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
+  border-left: 10px solid #111; border-image: repeating-linear-gradient(-45deg, #111 0 5px, #F5B700 5px 10px) 0 0 0 10; }
+:root[data-look="workshop"] .strings .rule { stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+:root[data-look="workshop"] .strings .slabel rect { fill: #111; stroke: none; }
+:root[data-look="workshop"] .strings .slabel text { fill: #F5B700; font-weight: 800; letter-spacing: 0.04em; }
+
+/* Woodland: a mossy forest floor in dappled light, parchment notes, wooden signs, vines for strings,
+   leaves drifting down. */
+:root[data-look="woodland"] .cork { background-color: #2F4A2A; background-repeat: repeat !important;
+  background-image: radial-gradient(60px 40px at 30% 30%, rgba(220, 240, 160, 0.10), transparent 70%), radial-gradient(90px 60px at 75% 70%, rgba(220, 240, 160, 0.08), transparent 70%),
+    radial-gradient(5px 3px at 20% 80%, rgba(120, 90, 40, 0.5) 96%, transparent), radial-gradient(4px 6px at 62% 18%, rgba(90, 120, 50, 0.6) 96%, transparent), radial-gradient(6px 3px at 85% 45%, rgba(140, 100, 40, 0.45) 96%, transparent);
+  background-size: calc(420px * var(--bz, 1)) calc(420px * var(--bz, 1)) !important; background-position: var(--bx, 0px) var(--by, 0px) !important; }
+:root[data-look="woodland"][data-mode="light"] .cork { background-color: #3E5F35; }
+:root[data-look="woodland"] .pcard { --paper-ink: #2B2618; --paper-soft: #6B6247;
+  border-radius: 6px; padding: 15px 14px 13px; background: #F5EEDA; border: 1px solid #C8B68A; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); }
+:root[data-look="woodland"] .pcard.t-task { border-top: 4px solid #6B8E23; padding-top: 13px; }
+:root[data-look="woodland"] .pcard.t-project { background: #E8DDBF; }
+:root[data-look="woodland"] .pcard.t-project::before { background: #8B5A2B; }
+:root[data-look="woodland"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 26%, #F5EEDA); }
+:root[data-look="woodland"] .pcard .pbar i { background: #6B8E23; }
+:root[data-look="woodland"] .pbanner { color: #F8EFD9; background: linear-gradient(#9A6A3A, #7A4E26); border-radius: 10px; padding: 0.5rem 2rem 0.6rem; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.2), 0 10px 24px rgba(0, 0, 0, 0.4); font-family: ui-serif, Georgia, serif; }
+:root[data-look="woodland"] .pbanner .btitle { font-size: 2.2rem; font-weight: 700; }
+:root[data-look="woodland"] .frame { border: 3px dashed #A6834F; border-radius: 26px; background: color-mix(in srgb, var(--sticky) 10%, rgba(255, 255, 255, 0.05)); }
+:root[data-look="woodland"] .fhead { top: 8px; left: 12px; height: 32px; padding: 0 2.4rem 0 0.8rem; border-radius: 6px; background: linear-gradient(#8B5A2B, #6E4520); color: #F5EEDA; font-family: ui-serif, Georgia, serif; font-size: 1rem; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3); }
+:root[data-look="woodland"] .strings .pen { stroke-width: 3; }
+:root[data-look="woodland"] .strings .slabel rect { fill: #F5EEDA; stroke: #6B8E23; stroke-width: 1.2; }
+:root[data-look="woodland"] .strings .slabel text { fill: #3E5222; font-family: ui-serif, Georgia, serif; font-style: italic; }
+
+/* Golden hour: the sun low (dusk in dark mode), warm paper with long shadows, specks of dust in the light. */
+:root[data-look="goldenhour"] .cork { background-color: #6D4C7D; background-repeat: no-repeat, repeat-x !important;
+  background-image: radial-gradient(circle, rgba(255, 244, 200, 0.95) 0 10%, rgba(255, 214, 140, 0.35) 11% 30%, transparent 31%), linear-gradient(180deg, #FFF1CC 0% 44%, #FFDF9E 50%, #FFC36E 52%, #F7A55A 54%, #E07A5F 56.5%, #6D4C7D 60% 100%);
+  background-size: calc(900px * var(--bz, 1)) calc(900px * var(--bz, 1)), 100% calc(40000px * var(--bz, 1)) !important;
+  background-position: calc(var(--bx, 0px) + 900px * var(--bz, 1)) calc(var(--by, 0px) + 150px * var(--bz, 1)), 0 calc(var(--by, 0px) - 20000px * var(--bz, 1)) !important; }
+:root[data-look="goldenhour"][data-mode="dark"] .cork { background-color: #1D2440;
+  background-image: radial-gradient(circle, rgba(255, 190, 120, 0.6) 0 8%, rgba(255, 160, 110, 0.18) 9% 28%, transparent 29%), linear-gradient(180deg, #F2A65A 0% 44%, #D98060 50%, #B56576 52%, #6D597A 54%, #355070 56.5%, #1D2440 60% 100%); }
+:root[data-look="goldenhour"] .pcard { --paper-ink: #3A2A1A; --paper-soft: #7A6048;
+  transform: none; border-radius: 8px; padding: 15px 14px 13px; background: #FFF8EC; border: 0; box-shadow: 14px 18px 26px rgba(140, 70, 20, 0.22), 0 1px 2px rgba(0, 0, 0, 0.08); }
+:root[data-look="goldenhour"][data-mode="dark"] .pcard { box-shadow: 14px 18px 26px rgba(10, 10, 30, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2); }
+:root[data-look="goldenhour"] .pcard.t-task { border-top: 3px solid #E8A33D; padding-top: 13px; }
+:root[data-look="goldenhour"] .pcard.t-project { background: #FFEFD2; }
+:root[data-look="goldenhour"] .pcard.t-project::before { display: none; }
+:root[data-look="goldenhour"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 26%, #FFF8EC); }
+:root[data-look="goldenhour"] .pcard .pbar i { background: #E8A33D; }
+:root[data-look="goldenhour"] .pbanner { color: #5A3418; }
+:root[data-look="goldenhour"][data-mode="dark"] .pbanner { color: #FFF3E0; }
+:root[data-look="goldenhour"] .pbanner .btitle { font-size: 2.5rem; font-weight: 800; font-family: ui-serif, Georgia, serif; text-shadow: 0 2px 16px rgba(255, 210, 140, 0.8); }
+:root[data-look="goldenhour"] .frame { border: 1.5px solid rgba(255, 255, 255, 0.6); border-radius: 20px; background: color-mix(in srgb, var(--sticky) 12%, rgba(255, 250, 235, 0.2)); }
+:root[data-look="goldenhour"] .fhead { top: 8px; left: 12px; height: 32px; color: #5A3418; font-weight: 800; }
+:root[data-look="goldenhour"][data-mode="dark"] .fhead { color: #FFF3E0; }
+:root[data-look="goldenhour"] .strings .thin { stroke-width: 2; }
+:root[data-look="goldenhour"] .strings .slabel rect { fill: #FFF8EC; stroke: none; }
+:root[data-look="goldenhour"] .strings .slabel text { fill: #8A4B1A; font-weight: 700; }
+
+/* moving layers: leaves in the wood, dust in the low sun */
+:root[data-look="woodland"] .cork::before, :root[data-look="goldenhour"] .cork::before, :root[data-look="woodland"] .cork::after {
+  content: ""; position: absolute; inset: -800px; --tile: 300px; background-size: var(--tile) var(--tile);
+  background-position: calc(var(--bx, 0px) + 800px) calc(var(--by, 0px) + 800px); }
+:root[data-look="woodland"] .cork::before { --tile: calc(380px * var(--bz, 1));
+  background-image: radial-gradient(8px 4px at 20% 30%, rgba(214, 120, 40, 0.85) 96%, transparent 100%), radial-gradient(5px 8px at 66% 62%, rgba(190, 150, 40, 0.8) 96%, transparent 100%), radial-gradient(7px 4px at 44% 88%, rgba(160, 70, 30, 0.75) 96%, transparent 100%);
+  animation: bt-fall-wind 34s linear infinite; }
+:root[data-look="woodland"] .cork::after { --tile: calc(520px * var(--bz, 1));
+  background-image: radial-gradient(80px 50px at 30% 40%, rgba(240, 255, 180, 0.07), transparent 70%), radial-gradient(60px 40px at 78% 76%, rgba(240, 255, 180, 0.06), transparent 70%);
+  animation: bt-slide-x 70s linear infinite; }
+:root[data-look="goldenhour"] .cork::before { --tile: calc(260px * var(--bz, 1));
+  background-image: radial-gradient(circle at 20% 70%, rgba(255, 240, 200, 0.55) 0 1.2px, transparent 2px), radial-gradient(circle at 64% 30%, rgba(255, 240, 200, 0.45) 0 1px, transparent 1.8px), radial-gradient(circle at 82% 82%, rgba(255, 240, 200, 0.4) 0 1.4px, transparent 2.2px);
+  animation: bt-slide-up 40s linear infinite; }
+
+/* ====================== (0.9.5) Fixes ====================== */
+/* Sakura at night: the petals under lanterns, instead of dark mud. */
+:root[data-look="sakura"][data-mode="dark"] .cork { background-color: #1B1426; }
+:root[data-look="sakura"][data-mode="dark"] .cork::after { content: ""; position: absolute; inset: -800px; z-index: -1; background-position: calc(var(--bx, 0px) + 800px) calc(var(--by, 0px) + 800px);
+  background-size: calc(640px * var(--bz, 1)) calc(640px * var(--bz, 1)); background-image: radial-gradient(circle at 25% 30%, rgba(255, 170, 90, 0.22), transparent 14%), radial-gradient(circle at 72% 68%, rgba(255, 150, 110, 0.18), transparent 12%); }
+:root[data-look="sakura"][data-mode="dark"] .pcard { --paper-ink: #F7E6EE; --paper-soft: rgba(247, 230, 238, 0.72); --faint: rgba(247, 230, 238, 0.5); --hover: rgba(255, 255, 255, 0.08); --check: #2A1E30;
+  background: #2A1E30; border-color: #6E3A55; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45); }
+:root[data-look="sakura"][data-mode="dark"] .pcard.t-project { background: #33233A; }
+:root[data-look="sakura"][data-mode="dark"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 18%, #2A1E30); }
+:root[data-look="sakura"][data-mode="dark"] .pcard .chip { background: rgba(255, 255, 255, 0.1); color: var(--paper-soft); }
+:root[data-look="sakura"][data-mode="dark"] .pcard .ptitle .tick { border-color: var(--paper-soft); }
+:root[data-look="sakura"][data-mode="dark"] .fhead { background: #2A1E30; border-color: #6E3A55; color: #FFB3CC; }
+:root[data-look="sakura"][data-mode="dark"] .frame { border-color: #6E3A55; }
+:root[data-look="sakura"][data-mode="dark"] .strings .slabel rect { fill: #2A1E30; stroke: #6E3A55; }
+:root[data-look="sakura"][data-mode="dark"] .strings .slabel text { fill: #FFB3CC; }
+
+/* Amber: an old amber monitor of its own: glowing text, scan lines, a dark bezel round the edge. */
+:root[data-look="amber"] .pcard .ptitle span, :root[data-look="amber"] .pcard .pbody, :root[data-look="amber"] .pkids { text-shadow: 0 0 6px rgba(255, 176, 0, 0.45); }
+:root[data-look="amber"] .pbanner .btitle { text-shadow: 0 0 6px #FFB000, 0 0 18px rgba(255, 176, 0, 0.55); }
+:root[data-look="amber"] .cork::after { content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.18) 2px 3px); box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.75), inset 0 0 18px rgba(255, 176, 0, 0.08);
+  animation: bt-flicker 6s steps(1) infinite; }
+@keyframes bt-flicker { 0%, 100% { opacity: 1; } 47% { opacity: 0.86; } 48% { opacity: 1; } 81% { opacity: 0.92; } 82% { opacity: 1; } }
+
+/* Café: no "Today's special" over real projects. */
+:root[data-look="mocha"] .pbanner .bcap { display: none; }
+:root[data-look="mocha"] .pbanner .bcap::before { content: none; }
+
+/* ====================== (0.9.5) Theme packs: the whole app, not just the board ====================== */
+/* Case file: typewritten, manila folder tabs, overdue stamped in red, red thread on the timeline. */
+:root[data-theme="casefile"] #list .bar h2, :root[data-theme="casefile"] .boardhead h2, :root[data-theme="casefile"] .gname, :root[data-theme="casefile"] .sechead .sname, :root[data-theme="casefile"] #detail .head .title { font-family: 'American Typewriter', 'Courier Prime', 'Courier New', Courier, monospace; }
+:root[data-theme="casefile"] .gname.band { background: #E3C98F; color: #3B2A14; border-radius: 8px 8px 0 0; letter-spacing: 0.14em; }
+:root[data-theme="casefile"][data-mode="dark"] .gname.band { background: #5A4626; color: #F0E6D2; }
+:root[data-theme="casefile"] .gname.band.late { background: var(--string-bg); color: var(--string); }
+:root[data-theme="casefile"] .row .when.late { border: 1.5px solid; border-radius: 3px; padding: 0 0.3rem; transform: rotate(-3deg); text-transform: uppercase; font-size: 0.66rem; letter-spacing: 0.08em; min-width: 0; }
+:root[data-theme="casefile"] .tick { border-radius: 3px; }
+:root[data-theme="casefile"] .tlbar { border-color: #B3261E; }
+:root[data-theme="casefile"] .tlnow { background: #B3261E; opacity: 0.9; }
+:root[data-theme="casefile"][data-look="corkboard"] .pcard, :root[data-theme="casefile"][data-look="corkboard"] .fhead { font-family: 'American Typewriter', 'Courier Prime', 'Courier New', Courier, monospace; }
+:root[data-theme="casefile"][data-look="corkboard"] .pbanner .bcap { display: block; font: 700 0.75rem 'Courier New', Courier, monospace; letter-spacing: 0.3em; text-transform: uppercase; opacity: 0.75; }
+
+/* Studio: the edit suite. Bands like track headers, dates like timecode, the timeline as tracks with a playhead. */
+:root[data-theme="studio"] .gname.band { border-radius: 3px; box-shadow: inset 4px 0 0 var(--accent); font-family: var(--mono); letter-spacing: 0.12em; }
+:root[data-theme="studio"] .row .when { font-family: var(--mono); font-size: 0.74rem; }
+:root[data-theme="studio"] .tick { border-radius: 4px; }
+:root[data-theme="studio"] .tlrow:nth-child(even) { background: rgba(127, 127, 127, 0.06); }
+:root[data-theme="studio"] .tlbar { border-radius: 4px; border-width: 1px; }
+:root[data-theme="studio"] .tlnow { width: 2px; background: #FF453A; opacity: 1; }
+:root[data-theme="studio"] .tlnow::before { content: ""; position: absolute; top: 0; left: -6px; border: 7px solid transparent; border-top: 10px solid #FF453A; }
+
+/* Workshop: stencilled headings, hazard stripes, costs like a bill of materials. */
+:root[data-theme="workshop"] #list .bar h2, :root[data-theme="workshop"] .boardhead h2 { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 900; }
+:root[data-theme="workshop"] .gname.band { border-radius: 3px; border-left: 8px solid #111; border-image: repeating-linear-gradient(-45deg, #111 0 4px, #F5B700 4px 8px) 0 0 0 8; font-weight: 900; }
+:root[data-theme="workshop"] .tick { border-radius: 3px; }
+:root[data-theme="workshop"] .projline .money, :root[data-theme="workshop"] .sechead .scost, :root[data-theme="workshop"] .row .title small { font-family: var(--mono); }
+:root[data-theme="workshop"] .tlbar.late { background: repeating-linear-gradient(-45deg, rgba(245, 183, 0, 0.55) 0 6px, rgba(17, 17, 17, 0.35) 6px 12px); }
+
+/* Field notes: a bullet journal. Dotted pages, handwritten headings, square boxes ticked with a cross. */
+:root[data-theme="fieldnotes"] #list, :root[data-theme="fieldnotes"] #detail { background-image: radial-gradient(circle, color-mix(in srgb, var(--ink) 16%, transparent) 0.9px, transparent 1.4px); background-size: 22px 22px; }
+:root[data-theme="fieldnotes"] #list .bar h2, :root[data-theme="fieldnotes"] .boardhead h2, :root[data-theme="fieldnotes"] .gname, :root[data-theme="fieldnotes"] .sechead .sname { font-family: 'Noteworthy', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive; }
+:root[data-theme="fieldnotes"] .gname.band { background: none; border-radius: 0; border-bottom: 2px solid var(--accent); text-transform: none; letter-spacing: 0; font-size: 0.95rem; }
+:root[data-theme="fieldnotes"] .row { border-bottom-style: dashed; }
+:root[data-theme="fieldnotes"] .tick { border-radius: 2px; }
+:root[data-theme="fieldnotes"] .tick.done { background: transparent; border-color: var(--accent); }
+:root[data-theme="fieldnotes"] .tick.done::after { width: 12px; height: 12px; border: 0; transform: none; background: linear-gradient(45deg, transparent 44%, var(--accent) 44% 56%, transparent 56%), linear-gradient(-45deg, transparent 44%, var(--accent) 44% 56%, transparent 56%); }
+
+/* Night sky: stars in the side panel, a glow on the headings and today. */
+:root[data-theme="dusk"] #nav { background-image: radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--ink) 35%, transparent) 0 1px, transparent 1.5px), radial-gradient(circle at 70% 80%, color-mix(in srgb, var(--ink) 25%, transparent) 0 0.8px, transparent 1.3px); background-size: 97px 97px, 61px 61px; }
+:root[data-theme="dusk"][data-mode="dark"] #list .bar h2, :root[data-theme="dusk"][data-mode="dark"] .boardhead h2 { text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent); }
+:root[data-theme="dusk"] .tlnow { box-shadow: 0 0 10px var(--accent); opacity: 1; }

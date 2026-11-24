@@ -21,7 +21,7 @@ import { createTimeline } from './timeline.js';
 import * as remind from './remind.js';
 import { widgetScript } from './widget.js';
 
-const VERSION = '0.9.4';
+const VERSION = '0.9.5';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -452,7 +452,8 @@ const boardApi = {
   toast: (...a) => toast(...a),
   newItem: (type, parent, extra) => newItem(type, parent ?? null, extra),
   placePicker: (key, exclude, onPick) => pickItem({ title: 'Bring onto this board', exclude: new Set(exclude), only: r => r.data.type !== 'section', onPick }),
-  style: () => boardLook(route.board) || theme.current(store).look,   // (0.9.4: a board's own look, else yours)
+  style: () => theme.realLook(boardLook(route.board) || theme.current(store).look),   // (0.9.4: a board's own look, else yours; 0.9.5: Seasons is this month's)
+  recLook: () => (theme.current(store).theme === 'casefile' ? 'crime' : 'none'),   // (0.9.5) a new recording's look
   tidyMove: () => theme.current(store).tidyMove === 'move',
   ownWire: () => !!theme.current(store).string,   // your own string colour (instead of the look's)
   pickClip: c => clipModal(c),
@@ -1951,6 +1952,23 @@ function lookPreview(id) {
     iceberg: `<rect width="120" height="48" fill="#06111F"/><rect width="120" height="17" fill="#CFEAF8"/><rect y="17" width="120" height="10" fill="#3B8DC0"/><rect y="27" width="120" height="10" fill="#1E5C8C"/><rect y="37" width="120" height="11" fill="#0E3456"/>
       <path d="M52 17L58 5L62 9L66 6L70 17Z" fill="#F7FCFF"/><path d="M52 17L44 30L40 46H82L78 30L70 17Z" fill="rgba(200,235,255,.25)" stroke="rgba(220,245,255,.5)"/><path d="M0 17H120" stroke="#fff" stroke-dasharray="5 3"/>
       <rect x="54" y="8" width="12" height="7" rx="1.5" fill="#fff"/><rect x="47" y="21" width="12" height="7" rx="1.5" fill="#fff"/><rect x="62" y="21" width="12" height="7" rx="1.5" fill="#fff"/><rect x="44" y="34" width="10" height="7" rx="1.5" fill="#fff"/><rect x="57" y="34" width="10" height="7" rx="1.5" fill="#fff"/><rect x="70" y="34" width="10" height="7" rx="1.5" fill="#fff"/>`,
+    // (0.9.5)
+    studio: `<rect width="120" height="48" fill="#17181C"/><path d="M0 12H120M0 24H120M0 36H120M30 0V48M60 0V48M90 0V48" stroke="rgba(255,255,255,.04)"/>
+      <rect x="8" y="12" width="36" height="26" rx="2" fill="#FAFAF7" stroke="#0B0B0D" stroke-width="1.5"/><rect x="8" y="12" width="36" height="6" fill="#E7E7E2"/><rect x="8" y="12" width="3" height="6" fill="#E5372C"/>
+      <rect x="76" y="12" width="36" height="26" rx="2" fill="#FAFAF7" stroke="#0B0B0D" stroke-width="1.5"/><rect x="76" y="12" width="36" height="6" fill="#E7E7E2"/>
+      <path d="M44 26C58 12 62 40 76 26" fill="none" stroke="#0B0B0D" stroke-width="5"/><path d="M44 26C58 12 62 40 76 26" fill="none" stroke="#2F6FE0" stroke-width="2.4"/>`,
+    workshop: `<rect width="120" height="48" fill="#C9A97A"/>${[...Array(30)].map((_, i) => `<circle cx="${6 + (i % 10) * 12}" cy="${6 + Math.floor(i / 10) * 16}" r="1.6" fill="#4E3820"/>`).join('')}
+      <rect x="9" y="12" width="34" height="27" rx="2" fill="#F2E2B6" stroke="#C8B07A"/><circle cx="14" cy="17" r="2" fill="#C9A97A" stroke="#E3CB8C"/><rect x="77" y="12" width="34" height="27" rx="2" fill="#FFF"/><circle cx="82" cy="17" r="2" fill="#C9A97A" stroke="#E3CB8C"/>
+      <path d="M43 22H58V32H77" fill="none" stroke="#FF6D00" stroke-width="2.2"/><path d="M73 29.5L77.5 32L73 34.5z" fill="#FF6D00"/>`,
+    woodland: `<rect width="120" height="48" fill="#2F4A2A"/><ellipse cx="30" cy="10" rx="18" ry="8" fill="rgba(220,240,160,.10)"/><ellipse cx="96" cy="40" rx="3.5" ry="2" fill="#D67828"/><ellipse cx="58" cy="6" rx="2" ry="3.5" fill="#BE9628"/>
+      <rect x="9" y="13" width="34" height="25" rx="3" fill="#F5EEDA"/><rect x="9" y="13" width="34" height="3" fill="#6B8E23"/><rect x="77" y="13" width="34" height="25" rx="3" fill="#F5EEDA"/>
+      <path d="M43 26C52 21 60 32 77 25" fill="none" stroke="#8DBE5A" stroke-width="2.6" stroke-linecap="round"/><path d="M58 27c2-4 6-4 7-2-3 1-5 2-7 2z" fill="#8DBE5A"/>`,
+    goldenhour: `<defs><linearGradient id="lpgh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".55" stop-color="#FFC36E"/><stop offset="1" stop-color="#E07A5F"/></linearGradient></defs>
+      <rect width="120" height="48" fill="url(#lpgh)"/><circle cx="100" cy="30" r="12" fill="rgba(255,244,200,.85)"/>
+      <rect x="9" y="12" width="34" height="25" rx="4" fill="#FFF8EC"/><path d="M43 37l8 6H17l-8-6z" fill="rgba(140,70,20,.15)"/><rect x="74" y="12" width="34" height="25" rx="4" fill="#FFF8EC"/>
+      <path d="M43 24H74" stroke="#B5651D" stroke-width="1.5"/><path d="M70 21.5L74.5 24L70 26.5z" fill="#B5651D"/>`,
+    seasons: `<rect width="30" height="48" fill="#FDEEF3"/><rect x="30" width="30" height="48" fill="#FFC36E"/><rect x="60" width="30" height="48" fill="#2F4A2A"/><rect x="90" width="30" height="48" fill="#E6EFF6"/>
+      <ellipse cx="15" cy="20" rx="4" ry="2.4" fill="#F48FB1"/><circle cx="45" cy="20" r="6" fill="#FFF4C8"/><ellipse cx="75" cy="20" rx="4" ry="2.4" fill="#D67828"/><circle cx="105" cy="20" r="2" fill="#fff"/><circle cx="100" cy="28" r="1.4" fill="#fff"/><circle cx="110" cy="30" r="1.6" fill="#fff"/>`,
     amber: `<rect width="120" height="48" fill="#0B0803"/><path d="M0 4H120M0 10H120M0 16H120M0 22H120M0 28H120M0 34H120M0 40H120M0 46H120" stroke="rgba(255,176,0,.05)"/>
       <rect x="8" y="9" width="38" height="30" fill="#120C04" stroke="#8A5A00"/><rect x="8" y="9" width="38" height="6" fill="#1C1306"/><path d="M12 23h12M12 29h18" stroke="#FFB000" stroke-width="1.6"/>
       <rect x="74" y="9" width="38" height="30" fill="#120C04" stroke="#8A5A00"/><rect x="74" y="9" width="38" height="6" fill="#1C1306"/><path d="M78 23h16M78 29h10" stroke="#FFB000" stroke-width="1.6"/>
