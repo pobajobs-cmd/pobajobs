@@ -40,6 +40,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html)
             return
+        if path == '/builds/braintree/share.html':   # (0.9.0) a read-only link's page
+            html = (SITE / 'builds/braintree/share.html').read_bytes()
+            html = html.replace(b'<script type="module" src="share.js">', b'<script type="module" src="/_dev/braintree/devapi.js"></script>\n<script type="module" src="share.js">')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(html)))
+            self.end_headers()
+            self.wfile.write(html)
+            return
         super().do_GET()
 
     def log_message(self, fmt, *args):

@@ -6,7 +6,7 @@
 //                    await btDev.call('/sync', {...}, token)   (act as another device)
 //                    await btDev.wipeServer()
 
-import { handleBraintree } from '/worker-braintree.js';
+import { handleBraintree, braintreeCron, encryptPush, vapidAuth } from '/worker-braintree.js';
 
 const SQLJS = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';
 const state = { offline: false, password: 'dev-password', calls: 0 };
@@ -91,4 +91,7 @@ window.btDev = {
   },
   async wipeServer() { await kv('readwrite', s => s.delete('db')); location.reload(); },
   async sql(q) { const db = await ready; return db.exec(q); },
+  // (0.9.0) run the reminders cron now; the push pieces, to test them
+  async cron() { const db = await ready; await braintreeCron({ DB: d1(db), BRAINTREE_PASSWORD: state.password }); await kv('readwrite', s => s.put(db.export(), 'db')); },
+  async pushParts() { const db = await ready; return { encryptPush, vapidAuth: endpoint => vapidAuth({ DB: d1(db) }, endpoint) }; },
 };
