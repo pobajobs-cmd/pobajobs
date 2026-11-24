@@ -21,7 +21,7 @@ import { createTimeline } from './timeline.js';
 import * as remind from './remind.js';
 import { widgetScript } from './widget.js';
 
-const VERSION = '0.9.1';
+const VERSION = '0.9.2';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -1861,6 +1861,31 @@ function lookPreview(id) {
     space: `<rect width="120" height="48" fill="#060A1C"/><circle cx="20" cy="7" r=".8" fill="#fff"/><circle cx="58" cy="42" r=".8" fill="#fff"/><circle cx="102" cy="5" r="1" fill="#fff"/><circle cx="55" cy="9" r=".6" fill="#fff"/><circle cx="114" cy="44" r=".7" fill="#fff"/>
       <rect x="8" y="14" width="36" height="24" rx="6" fill="#10163A" stroke="#7F95D8" stroke-width=".8"/><rect x="76" y="12" width="36" height="24" rx="6" fill="#10163A" stroke="#7F95D8" stroke-width=".8"/>
       <path d="M44 24L76 22" stroke="#C9D8FF" stroke-width=".9"/><circle cx="44" cy="24" r="3.5" fill="rgba(200,215,255,.25)"/><circle cx="44" cy="24" r="1.7" fill="#fff"/><circle cx="76" cy="22" r="3.5" fill="rgba(200,215,255,.25)"/><circle cx="76" cy="22" r="1.7" fill="#fff"/>`,
+    // (0.9.2) the newer themes' looks
+    ocean: `<rect width="120" height="48" fill="#0B3442"/><circle cx="60" cy="70" r="40" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="2"/><circle cx="60" cy="70" r="58" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="2"/>
+      <rect x="8" y="12" width="36" height="24" rx="7" fill="rgba(160,230,240,.15)" stroke="rgba(160,230,240,.45)"/><rect x="76" y="12" width="36" height="24" rx="7" fill="rgba(160,230,240,.15)" stroke="rgba(160,230,240,.45)"/>
+      <path d="M44 24C58 8 62 40 76 24" fill="none" stroke="#8FE9EE" stroke-width="5" opacity=".18"/><path d="M44 24C58 8 62 40 76 24" fill="none" stroke="#8FE9EE" stroke-width="1.8"/>`,
+    sunset: `<defs><linearGradient id="lpss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFC48F"/><stop offset=".45" stop-color="#FF9468"/><stop offset="1" stop-color="#9A4D80"/></linearGradient></defs>
+      <rect width="120" height="48" fill="url(#lpss)"/><circle cx="96" cy="14" r="9" fill="#FFF0B4" opacity=".9"/>
+      <rect x="9" y="14" width="34" height="24" fill="#FFFDF8" transform="rotate(-4 26 26)"/><rect x="76" y="15" width="34" height="24" fill="#FFFDF8" transform="rotate(3 93 27)"/>
+      <path d="M44 27L74 25" stroke="#FFF6EA" stroke-width="2" stroke-dasharray="1.5 4" stroke-linecap="round"/><path d="M70 22.5L75 25L70 27.5z" fill="#FFF6EA"/>`,
+    sakura: `<rect width="120" height="48" fill="#FDEEF3"/><ellipse cx="18" cy="8" rx="3" ry="1.8" fill="#F48FB1"/><ellipse cx="102" cy="42" rx="1.8" ry="3" fill="#F8BBD0"/><ellipse cx="62" cy="6" rx="2.5" ry="1.5" fill="#F8BBD0"/>
+      <rect x="9" y="13" width="35" height="24" rx="8" fill="#FFF" stroke="#F8C8D8" stroke-width="1.2"/><rect x="76" y="13" width="35" height="24" rx="8" fill="#FFF" stroke="#F8C8D8" stroke-width="1.2"/>
+      <path d="M44 25C58 12 62 38 76 25" fill="none" stroke="#FFF" stroke-width="5"/><path d="M44 25C58 12 62 38 76 25" fill="none" stroke="#E0568A" stroke-width="2.2"/>`,
+    mocha: `<rect width="120" height="48" fill="#3B2A20"/><path d="M14 0V48M40 0V48M66 0V48M92 0V48M118 0V48" stroke="rgba(255,255,255,.04)" stroke-width="2"/>
+      <rect x="10" y="12" width="34" height="26" fill="#D9BC94" transform="rotate(-3 27 25)"/><rect x="76" y="11" width="34" height="27" fill="#F4EBDD" transform="rotate(2 93 25)"/><path d="M77 15H109" stroke="rgba(90,60,40,.45)" stroke-dasharray="2 1.5"/>
+      <path d="M44 26C55 22 64 29 74 25" fill="none" stroke="#C9A27A" stroke-width="2.4" stroke-dasharray="5 1.2"/>`,
+    arctic: `<rect width="120" height="48" fill="#E6EFF6"/><circle cx="14" cy="8" r="1.2" fill="#fff"/><circle cx="58" cy="42" r="1.2" fill="#fff"/><circle cx="104" cy="6" r="1.2" fill="#fff"/><circle cx="88" cy="44" r="1" fill="#9BBBD9"/>
+      <rect x="9" y="12" width="35" height="24" rx="5" fill="rgba(255,255,255,.85)" stroke="#A0C3E6"/><rect x="9" y="12" width="35" height="3" rx="1.5" fill="#88C0D0"/><rect x="76" y="12" width="35" height="24" rx="5" fill="rgba(255,255,255,.85)" stroke="#A0C3E6"/>
+      <path d="M44 20H58V30H72" fill="none" stroke="#3D6FA8" stroke-width="1.5"/><path d="M71 27.5L75.5 30L71 32.5z" fill="#3D6FA8"/><circle cx="44" cy="20" r="2" fill="#3D6FA8"/>`,
+    newspaper: `<rect width="120" height="48" fill="#EFEBE1"/><path d="M40 0V48M80 0V48" stroke="rgba(0,0,0,.08)"/>
+      <rect x="8" y="10" width="36" height="28" fill="#F9F6EE" transform="rotate(-2 26 24)"/><path d="M12 16H40" stroke="#1A1A1A" stroke-width="1.6" transform="rotate(-2 26 24)"/><path d="M12 22H38M12 26H36M12 30H39" stroke="rgba(0,0,0,.3)" transform="rotate(-2 26 24)"/>
+      <rect x="76" y="11" width="36" height="27" fill="#F9F6EE" transform="rotate(2 94 24)"/><path d="M80 17H108" stroke="#1A1A1A" stroke-width="1.6" transform="rotate(2 94 24)"/>
+      <path d="M45 28C55 23 63 31 72 26" fill="none" stroke="#B3261E" stroke-width="2" stroke-linecap="round"/><path d="M67 22.5L72.5 26L66.5 29" fill="none" stroke="#B3261E" stroke-width="1.8" stroke-linecap="round"/>`,
+    amber: `<rect width="120" height="48" fill="#0B0803"/><path d="M0 4H120M0 10H120M0 16H120M0 22H120M0 28H120M0 34H120M0 40H120M0 46H120" stroke="rgba(255,176,0,.05)"/>
+      <rect x="8" y="9" width="38" height="30" fill="#120C04" stroke="#8A5A00"/><rect x="8" y="9" width="38" height="6" fill="#1C1306"/><path d="M12 23h12M12 29h18" stroke="#FFB000" stroke-width="1.6"/>
+      <rect x="74" y="9" width="38" height="30" fill="#120C04" stroke="#8A5A00"/><rect x="74" y="9" width="38" height="6" fill="#1C1306"/><path d="M78 23h16M78 29h10" stroke="#FFB000" stroke-width="1.6"/>
+      <path d="M46 24H60V30H72" fill="none" stroke="#FFB000" stroke-width="1.3" stroke-dasharray="3 2"/><path d="M70 27.5L74 30L70 32.5z" fill="#FFB000"/>`,
   };
   return `<svg viewBox="0 0 120 48" aria-hidden="true">${looks[id] || ''}</svg>`;
 }
@@ -1954,14 +1979,15 @@ async function settingsModal(focus) {
       // so closest() would always find it)
       const t = e.target.closest('[data-pick-theme]'), s = e.target.closest('[data-k]'), r = e.target.closest('[data-reset]'), l = e.target.closest('[data-pick-look]');
       if (t) {
-        // A theme with a feel of its own (Hacker's typewriter text) brings it; one with a board look
-        // to match offers it.
+        // A theme with a feel of its own (Hacker's typewriter text) brings it, and (0.9.2) every theme
+        // brings its board look along too (Undo keeps the look you had; you can still pick any look below).
         const th = theme.THEMES.find(x => x.id === t.dataset.pickTheme), cur = theme.current(store);
         const prev = theme.THEMES.find(x => x.id === cur.theme);
         // (leaving such a theme puts the usual text back, unless you'd picked another since)
         const font = th?.font || (prev?.font && cur.font === prev.font ? 'system' : null);
-        setPref({ theme: t.dataset.pickTheme, accent: null, ...(font ? { font } : {}) }, true);
-        if (th?.look && theme.current(store).look !== th.look) toast(`Use the ${theme.LOOKS[th.look].name} board look too?`, 'Yes', () => setPref({ look: th.look, string: null }, $('#modal .settings') ? true : false));
+        const newLook = th?.look && th.look in theme.LOOKS && cur.look !== th.look ? th.look : null, was = { look: cur.look, string: cur.string };
+        setPref({ theme: t.dataset.pickTheme, accent: null, ...(font ? { font } : {}), ...(newLook ? { look: newLook, string: null } : {}) }, true);
+        if (newLook) toast(`Boards now use the ${theme.LOOKS[newLook].name} look to match.`, 'Undo', () => setPref(was, $('#modal .settings') ? true : false));
       }
       else if (l) setPref({ look: l.dataset.pickLook, string: null }, true);   // each look comes with its own string
       else if (s) setPref({ [s.dataset.k]: s.dataset.v }, true);

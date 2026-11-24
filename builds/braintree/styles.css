@@ -720,17 +720,17 @@ body[data-view="board"][data-drawer] .closer { display: grid !important; }
    background, cards, section frames, banner and kind of string (see board.js wire()). */
 
 /* Dark looks: light writing on the cards, pictures without a white photo border. */
-:root[data-look="circuit"] .pcard, :root[data-look="neon"] .pcard, :root[data-look="hacker"] .pcard, :root[data-look="chalkboard"] .pcard, :root[data-look="space"] .pcard {
+:root[data-look="circuit"] .pcard, :root[data-look="neon"] .pcard, :root[data-look="hacker"] .pcard, :root[data-look="chalkboard"] .pcard, :root[data-look="space"] .pcard, :root[data-look="amber"] .pcard, :root[data-look="ocean"] .pcard {
   --hover: rgba(255, 255, 255, 0.08); transform: none; }
 :root[data-look="circuit"] .pcard .polaroid, :root[data-look="neon"] .pcard .polaroid, :root[data-look="hacker"] .pcard .polaroid,
-:root[data-look="chalkboard"] .pcard .polaroid, :root[data-look="space"] .pcard .polaroid, :root[data-look="minimal"] .pcard .polaroid { border: 0; border-radius: 6px; box-shadow: none; }
-:root[data-look="circuit"] .pcard .chip, :root[data-look="neon"] .pcard .chip, :root[data-look="hacker"] .pcard .chip, :root[data-look="chalkboard"] .pcard .chip, :root[data-look="space"] .pcard .chip { background: rgba(255, 255, 255, 0.1); color: var(--paper-soft); }
-:root[data-look="circuit"] .pcard .chip.late, :root[data-look="neon"] .pcard .chip.late, :root[data-look="hacker"] .pcard .chip.late, :root[data-look="chalkboard"] .pcard .chip.late, :root[data-look="space"] .pcard .chip.late { background: rgba(255, 110, 90, 0.2); color: #FFB4A8; }
-:root[data-look="circuit"] .pcard .chip.now, :root[data-look="neon"] .pcard .chip.now, :root[data-look="hacker"] .pcard .chip.now, :root[data-look="chalkboard"] .pcard .chip.now, :root[data-look="space"] .pcard .chip.now { background: rgba(255, 200, 80, 0.2); color: #FFD98A; }
-:root[data-look="circuit"] .pcard .ptitle .tick, :root[data-look="neon"] .pcard .ptitle .tick, :root[data-look="hacker"] .pcard .ptitle .tick, :root[data-look="chalkboard"] .pcard .ptitle .tick, :root[data-look="space"] .pcard .ptitle .tick { border-color: var(--paper-soft); }
-:root[data-look="circuit"] .pcard .pbar, :root[data-look="neon"] .pcard .pbar, :root[data-look="hacker"] .pcard .pbar, :root[data-look="chalkboard"] .pcard .pbar, :root[data-look="space"] .pcard .pbar { background: rgba(255, 255, 255, 0.15); }
+:root[data-look="chalkboard"] .pcard .polaroid, :root[data-look="space"] .pcard .polaroid, :root[data-look="minimal"] .pcard .polaroid, :root[data-look="amber"] .pcard .polaroid, :root[data-look="ocean"] .pcard .polaroid { border: 0; border-radius: 6px; box-shadow: none; }
+:root[data-look="circuit"] .pcard .chip, :root[data-look="neon"] .pcard .chip, :root[data-look="hacker"] .pcard .chip, :root[data-look="chalkboard"] .pcard .chip, :root[data-look="space"] .pcard .chip, :root[data-look="amber"] .pcard .chip, :root[data-look="ocean"] .pcard .chip { background: rgba(255, 255, 255, 0.1); color: var(--paper-soft); }
+:root[data-look="circuit"] .pcard .chip.late, :root[data-look="neon"] .pcard .chip.late, :root[data-look="hacker"] .pcard .chip.late, :root[data-look="chalkboard"] .pcard .chip.late, :root[data-look="space"] .pcard .chip.late, :root[data-look="amber"] .pcard .chip.late, :root[data-look="ocean"] .pcard .chip.late { background: rgba(255, 110, 90, 0.2); color: #FFB4A8; }
+:root[data-look="circuit"] .pcard .chip.now, :root[data-look="neon"] .pcard .chip.now, :root[data-look="hacker"] .pcard .chip.now, :root[data-look="chalkboard"] .pcard .chip.now, :root[data-look="space"] .pcard .chip.now, :root[data-look="amber"] .pcard .chip.now, :root[data-look="ocean"] .pcard .chip.now { background: rgba(255, 200, 80, 0.2); color: #FFD98A; }
+:root[data-look="circuit"] .pcard .ptitle .tick, :root[data-look="neon"] .pcard .ptitle .tick, :root[data-look="hacker"] .pcard .ptitle .tick, :root[data-look="chalkboard"] .pcard .ptitle .tick, :root[data-look="space"] .pcard .ptitle .tick, :root[data-look="amber"] .pcard .ptitle .tick, :root[data-look="ocean"] .pcard .ptitle .tick { border-color: var(--paper-soft); }
+:root[data-look="circuit"] .pcard .pbar, :root[data-look="neon"] .pcard .pbar, :root[data-look="hacker"] .pcard .pbar, :root[data-look="chalkboard"] .pcard .pbar, :root[data-look="space"] .pcard .pbar, :root[data-look="amber"] .pcard .pbar, :root[data-look="ocean"] .pcard .pbar { background: rgba(255, 255, 255, 0.15); }
 :root[data-look="circuit"] .pcard.t-project::before, :root[data-look="city"] .pcard.t-project::before, :root[data-look="neon"] .pcard.t-project::before, :root[data-look="minimal"] .pcard.t-project::before,
-:root[data-look="hacker"] .pcard.t-project::before, :root[data-look="chalkboard"] .pcard.t-project::before, :root[data-look="space"] .pcard.t-project::before { display: none; }
+:root[data-look="hacker"] .pcard.t-project::before, :root[data-look="chalkboard"] .pcard.t-project::before, :root[data-look="space"] .pcard.t-project::before, :root[data-look="amber"] .pcard.t-project::before, :root[data-look="ocean"] .pcard.t-project::before { display: none; }
 
 /* Circuit board: green solder mask, gold-edged boards with mounting holes, copper traces with pads. */
 :root[data-look="circuit"] .cork { background-color: #0E3B27;
@@ -1015,7 +1015,7 @@ svg.drawing { display: block; width: 100%; height: auto; fill: none; stroke: non
 
 /* Drawings made on a board: no card, just the drawing, in an ink that shows on that board */
 :root { --sketch-ink: #26292E; --sketch-paper: #FFFEFA; }
-:root[data-mode="dark"], :root[data-look="blueprint"], :root[data-look="circuit"], :root[data-look="neon"], :root[data-look="hacker"], :root[data-look="chalkboard"], :root[data-look="space"] { --sketch-ink: #F2F1EC; --sketch-paper: rgba(16, 16, 20, 0.88); }
+:root[data-mode="dark"], :root[data-look="blueprint"], :root[data-look="circuit"], :root[data-look="neon"], :root[data-look="hacker"], :root[data-look="chalkboard"], :root[data-look="space"], :root[data-look="amber"], :root[data-look="ocean"] { --sketch-ink: #F2F1EC; --sketch-paper: rgba(16, 16, 20, 0.88); }
 :root[data-look] .pcard.sketch { padding: 0 !important; border: 0 !important; border-radius: 0; background: none !important; box-shadow: none !important; transform: none !important; color: var(--sketch-ink); }
 :root[data-look] .pcard.sketch::before, :root[data-look] .pcard.sketch::after { display: none !important; }
 .pcard.sketch .pdraw { margin: 0; border-radius: 0; box-shadow: none; overflow: visible; }
@@ -1173,7 +1173,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .pcard .psheet .sheettable td, .pcard .psheet .sheettable th { border-color: color-mix(in srgb, var(--paper-ink) 18%, transparent); padding: 0.12rem 0.35rem; max-width: 120px; }
 .pcard .psheet .sheettable th { background: color-mix(in srgb, var(--paper-ink) 8%, transparent); }
 .pcard .psheet .sheetmore { padding: 0 0.35rem 0.2rem; color: var(--paper-soft); font-size: 0.72rem; }
-:root[data-look="circuit"] .pcard .psheet, :root[data-look="neon"] .pcard .psheet, :root[data-look="hacker"] .pcard .psheet, :root[data-look="chalkboard"] .pcard .psheet, :root[data-look="space"] .pcard .psheet, :root[data-look="blueprint"] .pcard .psheet { background: rgba(255, 255, 255, 0.05); }
+:root[data-look="circuit"] .pcard .psheet, :root[data-look="neon"] .pcard .psheet, :root[data-look="hacker"] .pcard .psheet, :root[data-look="chalkboard"] .pcard .psheet, :root[data-look="space"] .pcard .psheet, :root[data-look="blueprint"] .pcard .psheet, :root[data-look="amber"] .pcard .psheet, :root[data-look="ocean"] .pcard .psheet { background: rgba(255, 255, 255, 0.05); }
 
 /* A file or link as a tile: its kind in colour, then its name. */
 .tile, .ptile { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.6rem; border-radius: 10px; border: 1px solid var(--line); background: var(--card); cursor: pointer; min-width: 0; }
@@ -1212,8 +1212,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; }
 .pcard .pmini.paper { border: 0; height: 52px; width: 40px; }
 .pcard .pmini img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
 :root[data-look="blueprint"] .pcard .pdoc, :root[data-look="blueprint"] .pcard .pmini { box-shadow: none; outline: 1px solid var(--bp-line); }
-:root[data-look="circuit"] .pcard .pdoc, :root[data-look="neon"] .pcard .pdoc, :root[data-look="hacker"] .pcard .pdoc, :root[data-look="chalkboard"] .pcard .pdoc, :root[data-look="space"] .pcard .pdoc, :root[data-look="minimal"] .pcard .pdoc { border-radius: 6px; box-shadow: none; filter: brightness(0.94); }
-:root[data-look="circuit"] .pcard .pmini, :root[data-look="neon"] .pcard .pmini, :root[data-look="hacker"] .pcard .pmini, :root[data-look="chalkboard"] .pcard .pmini, :root[data-look="space"] .pcard .pmini, :root[data-look="minimal"] .pcard .pmini { border: 0; border-radius: 4px; box-shadow: none; transform: none; }
+:root[data-look="circuit"] .pcard .pdoc, :root[data-look="neon"] .pcard .pdoc, :root[data-look="hacker"] .pcard .pdoc, :root[data-look="chalkboard"] .pcard .pdoc, :root[data-look="space"] .pcard .pdoc, :root[data-look="minimal"] .pcard .pdoc, :root[data-look="amber"] .pcard .pdoc, :root[data-look="ocean"] .pcard .pdoc { border-radius: 6px; box-shadow: none; filter: brightness(0.94); }
+:root[data-look="circuit"] .pcard .pmini, :root[data-look="neon"] .pcard .pmini, :root[data-look="hacker"] .pcard .pmini, :root[data-look="chalkboard"] .pcard .pmini, :root[data-look="space"] .pcard .pmini, :root[data-look="minimal"] .pcard .pmini, :root[data-look="amber"] .pcard .pmini, :root[data-look="ocean"] .pcard .pmini { border: 0; border-radius: 4px; box-shadow: none; transform: none; }
 
 /* (0.7.9) Picking how a file shows on the board: its page, with the part you drag across picked out. */
 .pvsheet .pvpage { position: relative; width: fit-content; max-width: 100%; margin: 0.4rem auto 0.6rem; overflow: hidden; background: #FFF; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
@@ -1488,3 +1488,214 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 
 /* (0.9.1) the widget script */
 .widcode { width: 100%; margin-top: 0.6rem; font: 0.72rem/1.35 ui-monospace, Menlo, Consolas, monospace; color: var(--soft); background: var(--hover); border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem; resize: vertical; }
+
+/* (0.9.2) Amber: the Hacker look in amber (made from its rules) */
+:root[data-look="amber"] { --pin-bg: #0B0803; --pin-edge: #FFB000; }
+:root[data-look="amber"] .cork { background-color: #0B0803;
+  background-image: radial-gradient(ellipse at 50% 50%, rgba(255, 176, 0, 0.05), transparent 70%), linear-gradient(rgba(255, 176, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(transparent, transparent), linear-gradient(90deg, rgba(255, 176, 0, 0.03) 1px, transparent 1px); }
+:root[data-look="amber"] .pcard { --paper-ink: #FFC266; --paper-soft: rgba(255, 194, 102, 0.66); --faint: rgba(255, 194, 102, 0.45); --check: #0B0803; --proj: #FFD98A; --hover: rgba(255, 176, 0, 0.08);
+  border-radius: 5px; padding: 32px 13px 12px; border: 1px solid #8A5A00; background: #120C04; font-family: var(--mono);
+  box-shadow: 0 0 0 1px rgba(255, 176, 0, 0.06), 0 10px 26px rgba(0, 0, 0, 0.6); }
+:root[data-look="amber"] .pcard::after { content: "note.txt"; position: absolute; left: 0; right: 0; top: 0; height: 21px; padding: 3px 8px 0 42px; border-bottom: 1px solid #8A5A00; border-radius: 4px 4px 0 0;
+  font-size: 10px; line-height: 1.5; color: rgba(255, 194, 102, 0.6); pointer-events: none;
+  background: radial-gradient(circle at 10px 10px, #FF5F57 3px, transparent 3.5px), radial-gradient(circle at 20px 10px, #FEBC2E 3px, transparent 3.5px), radial-gradient(circle at 30px 10px, #FFB000 3px, transparent 3.5px), #1C1306; }
+:root[data-look="amber"] .pcard.t-task::after { content: "todo.sh"; }
+:root[data-look="amber"] .pcard.t-project::after { content: "project/"; }
+:root[data-look="amber"] .pcard.t-task { border-top: 1px solid #8A5A00; padding-top: 32px; }
+:root[data-look="amber"] .pcard[class*=" c-"] { background: #120C04; box-shadow: inset 3px 0 0 var(--sticky), 0 10px 26px rgba(0, 0, 0, 0.6); }
+:root[data-look="amber"] .pcard .ptitle { font-size: 0.9rem; }
+:root[data-look="amber"] .pcard .ptitle span::before { content: "> "; color: #FFB000; }
+:root[data-look="amber"] .pcard .tick { border-radius: 3px; border-color: #FFB000; }
+:root[data-look="amber"] .pcard .tick.done { background: #FFB000; }
+:root[data-look="amber"] .pcard .pbar i { background: #FFB000; }
+:root[data-look="amber"] .pcard .pin { top: 50%; }
+:root[data-look="amber"] .pbanner { color: #FFB000; font-family: var(--mono); justify-items: start; text-align: left; padding: 0.55rem 1.2rem 0.6rem; background: rgba(0, 0, 0, 0.65); border: 1px solid #8A5A00; border-radius: 4px; }
+:root[data-look="amber"] .pbanner .bcap { display: block; font-size: 0; }
+:root[data-look="amber"] .pbanner .bcap::before { content: "root@braintree:~$ open project"; font-size: 0.78rem; opacity: 0.7; }
+:root[data-look="amber"] .pbanner .btitle { font-size: 1.8rem; font-weight: 700; }
+:root[data-look="amber"] .pbanner .btitle::after { content: "▌"; margin-left: 0.12em; animation: bt-blink 1.1s steps(1) infinite; }
+:root[data-look="amber"] .frame { border: 1px dashed rgba(255, 176, 0, 0.55); border-radius: 0; background: rgba(255, 176, 0, 0.025); }
+:root[data-look="amber"] .fhead { top: -13px; left: 14px; height: 26px; padding: 0 2.4rem 0 0.5rem; background: #0B0803; color: #FFB000; font-family: var(--mono); font-size: 0.85rem; }
+:root[data-look="amber"] .fhead .fname::before { content: "[ "; }
+:root[data-look="amber"] .fhead .fname::after { content: " ]"; }
+:root[data-look="amber"] .fsize { background: linear-gradient(135deg, transparent 50%, rgba(255, 176, 0, 0.6) 50%); border-radius: 0; }
+:root[data-look="amber"] .strings .pipe { stroke-width: 1.6; stroke-dasharray: 6 4; stroke-linecap: butt; stroke-linejoin: miter; }
+:root[data-look="amber"] .strings .slabel rect { fill: #0B0803; }
+:root[data-look="amber"] .strings .slabel text { fill: #FFB000; font-family: var(--mono); font-size: 11px; }
+
+/* ---------- (0.9.2) Board looks for the newer themes ----------
+   Each draws its strings the way an older look does (board.js LOOK_BASE): Ocean and Sakura curve
+   like Neon, Postcards runs like Minimal, Café like Notebook, Frost like Blueprint, Newsprint like
+   Whiteboard, Amber like Hacker (Amber's rules are Hacker's with the colours changed, above). */
+:root[data-look="ocean"] { --pin-bg: #0B3442; --pin-edge: #8FE9EE; }
+:root[data-look="sunset"] { --pin-bg: #FFFDF8; --pin-edge: #E8623A; }
+:root[data-look="sakura"] { --pin-bg: #FFFFFF; --pin-edge: #E0568A; }
+:root[data-look="mocha"] { --pin-bg: #3B2A20; --pin-edge: #C9A27A; }
+:root[data-look="arctic"] { --pin-bg: #FFFFFF; --pin-edge: #4C7FCC; }
+:root[data-look="newspaper"] { --pin-bg: #F9F6EE; --pin-edge: #1A1A1A; }
+:root[data-look="mocha"], :root[data-look="ocean"], :root[data-look="amber"] { --sketch-ink: #F2F1EC; --sketch-paper: rgba(16, 16, 20, 0.88); }
+
+/* Ocean: deep water, cards like sea glass, lines curving through the water. */
+:root[data-look="ocean"] .cork { background-color: #0B3442;
+  background-image: radial-gradient(ellipse at 20% -10%, rgba(143, 233, 238, 0.22), transparent 55%), radial-gradient(ellipse at 85% 110%, rgba(0, 10, 20, 0.45), transparent 60%),
+    repeating-radial-gradient(circle at 50% 130%, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 44px); }
+:root[data-look="ocean"][data-mode="dark"] .cork { background-color: #072630; }
+:root[data-look="ocean"] .pcard { --paper-ink: #EAFBFC; --paper-soft: rgba(234, 251, 252, 0.74); --faint: rgba(234, 251, 252, 0.5); --check: #0B3442; --proj: #A8DCFF;
+  border-radius: 16px; padding: 16px 14px 13px; background: rgba(160, 230, 240, 0.13); border: 1px solid rgba(160, 230, 240, 0.38); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32); color: var(--paper-ink); }
+:root[data-look="ocean"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 24%, rgba(11, 52, 66, 0.92)); border-color: color-mix(in srgb, var(--sticky) 70%, transparent); }
+:root[data-look="ocean"] .pcard.t-task { border-top: 1px solid rgba(160, 230, 240, 0.38); padding-top: 16px; box-shadow: inset 4px 0 0 #8FE9EE, 0 10px 26px rgba(0, 0, 0, 0.32); }
+:root[data-look="ocean"] .pcard.t-project { border: 2px solid rgba(143, 233, 238, 0.75); }
+:root[data-look="ocean"] .pcard.t-project::before { display: none; }
+:root[data-look="ocean"] .pcard .pbar i { background: #8FE9EE; }
+:root[data-look="ocean"] .pbanner { color: #EAFBFC; }
+:root[data-look="ocean"] .pbanner .btitle { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.01em; text-shadow: 0 2px 18px rgba(143, 233, 238, 0.45); }
+:root[data-look="ocean"] .pbanner .bsub { color: #8FE9EE; opacity: 0.9; }
+:root[data-look="ocean"] .frame { border: 1.5px solid rgba(143, 233, 238, 0.4); border-radius: 26px; background: color-mix(in srgb, var(--sticky) 9%, rgba(143, 233, 238, 0.04)); }
+:root[data-look="ocean"] .fhead { top: 8px; left: 12px; height: 32px; color: #8FE9EE; font-size: 0.82rem; letter-spacing: 0.1em; text-transform: uppercase; }
+:root[data-look="ocean"] .frame[class*=" c-"] .fhead { color: color-mix(in srgb, var(--sticky) 70%, #FFFFFF); }
+:root[data-look="ocean"] .strings .tube { stroke: var(--wire); stroke-width: 2.6; }
+:root[data-look="ocean"] .strings .tube.glow { stroke-width: 9; opacity: 0.16; filter: none; }
+:root[data-look="ocean"] .strings .shead { fill: var(--wire); }
+:root[data-look="ocean"] .strings .slabel rect { fill: #0B3442; stroke: rgba(143, 233, 238, 0.6); stroke-width: 1.4; }
+:root[data-look="ocean"] .strings .slabel text { fill: #EAFBFC; }
+
+/* Postcards: a sunset sky, cards as white-bordered postcards, routes as dotted flight paths. */
+:root[data-look="sunset"] .cork { background-color: #F08A6C;
+  background-image: radial-gradient(circle at 78% 26%, rgba(255, 240, 180, 0.95) 0 54px, rgba(255, 225, 160, 0.3) 56px 130px, transparent 132px),
+    linear-gradient(180deg, #FFC48F 0%, #FF9468 36%, #D65F7A 70%, #6A3F7E 100%); }
+:root[data-look="sunset"][data-mode="dark"] .cork { background-image: radial-gradient(circle at 78% 30%, rgba(255, 200, 150, 0.55) 0 44px, rgba(255, 180, 140, 0.15) 46px 120px, transparent 122px),
+    linear-gradient(180deg, #8C4A5E 0%, #6A3555 40%, #3A2550 75%, #1C1530 100%); }
+:root[data-look="sunset"] .pcard { --paper-ink: #3A2320; --paper-soft: #7A5A4D;
+  border-radius: 3px; padding: 14px 13px 12px; background: #FFFDF8; border: 6px solid #FFFDF8; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05), 0 10px 24px rgba(70, 20, 40, 0.35); }
+:root[data-look="sunset"] .pcard.t-task { border-top: 6px solid #FFFDF8; box-shadow: inset 0 3px 0 #E8623A, 0 10px 24px rgba(70, 20, 40, 0.35); padding-top: 16px; }
+:root[data-look="sunset"] .pcard.t-project { background: #FFF2E2; border-color: #FFF2E2; padding-top: 14px; }
+:root[data-look="sunset"] .pcard.t-project::before { display: none; }
+:root[data-look="sunset"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 30%, #FFFDF8); }
+:root[data-look="sunset"] .pcard .ptitle { font-weight: 700; }
+:root[data-look="sunset"] .pcard .pbar i { background: #E8623A; }
+:root[data-look="sunset"] .pbanner { color: #FFF8EC; }
+:root[data-look="sunset"] .pbanner .bcap { display: block; font-size: 0; }
+:root[data-look="sunset"] .pbanner .bcap::before { content: "Greetings from"; font-size: 0.85rem; font-style: italic; letter-spacing: 0.08em; }
+:root[data-look="sunset"] .pbanner .btitle { font-size: 2.6rem; font-weight: 900; letter-spacing: -0.01em; text-shadow: 0 3px 0 #C9577A, 0 8px 20px rgba(60, 10, 40, 0.3); }
+:root[data-look="sunset"] .frame { border: 2px dashed rgba(255, 248, 236, 0.8); border-radius: 18px; background: color-mix(in srgb, var(--sticky) 16%, rgba(255, 248, 236, 0.12)); }
+:root[data-look="sunset"] .fhead { top: 8px; left: 12px; height: 32px; color: #FFF8EC; font-weight: 800; text-shadow: 0 1px 6px rgba(80, 20, 40, 0.45); }
+:root[data-look="sunset"] .strings .thin { stroke-width: 2.2; stroke-dasharray: 2 7; stroke-linecap: round; }
+:root[data-look="sunset"] .strings .slabel rect { fill: #FFFDF8; stroke: none; }
+:root[data-look="sunset"] .strings .slabel text { fill: #A0452E; font-weight: 700; }
+
+/* Sakura: soft pink paper with falling petals, rounded cards, ribbons. */
+:root[data-look="sakura"] .cork { background-color: #FDEEF3; background-size: 260px 260px;
+  background-image: radial-gradient(6px 3.5px at 30px 40px, rgba(244, 143, 177, 0.6) 96%, transparent 100%), radial-gradient(3.5px 6px at 170px 90px, rgba(248, 187, 208, 0.8) 96%, transparent 100%),
+    radial-gradient(5px 3px at 110px 200px, rgba(244, 143, 177, 0.5) 96%, transparent 100%), radial-gradient(3.5px 5px at 230px 230px, rgba(248, 187, 208, 0.7) 96%, transparent 100%),
+    radial-gradient(4px 2.5px at 70px 150px, rgba(236, 120, 160, 0.35) 96%, transparent 100%); }
+:root[data-look="sakura"][data-mode="dark"] .cork { background-color: #2A1A22; }
+:root[data-look="sakura"] .pcard { --paper-ink: #3A1F2C; --paper-soft: #8A6273;
+  transform: none; border-radius: 18px; padding: 16px 15px 13px; background: #FFFFFF; border: 1.5px solid #F8C8D8; box-shadow: 0 8px 20px rgba(217, 72, 122, 0.14); font-family: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', var(--font); }
+:root[data-look="sakura"] .pcard.t-task { border-top: 1.5px solid #F8C8D8; padding-top: 16px; box-shadow: inset 0 4px 0 #F48FB1, 0 8px 20px rgba(217, 72, 122, 0.14); }
+:root[data-look="sakura"] .pcard.t-project { background: #FFF0F5; }
+:root[data-look="sakura"] .pcard.t-project::before { display: none; }
+:root[data-look="sakura"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 24%, #FFFFFF); }
+:root[data-look="sakura"] .pcard .tick.done { background: #E0568A; border-color: #E0568A; }
+:root[data-look="sakura"] .pcard .pbar i { background: #F48FB1; }
+:root[data-look="sakura"] .pbanner { color: #B83266; font-family: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', var(--font); }
+:root[data-look="sakura"][data-mode="dark"] .pbanner { color: #FFB3CC; }
+:root[data-look="sakura"] .pbanner .btitle { font-size: 2.4rem; font-weight: 800; }
+:root[data-look="sakura"] .pbanner .btitle::before, :root[data-look="sakura"] .pbanner .btitle::after { content: "✿"; color: #F48FB1; font-size: 0.6em; vertical-align: 0.35em; margin: 0 0.35em; }
+:root[data-look="sakura"] .frame { border: 2px solid #F8BBD0; border-radius: 30px; background: color-mix(in srgb, var(--sticky) 12%, rgba(255, 255, 255, 0.5)); }
+:root[data-look="sakura"][data-mode="dark"] .frame { background: color-mix(in srgb, var(--sticky) 10%, rgba(255, 255, 255, 0.06)); }
+:root[data-look="sakura"] .fhead { top: -15px; left: 20px; height: 30px; padding: 0 2.4rem 0 0.9rem; border-radius: 15px; background: #FFFFFF; border: 1.5px solid #F8BBD0; color: #B83266;
+  font-family: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', var(--font); font-size: 0.95rem; }
+:root[data-look="sakura"] .strings .tube { stroke: var(--wire); stroke-width: 3.4; }
+:root[data-look="sakura"] .strings .tube.glow { stroke: #FFFFFF; stroke-width: 8; opacity: 0.95; filter: none; }
+:root[data-look="sakura"][data-mode="dark"] .strings .tube.glow { stroke: #4A2A38; }
+:root[data-look="sakura"] .strings .shead { fill: var(--wire); }
+:root[data-look="sakura"] .strings .slabel rect { fill: #FFFFFF; stroke: #F8BBD0; stroke-width: 1.5; }
+:root[data-look="sakura"] .strings .slabel text { fill: #B83266; font-family: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', var(--font); }
+
+/* Café: a dark wooden wall, kraft-paper tags and receipts, twine, a menu-board banner. */
+:root[data-look="mocha"] .cork { background-color: #3B2A20;
+  background-image: radial-gradient(ellipse at 50% -10%, rgba(255, 220, 170, 0.14), transparent 60%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 11px, rgba(0, 0, 0, 0.05) 11px 13px, transparent 13px 29px); }
+:root[data-look="mocha"][data-mode="dark"] .cork { background-color: #2B1F17; }
+:root[data-look="mocha"] .pcard { --paper-ink: #3A2A1E; --paper-soft: rgba(58, 42, 30, 0.72); --faint: rgba(58, 42, 30, 0.5);
+  border-radius: 2px; padding: 16px 14px 13px; background: #D9BC94; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 10px 22px rgba(0, 0, 0, 0.45); font-family: ui-serif, 'New York', Georgia, serif; }
+:root[data-look="mocha"] .pcard.t-task { background: #F4EBDD; border-top: 2px dashed rgba(90, 60, 40, 0.45); padding-top: 15px; }
+:root[data-look="mocha"] .pcard.t-project { background: #C4A074; }
+:root[data-look="mocha"] .pcard.t-project::before { background: #C4A074; }
+:root[data-look="mocha"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 32%, #D9BC94); }
+:root[data-look="mocha"] .pcard .ptitle { font-weight: 700; }
+:root[data-look="mocha"] .pcard .pbar i { background: #6B4226; }
+:root[data-look="mocha"] .pbanner { color: #F3E6D3; font-family: ui-serif, 'New York', Georgia, serif; padding: 0.5rem 2rem 0.6rem; border-top: 2px solid rgba(243, 230, 211, 0.55); border-bottom: 2px solid rgba(243, 230, 211, 0.55); }
+:root[data-look="mocha"] .pbanner .bcap { display: block; font-size: 0; }
+:root[data-look="mocha"] .pbanner .bcap::before { content: "Today’s special"; font-size: 0.82rem; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.75; }
+:root[data-look="mocha"] .pbanner .btitle { font-size: 2.4rem; font-weight: 700; font-style: italic; }
+:root[data-look="mocha"] .frame { border: 2px solid rgba(243, 230, 211, 0.32); border-radius: 10px; background: color-mix(in srgb, var(--sticky) 10%, rgba(243, 230, 211, 0.04)); }
+:root[data-look="mocha"] .fhead { top: 6px; left: 12px; height: 34px; color: #F3E6D3; font-family: ui-serif, 'New York', Georgia, serif; font-style: italic; font-size: 1.2rem; }
+:root[data-look="mocha"] .strings .pen { stroke-width: 3; stroke-dasharray: 9 2; }
+:root[data-look="mocha"] .strings .slabel rect { fill: #F4EBDD; stroke: none; }
+:root[data-look="mocha"] .strings .slabel text { fill: #3A2A1E; font-family: ui-serif, 'New York', Georgia, serif; font-style: italic; }
+
+/* Frost: snow-blue and still, frosted panels, crisp lines. */
+:root[data-look="arctic"] .cork { background-color: #E6EFF6; background-size: auto, 38px 38px, 61px 61px;
+  background-image: linear-gradient(160deg, #F6FAFC 0%, #DCE8F2 100%), radial-gradient(circle, rgba(255, 255, 255, 0.95) 1.3px, transparent 1.9px), radial-gradient(circle, rgba(120, 165, 210, 0.3) 0.9px, transparent 1.4px); }
+:root[data-look="arctic"][data-mode="dark"] .cork { background-color: #161C26; background-image: linear-gradient(160deg, #1F2733 0%, #121822 100%), radial-gradient(circle, rgba(220, 235, 255, 0.35) 1.2px, transparent 1.8px), radial-gradient(circle, rgba(136, 192, 208, 0.18) 0.9px, transparent 1.4px); }
+:root[data-look="arctic"] .pcard { --paper-ink: #1E2633; --paper-soft: #5E6B7D;
+  transform: none; border-radius: 10px; padding: 15px 14px 13px; background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(160, 195, 230, 0.85); box-shadow: inset 0 1px 0 #FFFFFF, 0 8px 20px rgba(60, 100, 150, 0.16); }
+:root[data-look="arctic"] .pcard.t-task { border-top: 3px solid #88C0D0; padding-top: 14px; }
+:root[data-look="arctic"] .pcard.t-project { border: 2px solid #5E81AC; }
+:root[data-look="arctic"] .pcard.t-project::before { display: none; }
+:root[data-look="arctic"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 22%, rgba(255, 255, 255, 0.85)); }
+:root[data-look="arctic"] .pcard .pbar i { background: #4C7FCC; }
+:root[data-look="arctic"][data-mode="dark"] .pcard { --paper-ink: #E5E9F0; --paper-soft: rgba(229, 233, 240, 0.72); --faint: rgba(229, 233, 240, 0.5); --hover: rgba(255, 255, 255, 0.08); --check: #272D3A;
+  background: rgba(39, 45, 58, 0.92); border-color: rgba(136, 192, 208, 0.35); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35); }
+:root[data-look="arctic"][data-mode="dark"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 18%, rgba(39, 45, 58, 0.95)); }
+:root[data-look="arctic"][data-mode="dark"] .pcard .chip { background: rgba(255, 255, 255, 0.1); color: var(--paper-soft); }
+:root[data-look="arctic"][data-mode="dark"] .pcard .ptitle .tick { border-color: var(--paper-soft); }
+:root[data-look="arctic"] .pbanner { color: #2E4A6B; }
+:root[data-look="arctic"][data-mode="dark"] .pbanner { color: #D8E6F3; }
+:root[data-look="arctic"] .pbanner .btitle { font-size: 2.3rem; font-weight: 800; letter-spacing: -0.02em; }
+:root[data-look="arctic"] .pbanner .btitle::before { content: "❄ "; color: #88C0D0; }
+:root[data-look="arctic"] .frame { border: 1.5px solid rgba(94, 129, 172, 0.45); border-radius: 14px; background: color-mix(in srgb, var(--sticky) 10%, rgba(255, 255, 255, 0.35)); }
+:root[data-look="arctic"][data-mode="dark"] .frame { background: color-mix(in srgb, var(--sticky) 8%, rgba(255, 255, 255, 0.03)); border-color: rgba(136, 192, 208, 0.35); }
+:root[data-look="arctic"] .fhead { top: 6px; left: 12px; height: 32px; color: #3D5A80; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; }
+:root[data-look="arctic"][data-mode="dark"] .fhead { color: #88C0D0; }
+:root[data-look="arctic"] .strings .rule { stroke-width: 1.8; stroke-linecap: round; }
+:root[data-look="arctic"] .strings .slabel rect { fill: #FFFFFF; stroke: rgba(94, 129, 172, 0.4); }
+:root[data-look="arctic"] .strings .slabel text { fill: #2E4A6B; }
+:root[data-look="arctic"][data-mode="dark"] .strings .slabel rect { fill: #272D3A; stroke: rgba(136, 192, 208, 0.4); }
+:root[data-look="arctic"][data-mode="dark"] .strings .slabel text { fill: #D8E6F3; }
+
+/* Newsprint: newspaper columns, clippings, a masthead, the editor's red pen. */
+:root[data-look="newspaper"] .cork { background-color: #EFEBE1; background-size: 240px 100%, 7px 7px;
+  background-image: linear-gradient(90deg, transparent 0 238px, rgba(0, 0, 0, 0.07) 238px 240px), radial-gradient(circle, rgba(0, 0, 0, 0.05) 0.6px, transparent 1px); }
+:root[data-look="newspaper"][data-mode="dark"] .cork { background-color: #1E1D1A; background-image: linear-gradient(90deg, transparent 0 238px, rgba(255, 255, 255, 0.06) 238px 240px), radial-gradient(circle, rgba(255, 255, 255, 0.04) 0.6px, transparent 1px); }
+:root[data-look="newspaper"] .pcard { --paper-ink: #1A1A1A; --paper-soft: #57534B;
+  border-radius: 0; padding: 15px 14px 13px; background: #F9F6EE; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.18), 0 6px 14px rgba(0, 0, 0, 0.14); font-family: ui-serif, 'New York', Georgia, serif; }
+:root[data-look="newspaper"] .pcard .ptitle { font-weight: 800; font-size: 1.05rem; border-bottom: 1px solid #1A1A1A; padding-bottom: 4px; }
+:root[data-look="newspaper"] .pcard.t-task { border-top: 0; padding-top: 15px; }
+:root[data-look="newspaper"] .pcard.t-task .ptitle { border-bottom: 0; padding-bottom: 0; }
+:root[data-look="newspaper"] .pcard .tick { border-radius: 2px; border-color: #1A1A1A; }
+:root[data-look="newspaper"] .pcard .tick.done { background: #1A1A1A; }
+:root[data-look="newspaper"] .pcard.t-project { background: #F9F6EE; border-top: 5px double #1A1A1A; }
+:root[data-look="newspaper"] .pcard.t-project::before { display: none; }
+:root[data-look="newspaper"] .pcard[class*=" c-"] { background: color-mix(in srgb, var(--sticky) 22%, #F9F6EE); }
+:root[data-look="newspaper"] .pcard .pbar i { background: #1A1A1A; }
+:root[data-look="newspaper"] .pbanner { color: #111111; font-family: 'Old English Text MT', 'UnifrakturMaguntia', ui-serif, Georgia, serif; padding: 0.35rem 2.2rem 0.45rem; border-top: 4px double #111111; border-bottom: 4px double #111111; }
+:root[data-look="newspaper"][data-mode="dark"] .pbanner { color: #ECE8DF; border-color: #ECE8DF; }
+:root[data-look="newspaper"] .pbanner .bcap { display: block; font-size: 0; }
+:root[data-look="newspaper"] .pbanner .bcap::before { content: "The Brain Tree Times · Late edition"; font-family: ui-serif, Georgia, serif; font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase; }
+:root[data-look="newspaper"] .pbanner .btitle { font-size: 3rem; font-weight: 700; }
+:root[data-look="newspaper"] .pbanner .bsub { font-family: ui-serif, Georgia, serif; text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.72rem; }
+:root[data-look="newspaper"] .frame { border: 1px solid #1A1A1A; border-radius: 0; background: color-mix(in srgb, var(--sticky) 9%, rgba(255, 255, 255, 0.25)); }
+:root[data-look="newspaper"] .fhead { top: -1px; left: -1px; height: 30px; padding: 0 2.4rem 0 0.7rem; background: #1A1A1A; color: #F4F1EA; font-family: ui-serif, Georgia, serif; font-size: 0.8rem; letter-spacing: 0.14em; text-transform: uppercase; }
+:root[data-look="newspaper"][data-mode="dark"] .frame { border-color: #CFCAC0; background: color-mix(in srgb, var(--sticky) 7%, rgba(255, 255, 255, 0.03)); }
+:root[data-look="newspaper"][data-mode="dark"] .fhead { background: #CFCAC0; color: #161513; }
+:root[data-look="newspaper"] .fsize { border-radius: 0; }
+:root[data-look="newspaper"] .strings .marker { stroke-width: 2.6; opacity: 0.9; }
+:root[data-look="newspaper"] .strings .slabel rect { fill: #F9F6EE; stroke: #B3261E; stroke-width: 1.2; }
+:root[data-look="newspaper"] .strings .slabel text { fill: #B3261E; font-family: ui-serif, Georgia, serif; font-style: italic; font-weight: 700; }
+/* (0.9.2) these backgrounds are whole pictures or their own patterns, not the board's 220 px tiles */
+:root[data-look="ocean"] .cork, :root[data-look="sunset"] .cork, :root[data-look="mocha"] .cork { background-size: 100% 100% !important; background-position: 0 0 !important; }
+:root[data-look="sakura"] .cork { background-size: 260px 260px !important; }
+:root[data-look="arctic"] .cork { background-size: 100% 100%, 38px 38px, 61px 61px !important; background-position: 0 0, 0 0, 19px 13px !important; }
+:root[data-look="newspaper"] .cork { background-size: 240px 100%, 7px 7px !important; background-position: 0 0 !important; }

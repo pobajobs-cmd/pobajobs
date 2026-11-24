@@ -48,7 +48,18 @@ const WORDS = {
   hacker: words('Pipe one into the other', 'Pipe killed.', 'Piped.'),
   chalkboard: words('Chalk an arrow', 'Arrow wiped off.', 'Arrow chalked.'),
   space: words('Join the stars', 'Constellation broken.', 'Stars joined.'),
+  // (0.9.2) the looks that go with the newer themes
+  ocean: words('Throw a line', 'Line reeled in.', 'Line thrown.'),
+  sunset: words('Plot a route', 'Route cancelled.', 'Route plotted.'),
+  sakura: words('Tie a ribbon', 'Ribbon untied.', 'Ribbon tied.'),
+  mocha: words('Tie with twine', 'Twine snipped.', 'Tied with twine.'),
+  arctic: words('Draw a line', 'Line melted away.', 'Line drawn.'),
+  newspaper: words('Mark it up', 'Mark struck out.', 'Marked up.'),
+  amber: words('Pipe one into the other', 'Pipe killed.', 'Piped.'),
 };
+// (0.9.2) Each newer look draws its strings the way an older one does (smooth curves, a pen line,
+// right angles…) and has its own colours, cards, sections and banner in styles.css.
+const LOOK_BASE = { ocean: 'neon', sunset: 'minimal', sakura: 'neon', mocha: 'notebook', arctic: 'blueprint', newspaper: 'whiteboard', amber: 'hacker' };
 function words(tie, cut, done) {
   return { ...TIE, tie, cut, done, hint: 'Drag the dot on a card’s edge onto another card, or tap String, to tie them together.' };
 }
@@ -127,8 +138,9 @@ export function createBoard(host, api) {
   const shown = new Map();             // (0.7.6) 'from|to' -> the string as drawn (its corners in .pts)
   let selString = null;                // (0.7.6) the string showing its dots to shape it by
   let viaDraft = null, lastViaTap = null;   // (the shape while it's being dragged; a tap on a dot, for double-taps)
-  const look = () => (api.style() in WORDS ? api.style() : 'corkboard');
-  const words = () => WORDS[look()];
+  // (the look's way of drawing strings; its words are its own)
+  const look = () => { const s = api.style(); return LOOK_BASE[s] || (s in WORDS ? s : 'corkboard'); };
+  const words = () => WORDS[api.style()] || WORDS[look()];
   const isFrame = id => frameIds.has(id);
   // Each card's size on this board (data.cork[key].s, 1 = normal); it grows from its top-left corner.
   const scales = new Map();
