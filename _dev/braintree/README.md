@@ -285,6 +285,16 @@ The user asked for an iceberg theme for iceberg-meme charts (tiers from the well
 - **Iceberg theme** (app colours icy blue; its boards are Frost, since an iceberg drawn round ordinary sections makes no sense: iceberg charts carry their own look).
 - Tested headless (Edge): making a chart through + → Iceberg chart, filling the tiers, arranging, desktop and phone; leaving the board puts the usual look back; the dive recording's eight shots. Not tested: playing the dive to a video on the iPhone.
 
+## 0.9.5 Theme packs, and fixing the weak pairings
+
+The user said to build all of the proposed theme packs and fixes ("Go for all you can").
+
+- **Packs** (theme.js THEMES; app-wide CSS under "Theme packs" keyed on `html[data-theme]`): **Case file** (typewriter font, manila folder bands, OVERDUE stamped on late dates, square ticks, red thread on the timeline, the Corkboard board typed with a case label; new recordings start on the Crime look via `boardApi.recLook`), **Studio** (Studio board, track-header bands, timecode-style dates, the timeline as tracks with a red playhead), **Workshop** (Workshop board, stencilled headings, hazard-striped bands, monospaced costs, hazard stripes on late timeline bars), **Field notes** (Notebook board, dotted pages, handwritten headings, square boxes crossed when done), **Night sky** (Dusk renamed, same id: deep indigo, Space board, stars in the side panel, a glowing today line), **Seasons** (Sakura in spring, Sunset/Golden hour in summer, Forest/Woodland in autumn, Arctic/Frost in winter, by the month: `theme.season()`, `realLook`, `realTheme`; `html[data-theme]` and `[data-look]` are the month's).
+- **New looks** (board.js LOOK_BASE, CSS): **Studio** (Neon's curves: coloured cables with a dark sheath; storyboard cards numbered SHOT 01… by a CSS counter; film-strip sections; a clapperboard banner), **Workshop** (Blueprint's right angles in orange cable; a pegboard; manila tags with a hole; dashed shadow-board sections with a stencilled yellow sign), **Woodland** (Notebook's pen as vines; moss and dappled light; parchment; wooden signs; leaves drifting), **Golden hour** (Minimal's lines; a low sun in a warm sky pinned to the board, dusk in dark mode; long warm shadows; dust in the light).
+- **Fixes**: Forest → Woodland (not Chalkboard); Sunset → Golden hour (not Postcards, which stays as a look); Sakura at night (dark plum cards, lanterns, instead of white cards on mud); Newsprint stays newsprint in dark mode; Amber is its own old monitor (glowing text, scan lines, a dark bezel, a faint flicker; still under Moving/Still); Café loses "Today's special".
+- New fonts: Typewriter and Handwritten (Settings → Text style).
+- Tested headless (Edge): every pack's board, Case file / Studio / Workshop / Field notes / Night sky lists, Studio's timeline, Golden hour light and dark, Sakura at night, Amber, Newsprint in dark mode, Seasons resolving to Woodland in November. Not tested on the iPhone.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
