@@ -51,6 +51,7 @@
 //                   Night sky, Seasons) that style the lists, timeline and recordings as well as the board
 //   0.9.6           (nothing new to show: a long Late list in the weekly review folds after 8; Iceberg is
 //                   offered per board, not for every board)
+//   0.9.7           (nothing new to show: realistic textures on several looks, pictures that don't flash)
 
 import { clipDivHTML } from './media.js';
 import { drawDivHTML, drawingBox } from './draw.js';

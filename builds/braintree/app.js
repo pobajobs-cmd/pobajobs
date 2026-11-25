@@ -21,7 +21,7 @@ import { createTimeline } from './timeline.js';
 import * as remind from './remind.js';
 import { widgetScript } from './widget.js';
 
-const VERSION = '0.9.6';
+const VERSION = '0.9.7';
 const $ = (sel, el = document) => el.querySelector(sel);
 const TYPE_NAMES = { task: 'To-do', note: 'Note', project: 'Project', section: 'Section' };
 const SMART = [
@@ -1999,7 +1999,7 @@ async function settingsModal(focus) {
       <div class="setrow"><span>Text style</span>${seg('font', Object.fromEntries(Object.entries(theme.FONTS).map(([k, f]) => [k, `<span style="font-family:${f.stack.replace(/"/g, "'")}">${f.name}</span>`])))}</div>
       <div class="setrow"><span>Text size</span>${seg('size', { small: 'Small', normal: 'Normal', large: 'Large' })}</div>
       <h3>Boards</h3>
-      <div class="lookpick">${Object.entries(theme.LOOKS).filter(([id]) => id !== 'iceberg' || p.look === 'iceberg').map(([id, l]) => `
+      <div class="lookpick">${Object.entries(theme.LOOKS).map(([id, l]) => `
         <button data-pick-look="${id}" class="${p.look === id ? 'on' : ''}">${lookPreview(id)}<span>${l.name}</span></button>`).join('')}</div>
       <div class="setrow"><span>String colour</span><span class="colour"><input type="color" data-colour="string" value="${theme.wireColour(p, dark)}" aria-label="String colour"><button data-reset="string" class="link" ${p.string ? '' : 'hidden'}>Use the look’s</button></span></div>
       <div class="setrow"><span>Backgrounds</span>${seg('motion', { on: 'Moving', off: 'Still' })}</div>

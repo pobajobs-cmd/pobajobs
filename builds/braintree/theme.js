@@ -75,7 +75,7 @@ export const THEMES = [
   { id: 'seasons', name: 'Seasons', look: 'seasons',
     light: { bg: '#FFF6F8', side: '#FBEAF0', card: '#FFFFFF', ink: '#2E1B24', soft: '#7D5F6D', accent: '#7A9A3A', string: '#C0392B', on: '#FFFFFF', proj: '#5D7FC4', ok: '#3C8D5A' },
     dark: { bg: '#1B1A16', side: '#141310', card: '#26241E', ink: '#F0EBDD', soft: '#B5AE98', accent: '#C9A23A', string: '#E8705E', on: '#1A1203', proj: '#94B4F0', ok: '#6CC28A' } },
-  { id: 'iceberg', name: 'Iceberg', look: 'arctic',   // 0.9.4 (boards: Frost; iceberg charts have the Iceberg look on their own boards)
+  { id: 'iceberg', name: 'Iceberg', look: 'iceberg',   // 0.9.4 (0.9.7: its boards are icebergs again: sections are the tiers)
     light: { bg: '#F2F8FC', side: '#E4EFF6', card: '#FFFFFF', ink: '#0F2233', soft: '#557086', accent: '#1F7AB8', string: '#D6455D', on: '#FFFFFF', proj: '#1D5C8C', ok: '#2F8A6E' },
     dark: { bg: '#071522', side: '#050F19', card: '#0E2133', ink: '#E3F1FA', soft: '#8FB0C6', accent: '#6CC3F0', string: '#FF7088', on: '#04121D', proj: '#8DC8F0', ok: '#5CC2A0' } },
   { id: 'amber', name: 'Amber terminal', look: 'amber', font: 'mono',

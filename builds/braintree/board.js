@@ -26,6 +26,7 @@ import { previewKind, KIND_ASPECT } from './preview.js';
 import { TRANS_NAMES, FX, LOOKS, SIZES, timeline, totalTime, openPlayer } from './record.js';
 import { terms, matchItem } from './search.js';
 import { money, costOf, tagChips } from './plan.js';
+import { texture } from './textures.js';
 
 const CARD_W = 220, GAP = 28, PAD = 24, HEAD = 46;
 const SECTION_W = 2 * PAD + 2 * CARD_W + GAP, SECTION_H = 320;
@@ -140,6 +141,11 @@ export function createBoard(host, api) {
   let tieOnce = false;                 // String mode just for one branch (from a string's Branch button)
   let sketching = null;                // a drawing on the board being changed (its card is hidden meanwhile)
   const isSketch = r => !!r?.data.sketch;
+  const picSrc = new Map();   // (0.9.7) pictures on cards already loaded: 'thumb'|'docpv' + id → address
+  // (0.9.7) the textures a look's background is made of (textures.js), made the first time it's shown
+  const TEX = { woodland: ['moss'], ocean: ['caustic'], mocha: ['wood'], workshop: ['peg'], newspaper: ['paper'], arctic: ['snow'], space: ['nebula'], iceberg: ['caustic'] };
+  const texDone = new Set();
+  function lookTextures() { for (const n of TEX[api.style()] || []) if (!texDone.has(n)) { texDone.add(n); cork.style.setProperty('--tex-' + n, `url(${texture(n)})`); } }
   const junctions = new Map();         // 'from|to' -> where that string's label (and its branches) sit
   const shown = new Map();             // (0.7.6) 'from|to' -> the string as drawn (its corners in .pts)
   let selString = null;                // (0.7.6) the string showing its dots to shape it by
@@ -788,9 +794,13 @@ export function createBoard(host, api) {
     // (a drawing on the board can be any size: it's as big as it was drawn)
     for (const r of cards) { const v = +r.data.cork?.[key]?.s; if (v && Math.abs(v - 1) > 0.01) scales.set(r.id, isSketch(r) ? clamp(v, 0.15, 8) : clamp(v, 0.5, 3)); }
     const t = api.today(), sel = api.selected();
+    lookTextures();
     host.querySelector('.boardhead h2').textContent = api.titleOf(proj);
     framesEl.innerHTML = frames.map(r => frameHTML(r, I, sel)).join('');
-    cardsEl.innerHTML = bannerHTML(proj, sel) + cards.map(r => cardHTML(r, I, t, sel)).join('');
+    // (0.9.7) pictures already loaded go straight back in, so redrawing (a sync arriving just after the
+    // board opens, say) doesn't blank them for a moment
+    cardsEl.innerHTML = (bannerHTML(proj, sel) + cards.map(r => cardHTML(r, I, t, sel)).join(''))
+      .replace(/data-(thumb|docpv)="([^"]+)"/g, (m, k, id) => (picSrc.has(k + id) ? `${m} src="${picSrc.get(k + id)}"` : m));
     // Measure first (a card is the same size wherever it goes), then lay out.
     for (const el of cardsEl.querySelectorAll('.pbody')) if (el.scrollHeight > el.clientHeight + 2) el.classList.add('clip');
     for (const el of cardsEl.children) {
@@ -802,12 +812,12 @@ export function createBoard(host, api) {
     for (const el of framesEl.children) placeEl(el);
     for (const el of cardsEl.children) placeEl(el);
     placeMedia();
-    for (const img of cardsEl.querySelectorAll('img[data-thumb]')) api.store.fileUrl(img.dataset.thumb).then(u => { if (u) img.src = u; else img.remove(); });
+    for (const img of cardsEl.querySelectorAll('img[data-thumb]:not([src])')) api.store.fileUrl(img.dataset.thumb).then(u => { if (u) { picSrc.set('thumb' + img.dataset.thumb, u); img.src = u; } else img.remove(); });
     // (0.7.9) files with no picture of their own yet: made on this device (see app.js docPreviewUrl)
-    for (const img of cardsEl.querySelectorAll('img[data-docpv]')) {
+    for (const img of cardsEl.querySelectorAll('img[data-docpv]:not([src])')) {
       const cid = img.closest('[data-card]')?.dataset.card;
       const d = cid && cardBody(api.store.get(cid)?.data.body).docs.find(x => x.id === img.dataset.docpv);
-      if (d && api.docPreview) api.docPreview(d).then(u => { if (u) img.src = u; else img.remove(); }); else img.remove();
+      if (d && api.docPreview) api.docPreview(d).then(u => { if (u) { picSrc.set('docpv' + img.dataset.docpv, u); img.src = u; } else img.remove(); }); else img.remove();
     }
     const hasLinks = [...cards, ...frames].some(r => (r.data.links || []).length);
     const tieBtn = host.querySelector('[data-b=tie]');
