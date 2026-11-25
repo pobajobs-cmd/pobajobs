@@ -52,6 +52,7 @@
 //   0.9.6           (nothing new to show: a long Late list in the weekly review folds after 8; Iceberg is
 //                   offered per board, not for every board)
 //   0.9.7           (nothing new to show: realistic textures on several looks, pictures that don't flash)
+//   0.9.8           (nothing new to show: the iceberg is drawn like the meme's, growing with the tiers)
 
 import { clipDivHTML } from './media.js';
 import { drawDivHTML, drawingBox } from './draw.js';

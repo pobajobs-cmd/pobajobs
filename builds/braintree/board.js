@@ -3409,26 +3409,42 @@ export function createBoard(host, api) {
     bergWL = rs.length >= 2 ? (rs[0].y + rs[0].h + rs[1].y) / 2 : rs.length ? rs[0].y + rs[0].h + 40 : top + 200;
     cork.style.setProperty('--wl', Math.round(bergWL));
     if (!rs.length) { bergEl.innerHTML = `<path class="waterline" d="M-20000 ${f(bergWL)}H20000"/>`; return; }
-    // A rough outline round the tiers: down the right side, a ragged bottom, up the left, to a peak.
+    // (0.9.8) One iceberg like the meme's, sized by everything on the board, so it grows as tiers and
+    // cards are added: a small craggy peak above the water, and below it a far bigger mass that
+    // swells out to its widest about halfway down, then rounds off underneath. It always reaches
+    // past every tier's sides (plus a margin) at that depth.
     let seed = hash(key);
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-    const R = [], L = [], pad = 30;
-    for (const b of rs) {
-      R.push([b.x + b.w + pad + rnd() * 16, b.y + 6 + rnd() * 18], [b.x + b.w + pad + 10 + rnd() * 22, b.y + b.h * (0.35 + rnd() * 0.3)], [b.x + b.w + pad + rnd() * 16, b.y + b.h - rnd() * 10]);
-      L.push([b.x - pad - rnd() * 16, b.y + 6 + rnd() * 18], [b.x - pad - 10 - rnd() * 22, b.y + b.h * (0.35 + rnd() * 0.3)], [b.x - pad - rnd() * 16, b.y + b.h - rnd() * 10]);
+    const t0 = rs[0], last = rs[rs.length - 1];
+    const cx = rs.reduce((a, b) => a + b.x + b.w / 2, 0) / rs.length;
+    const need = y => Math.max(0, ...rs.filter(b => y >= b.y - 30 && y <= b.y + b.h + 30).map(b => Math.max(cx - b.x, b.x + b.w - cx) + 50));
+    const wide = Math.max(...rs.map(b => Math.max(cx - b.x, b.x + b.w - cx))) + 110;
+    const topW = Math.max(t0.w / 2 + 40, 120), bot = last.y + last.h + 90 + rs.length * 12, H = Math.max(200, bot - bergWL);
+    const half = t => (t < 0.5 ? topW + (wide - topW) * Math.sin(t / 0.5 * Math.PI / 2) : wide * (1 - Math.pow((t - 0.5) / 0.5, 2.2) * 0.72));
+    const N = 26, R = [], L = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, y = bergWL + t * H, h = Math.max(half(t), need(y)), j = () => (rnd() - 0.5) * 22;
+      R.push([cx + h + j(), y]); L.push([cx - h + j(), y]);
     }
-    const t0 = rs[0], last = rs[rs.length - 1], by = last.y + last.h + 40;
-    const peak = [[t0.x + t0.w * (0.3 + rnd() * 0.1), t0.y - 40 - rnd() * 20], [t0.x + t0.w * (0.5 + rnd() * 0.1), t0.y - 95 - rnd() * 25], [t0.x + t0.w * (0.75 + rnd() * 0.1), t0.y - 35 - rnd() * 20]];
-    const foot = [[last.x + last.w * 0.8, by + 30 + rnd() * 40], [last.x + last.w * 0.55, by + 80 + rnd() * 50], [last.x + last.w * 0.3, by + 50 + rnd() * 40], [last.x + last.w * 0.1, by + 10 + rnd() * 30]];
-    const pts = [...peak, ...R, ...foot, ...L.reverse()];
-    const d = 'M' + pts.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + 'Z';
+    // the rounded underside, and the peak (to a point above the first tier, with a shoulder or two)
+    const bottom = [[cx + wide * 0.18, bergWL + H + 40], [cx - wide * 0.12, bergWL + H + 55]];
+    const pk = Math.min(t0.y - 90, bergWL - 160), tw = topW;
+    const peak = [[cx - tw, bergWL], [cx - tw * 0.6, bergWL - (bergWL - pk) * 0.45], [cx - tw * 0.35, bergWL - (bergWL - pk) * 0.5], [cx - tw * 0.1, pk + 12], [cx + tw * 0.08, pk], [cx + tw * 0.3, pk + (bergWL - pk) * 0.3], [cx + tw * 0.55, bergWL - (bergWL - pk) * 0.42], [cx + tw * 0.8, bergWL - (bergWL - pk) * 0.2], [cx + tw, bergWL]];
+    const pts = [...peak, ...R.slice(1), ...bottom, ...L.slice(1).reverse()];
+    // (smoothed through midpoints, so the sides are rounded rather than straight segments)
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    let d = `M${f(mid(pts[pts.length - 1], pts[0])[0])} ${f(mid(pts[pts.length - 1], pts[0])[1])}`;
+    for (let i = 0; i < pts.length; i++) { const p = pts[i], m = mid(p, pts[(i + 1) % pts.length]); d += `Q${f(p[0])} ${f(p[1])} ${f(m[0])} ${f(m[1])}`; }
+    d += 'Z';
     const xs = pts.map(p => p[0]), X0 = Math.min(...xs) - 60, X1 = Math.max(...xs) + 60, Y0 = Math.min(...pts.map(p => p[1])) - 60, Y1 = Math.max(...pts.map(p => p[1])) + 60;
+    // the lines between the tiers, right across the water (like the meme's bands)
+    const tierLines = rs.slice(1).map((b, i) => (b.y + rs[i].y + rs[i].h) / 2).filter(y => y > bergWL + 20).map(y => `<path class="tierline" d="M${f(X0 - 20000)} ${f(y)}H${f(X1 + 20000)}"/>`).join('');
     // (how deep each tier is, beside it)
     const marks = tierOrder().map(r => rectOf(r.id)).filter(Boolean).map((b, i) => `<text class="depth${b.y + 30 < bergWL ? ' up' : ''}" x="${f(X0 - 10)}" y="${f(b.y + 30)}" text-anchor="end">${DEPTHS[Math.min(i, DEPTHS.length - 1)]}</text>`).join('');
     bergEl.innerHTML = `<defs><clipPath id="bt-berg-up"><rect x="${f(X0)}" y="${f(Y0)}" width="${f(X1 - X0)}" height="${f(Math.max(0, bergWL - Y0))}"/></clipPath>
       <clipPath id="bt-berg-down"><rect x="${f(X0)}" y="${f(bergWL)}" width="${f(X1 - X0)}" height="${f(Math.max(0, Y1 - bergWL))}"/></clipPath></defs>
       <path class="ice under" d="${d}" clip-path="url(#bt-berg-down)"/><path class="ice over" d="${d}" clip-path="url(#bt-berg-up)"/>
-      <path class="waterline" d="M${f(X0 - 20000)} ${f(bergWL)}H${f(X1 + 20000)}"/>${marks}`;
+      ${tierLines}<path class="waterline" d="M${f(X0 - 20000)} ${f(bergWL)}H${f(X1 + 20000)}"/>${marks}`;
   }
   // The tiers stacked from the tip down, each at least as wide as the one above; their cards in rows.
   async function arrangeIceberg() {

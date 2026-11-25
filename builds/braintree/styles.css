@@ -2038,3 +2038,4 @@ body[data-view="timeline"][data-drawer] .closer { display: grid !important; }
 :root[data-look="iceberg"] .cork::before { content: ""; position: absolute; left: -800px; right: -800px; bottom: -800px; top: calc(var(--by, 0px) + var(--wl, 0) * var(--bz, 1) * 1px);
   --tile: calc(384px * var(--bz, 1)); background-image: var(--tex-caustic, none); background-size: var(--tile) var(--tile); background-position: calc(var(--bx, 0px) + 800px) calc(var(--wl, 0) * var(--bz, 1) * -1px + var(--by, 0px) * 0);
   opacity: 0.24; }
+.berg .tierline { stroke: rgba(255, 255, 255, 0.22); stroke-width: 2; stroke-dasharray: 3 9; fill: none; }   /* (0.9.8) the bands between tiers */
