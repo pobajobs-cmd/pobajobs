@@ -301,6 +301,14 @@ The user said to build all of the proposed theme packs and fixes ("Go for all yo
 - The weekly review's Late list shows the first 8, then "Show N more".
 - Settings → Boards no longer offers Iceberg as everyone's look (it drew an iceberg round ordinary sections); it's for iceberg charts' own boards (hold a project → Board look). Still shown there if it's already picked.
 
+## 0.9.7 Realistic backgrounds, no flashing pictures, the Iceberg theme's icebergs back
+
+- **Flicker**: a board drew all its cards twice on opening when a sync (or any change) arrived just after, and each redraw blanked every photo and file picture while it loaded again. board.js keeps the addresses of pictures already loaded (`picSrc`) and writes them straight into the redrawn cards, so nothing flashes.
+- **Textures** (new `textures.js`): seamless tiles drawn on the device once, like the corkboard's: a bed of moss (Woodland), caustic light (Ocean, and under the Iceberg's water), dark wooden planks (Café), hardboard with shaded holes (Workshop), newsprint grain, lying snow (Frost) and a faint nebula (Space). Periodic value noise and a wrapped, domain-warped cell pattern, so the tiles have no seams; all pinned to the board and scaled with it. 13 to 100 ms each on a PC.
+- Ocean's water is a deeper, bluer gradient with the caustics drifting; Woodland's falling leaves only show while backgrounds move (still, they read as a pattern).
+- The Iceberg theme's boards are icebergs again, and Iceberg is back in Settings → Boards, as the user asked.
+- Tested headless: before/after textures on the CNC test board, the iceberg chart, a forced redraw keeping every picture.
+
 ## Free tier
 
 Each item is a small JSON row. Photos are shrunk to at most 2000 px JPEG (usually 150–500 KB) and stored in D1. The free D1 database holds 500 MB, so roughly a thousand or more photos. Settings in the app shows how much is stored. If photos ever outgrow that, they can move to R2 (Cloudflare file storage, 10 GB free).
